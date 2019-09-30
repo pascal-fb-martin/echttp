@@ -20,11 +20,11 @@ typedef const char *echttp_callback (const char *method, const char *uri,
 ```
 The profile for any HTTP request processing function.
 ```
-int echttp_route_uri (const char *uri, ehttp_callback *call);
+int echttp_route_uri (const char *uri, echttp_callback *call);
 ```
 Define a route for processing the exact specified URI.
 ```
-int echttp_route_match (const char *root, ehttp_callback *call);
+int echttp_route_match (const char *root, echttp_callback *call);
 ```
 Defines a route for a parent URI and all its children.
 ```
@@ -32,28 +32,28 @@ int echttp_route_static (const char *uri, const char *path);
 ```
 Associate a parent URI with a local directory path: a child of the specified URI must match an existing file at the specified path.
 ```
-const char *ehttp_attribute_get (const char *name); 
+const char *echttp_attribute_get (const char *name); 
 ```
 Retrieve the value of the specified HTTP attribute, or 0 if not found. This function should be called from within an HTTP callback, while processing an HTTP request.
 ```
-const char *ehttp_parameter_get  (const char *name);
+const char *echttp_parameter_get  (const char *name);
 ```
 Retrieve the value of the specified HTTP parameter, or 0 if not found. This function should be called from within an HTTP callback, while processing an HTTP request.
 ```
-void ehttp_attribute_set (const char *name, const char *value);
+void echttp_attribute_set (const char *name, const char *value);
 ```
 Set an attribute for the HTTP response. This function should be called from within an HTTP callback, while processing an HTTP request.
 ```
-void ehttp_error (int code, const char *message);
+void echttp_error (int code, const char *message);
 ```
 The HTTP response will return the specified error instead of OK.
 ```
-void ehttp_redirect (const char *url);
+void echttp_redirect (const char *url);
 ```
 The HTTP response will return a redirect to the specified URL.
 ```
-typedef void *ehttp_listener (int fd, int mode);
-void ehttp_listen (int fd, int mode, ehttp_listener *listener);
+typedef void *echttp_listener (int fd, int mode);
+void echttp_listen (int fd, int mode, echttp_listener *listener);
 ```
 Listen to the specified file descriptor (mode=0: don't listen, mode=1: read only, mode=2: write only, mode=3: read & write).
 
