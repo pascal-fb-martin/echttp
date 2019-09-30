@@ -1,0 +1,340 @@
+/* echttp - Embedded HTTP server.
+ * A minimal HTTP server library designed for simplicity and embedding in
+ * existing applications.
+ *
+ * echttp_raw.c -- a socket management, protocol-independent layer.
+ *
+ * typedef int echttp_raw_callback (int client, char *data, int length);
+ * int echttp_raw_open (const char *service, int debug);
+ *
+ * int echttp_raw_send (int client, const char *data, int length, int hangup);
+ *
+ * void echttp_raw_loop (echttp_raw_callback *received);
+ *
+ * void echttp_raw_close (void);
+ */
+
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <time.h>
+#include <sys/select.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include "echttp.h"
+#include "echttp_raw.h"
+
+#define ETH_MAX_FRAME 1500
+
+static int echttp_raw_server = -1;
+static int echttp_raw_debug = 0;
+
+
+#define EHTTP_CLIENT_BUFFER 102400
+typedef struct {
+    char data[EHTTP_CLIENT_BUFFER];
+    int start;
+    int end;
+} echttp_buffer;
+
+#define EHTTP_CLIENT_MAX 16
+static struct {
+    int socket;
+    int hangup;
+    time_t deadline;
+    echttp_buffer in;
+    echttp_buffer out;
+} echttp_raw_client[EHTTP_CLIENT_MAX];
+
+
+static void echttp_raw_cleanup (int i) {
+   echttp_raw_client[i].socket = -1;
+   echttp_raw_client[i].in.start = 0;
+   echttp_raw_client[i].in.end = 0;
+   echttp_raw_client[i].out.start = 0;
+   echttp_raw_client[i].out.end = 0;
+   echttp_raw_client[i].deadline = 0;
+   echttp_raw_client[i].hangup = 0;
+}
+
+static const char *echttp_printip (long ip) {
+    static char ascii[16];
+
+    snprintf (ascii, sizeof(ascii), "%d.%d.%d.%d",
+              (ip>>24) & 0xff, (ip>>16) & 0xff, (ip>>8) & 0xff, ip & 0xff);
+    return ascii;
+}
+
+static void echttp_raw_accept (void) {
+   int i;
+   struct sockaddr_in peer;
+   socklen_t peerlength = sizeof(peer);
+
+   int client = accept(echttp_raw_server,
+                       (struct sockaddr *)(&peer), &peerlength);
+   if (client < 0) {
+       fprintf (stderr, "cannot accept new client: %s\n", strerror(errno));
+       return;
+   }
+
+   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+       if (echttp_raw_client[i].socket < 0) {
+           if (echttp_raw_debug) {
+               printf ("Accepting client %d from %s:%d\n", i,
+                       echttp_printip(ntohl((long)(peer.sin_addr.s_addr))),
+                       peer.sin_port);
+           }
+           echttp_raw_cleanup(i);
+           echttp_raw_client[i].socket = client;
+           return;
+       }
+   }
+
+   fprintf (stderr, "Too many client, reject this new one.\n");
+   close (client);
+}
+
+int echttp_raw_open (const char *service, int debug) {
+
+   int i;
+
+   struct sockaddr_in netaddress;
+   int port = -1;
+
+   echttp_raw_debug = debug;
+
+   struct servent *entry = getservbyname(service, "tcp");
+   if (entry == NULL) {
+       if (isdigit (service[0])) {
+          port = atoi(service);
+       }
+   } else {
+       port = ntohs(entry->s_port);
+   }
+
+   if (port <= 0) {
+       fprintf (stderr, "invalid service name %s\n", service);
+       return 0;
+   }
+
+   if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
+
+   echttp_raw_server = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+   if (echttp_raw_server < 0) {
+       fprintf (stderr, "cannot open socket for service %s: %s\n",
+                service, strerror(errno));
+       return 0;
+   }
+
+   memset(&netaddress, 0, sizeof(netaddress));
+   netaddress.sin_family = AF_INET;
+   netaddress.sin_addr.s_addr = INADDR_ANY;
+   netaddress.sin_port = htons(port);
+
+   if (bind(echttp_raw_server,
+            (struct sockaddr *)&netaddress, sizeof(netaddress)) < 0) {
+       fprintf (stderr, "cannot bind to service %s: %s\n",
+                service, strerror(errno));
+       return 0;
+   }
+
+   if (listen (echttp_raw_server, 4) < 0) {
+       fprintf (stderr, "listen to service %s failed: %s\n",
+                service, strerror(errno));
+       return 0;
+   }
+
+   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+       echttp_raw_client[i].socket = -1;
+   }
+   return 1;
+}
+
+static void echttp_raw_close_client (int i, const char *reason) {
+    if (echttp_raw_client[i].socket >= 0) {
+        if (echttp_raw_debug) printf ("closing client %d: %s\n", i, reason);
+        close (echttp_raw_client[i].socket);
+        echttp_raw_cleanup(i);
+    }
+}
+
+static int echttp_raw_consume (echttp_buffer *buffer, int length) {
+   buffer->start += length;
+   if (buffer->start >= buffer->end) {
+       buffer->start = buffer->end = 0;
+   }
+   return buffer->start == 0;
+}
+
+static void echttp_raw_transmit (int i) {
+
+   echttp_buffer *buffer = &(echttp_raw_client[i].out);
+
+   ssize_t length = buffer->end - buffer->start;
+   if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
+
+   length = send (echttp_raw_client[i].socket,
+                  buffer->data + buffer->start, (size_t)length, 0);
+   if (length <= 0) {
+       echttp_raw_close_client (i, strerror(errno));
+       return;
+   }
+   if (echttp_raw_debug) {
+       printf ("Transmit data at %d: %*.*s\n",
+               buffer->start, 0-length, length, buffer->data + buffer->start);
+   }
+   if (echttp_raw_consume (buffer, length)) {
+       echttp_raw_client[i].deadline = time(NULL) + 10;
+   }
+}
+
+static int echttp_split (char *data, const char *sep, char **items, int max) {
+    int count = 0;
+    int length = strlen(sep);
+    char *start = data;
+
+    while (*data) {
+       if (strncmp(sep, data, length) == 0) {
+           *data = 0;
+           items[count++] = start;
+           data += length;
+           start = data;
+       } else {
+           data += 1;
+       }
+    }
+    if (data > start) items[count++] = start;
+    return count;
+}
+
+static void echttp_raw_receive (int i, echttp_raw_callback received) {
+
+   echttp_buffer *buffer = &(echttp_raw_client[i].in);
+
+   ssize_t length = sizeof(buffer->data) - buffer->end - 1;
+   if (length <= 0) {
+       echttp_raw_close_client (i, "data too large");
+       return;
+   }
+   length = recv (echttp_raw_client[i].socket,
+                  buffer->data + buffer->end, (size_t)length-1, 0);
+   if (length <= 0) {
+       echttp_raw_close_client (i, strerror(errno));
+       return;
+   }
+   buffer->end += length;
+   buffer->data[buffer->end] = 0;
+
+   if (echttp_raw_debug) {
+       printf ("Data (client %d) = %s\n", i, buffer->data);
+       fflush (stdout);
+   }
+   if (received) {
+       length =
+           received (i, buffer->data+buffer->start, buffer->end-buffer->start);
+       if (length > 0) echttp_raw_consume (buffer, length);
+   }
+}
+
+static int echttp_raw_invalid (int client) {
+   if ((client < 0) || (client >= EHTTP_CLIENT_MAX)) {
+       fprintf (stderr, "Invalid client number %d (out of range)\n", client);
+       return 1;
+   }
+   if (echttp_raw_client[client].socket < 0) {
+       fprintf (stderr, "Invalid client number %d (closed)\n", client);
+       return 1;
+   }
+   return 0;
+}
+
+void echttp_raw_send (int client, const char *data, int length, int hangup) {
+   echttp_buffer *buffer = &(echttp_raw_client[client].out);
+   if (echttp_raw_invalid(client)) return;
+   if (length > sizeof(buffer->data) - buffer->end) {
+       echttp_raw_close_client (client, "Transmit data is too large");
+       return;
+   }
+   memcpy (buffer->data+buffer->end, data, length);
+   buffer->end += length;
+   echttp_raw_client[client].hangup |= hangup;
+}
+
+void echttp_raw_loop (echttp_raw_callback *received) {
+
+   struct timeval timeout;
+   fd_set readset;
+   fd_set writeset;
+   int i;
+   int count;
+   int maxfd;
+
+   while (echttp_raw_server >= 0) {
+      FD_ZERO(&readset);
+      FD_ZERO(&writeset);
+      FD_SET(echttp_raw_server, &readset);
+      maxfd = echttp_raw_server;
+
+      for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+          int socket = echttp_raw_client[i].socket;
+          if (socket >= 0) {
+              if (echttp_raw_client[i].out.end > 0) {
+                  FD_SET(socket, &writeset);
+              } else {
+                  // Receive only after the previous response has been sent.
+                  FD_SET(socket, &readset);
+              }
+              if (socket > maxfd) maxfd = socket;
+          }
+      }
+
+      timeout.tv_sec = 1;
+      timeout.tv_usec = 0;
+      count = select(maxfd+1, &readset, &writeset, NULL, &timeout);
+
+      if (count > 0) {
+          if (FD_ISSET(echttp_raw_server, &readset)) {
+              echttp_raw_accept();
+          }
+
+          for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+             int socket = echttp_raw_client[i].socket;
+             if (socket >= 0) {
+                 if (FD_ISSET(socket, &writeset)) {
+                     echttp_raw_transmit (i);
+                 }
+                 if (FD_ISSET(socket, &readset)) {
+                     echttp_raw_receive (i, received);
+                 }
+             }
+          }
+      }
+
+      time_t now = time(NULL);
+      for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+          if (echttp_raw_client[i].deadline == 0) continue;
+          if (now > echttp_raw_client[i].deadline) {
+              echttp_raw_close_client (i, "deadline reached");
+          }
+      }
+   }
+}
+
+void echttp_raw_close (void) {
+   int i;
+   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+      if (echttp_raw_client[i].socket >= 0) {
+          echttp_raw_close_client (i, "closing server");
+      }
+   }
+   close(echttp_raw_server);
+   echttp_raw_server = -1;
+}
+
