@@ -14,6 +14,10 @@ int echttp_open (int argc, const char **argv);
 ```
 Initialize the HTTP server. The HTTP-specific arguments are removed from the argument list and the count of remaining arguments is returned.
 
+The arguments consumed by echttp_open are:
+-http-port=_port_ (Port number or service name to listen to; default is "http", i.e. port 80.)
+-http-debug (If present, expect to see a lot of debug traces.)
+
 ```
 typedef const char *echttp_callback (const char *method, const char *uri,
                                      const char *data, int length);
