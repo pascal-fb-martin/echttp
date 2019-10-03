@@ -50,7 +50,7 @@ const char *http_echo (const char *method, const char *uri,
     static char buffer[1024];
     echttp_attribute_set ("Content-Type", "text/html");
     snprintf (buffer, sizeof(buffer),
-              "<e>You called <b>%s</b></e> with %s",
+              "<e>You called <b>%s</b></e> with what = %s",
               uri, echttp_parameter_get("what"));
     return buffer;
 }

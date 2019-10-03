@@ -95,6 +95,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "echttp.h"
 #include "echttp_raw.h"
@@ -295,6 +296,14 @@ static void echttp_unknown (int client) {
     echttp_raw_send (client, unknown, sizeof(unknown)-1, 1);
 }
 
+static void echttp_invalid (int client) {
+    static const char invalid[] =
+        "HTTP/1.1 406 Not Acceptable\r\n"
+        "Content-Length: 0\r\n"
+        "Connection: Closed\r\n\r\n";
+    echttp_raw_send (client, invalid, sizeof(invalid)-1, 1);
+}
+
 static int echttp_search (const char *uri, int mode) {
    int i;
    int index = echttp_hash (uri);
@@ -304,6 +313,29 @@ static int echttp_search (const char *uri, int mode) {
            strcmp (echttp_routing.item[i].uri, uri) == 0) return i;
    }
    return -1;
+}
+
+static int echttp_hextoi (char a) {
+    if (isdigit(a)) return a - '0';
+    return 10 + 'a' - tolower(a);
+}
+
+static char *echttp_unescape (char *data) {
+    char *f = data;
+    char *t = data;
+    while (*f) {
+        if (*f == '%') {
+            if ((!isxdigit(f[1])) || (!isxdigit(f[2]))) return 0;
+            *t = 16 * echttp_hextoi(f[1]) + echttp_hextoi(f[2]);
+            f += 2;
+        } else if (t != f) {
+            *t = *f;
+        }
+        t += 1;
+        f += 1;
+    }
+    *t = 0; // Force a terminator.
+    return data;
 }
 
 static int echttp_received (int client, char *data, int length) {
@@ -361,11 +393,15 @@ static int echttp_received (int client, char *data, int length) {
        char *request[4];
        int wordcount = echttp_split (line[0], " ", request, 4);
        if (wordcount != 3) {
-           echttp_unknown (client);
+           echttp_invalid (client);
            return length; // Consume everything, since we are closing.
        }
-       context->method = request[0];
-       context->uri = request[1];
+       context->method = echttp_unescape(request[0]);
+       context->uri = echttp_unescape(request[1]);
+       if (context->method == 0 || context->uri == 0) {
+           echttp_invalid (client);
+           return length; // Consume everything, since we are closing.
+       }
 
        echttp_symbol_reset(&(context->params));
        wordcount = echttp_split (context->uri, "?", request, 4);
@@ -457,7 +493,7 @@ int echttp_open (int argc, const char **argv) {
        }
        shift += 1;
    }
-   echttp_raw_open (service, echttp_debug);
+   if (! echttp_raw_open (service, echttp_debug)) return -1;
    return shift;
 }
 
