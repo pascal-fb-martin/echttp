@@ -562,7 +562,7 @@ void echttp_redirect (const char *url) {
     echttp_attribute_set ("Location", url);
 }
 
-void echttp_listen (int fd, int mode, echttp_listener *listener) {
-    // TBD.
+void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {
+    echttp_raw_register (fd, mode, listener, premium);
 }
  

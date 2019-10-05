@@ -55,6 +55,11 @@ const char *http_echo (const char *method, const char *uri,
     return buffer;
 }
 
+static void http_console (int fd, int mode) {
+    char buffer[1024];
+    printf ("Console: %s\n", fgets(buffer, sizeof(buffer), stdin));
+}
+
 int main (int argc, const char **argv) {
     int i;
     argc = echttp_open (argc, argv);
@@ -67,6 +72,8 @@ int main (int argc, const char **argv) {
     echttp_route_uri ("/welcome", http_welcome);
     echttp_route_uri ("/whoami", http_whoami);
     echttp_route_match ("/echo", http_echo);
+
+    echttp_listen (0, 1, http_console, 1);
 
     echttp_loop();
     echttp_close();

@@ -56,21 +56,33 @@ static int echttp_raw_server = -1;
 static int echttp_raw_debug = 0;
 
 
-#define EHTTP_CLIENT_BUFFER 102400
+#define ECHTTP_RAW_MAXREGISTERED  256
 typedef struct {
-    char data[EHTTP_CLIENT_BUFFER];
+    int mode;
+    int fd;
+    echttp_listener *listener;
+} echttp_raw_registration;
+
+static echttp_raw_registration echttp_raw_other[ECHTTP_RAW_MAXREGISTERED];
+static int echttp_raw_other_count = 0;
+static int echttp_raw_premium = -1;
+
+
+#define ECHTTP_CLIENT_BUFFER 102400
+typedef struct {
+    char data[ECHTTP_CLIENT_BUFFER];
     int start;
     int end;
 } echttp_buffer;
 
-#define EHTTP_CLIENT_MAX 16
+#define ECHTTP_CLIENT_MAX 16
 static struct {
     int socket;
     int hangup;
     time_t deadline;
     echttp_buffer in;
     echttp_buffer out;
-} echttp_raw_client[EHTTP_CLIENT_MAX];
+} echttp_raw_client[ECHTTP_CLIENT_MAX];
 
 
 static void echttp_raw_cleanup (int i) {
@@ -103,7 +115,7 @@ static void echttp_raw_accept (void) {
        return;
    }
 
-   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+   for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
        if (echttp_raw_client[i].socket < 0) {
            if (echttp_raw_debug) {
                printf ("Accepting client %d from %s:%d\n", i,
@@ -170,7 +182,7 @@ int echttp_raw_open (const char *service, int debug) {
        return 0;
    }
 
-   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+   for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
        echttp_raw_client[i].socket = -1;
    }
    return 1;
@@ -263,7 +275,7 @@ static void echttp_raw_receive (int i, echttp_raw_callback received) {
 }
 
 static int echttp_raw_invalid (int client) {
-   if ((client < 0) || (client >= EHTTP_CLIENT_MAX)) {
+   if ((client < 0) || (client >= ECHTTP_CLIENT_MAX)) {
        fprintf (stderr, "Invalid client number %d (out of range)\n", client);
        return 1;
    }
@@ -301,7 +313,7 @@ void echttp_raw_loop (echttp_raw_callback *received) {
       FD_SET(echttp_raw_server, &readset);
       maxfd = echttp_raw_server;
 
-      for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+      for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
           int socket = echttp_raw_client[i].socket;
           if (socket >= 0) {
               if (echttp_raw_client[i].out.end > 0) {
@@ -314,16 +326,36 @@ void echttp_raw_loop (echttp_raw_callback *received) {
           }
       }
 
+      for (i = 0; i < echttp_raw_other_count; ++i) {
+          if (echttp_raw_other[i].mode & 1) {
+              FD_SET(echttp_raw_other[i].fd, &readset);
+          }
+          if (echttp_raw_other[i].mode & 2) {
+              FD_SET(echttp_raw_other[i].fd, &writeset);
+          }
+      }
+
       timeout.tv_sec = 1;
       timeout.tv_usec = 0;
       count = select(maxfd+1, &readset, &writeset, NULL, &timeout);
 
       if (count > 0) {
+          if (echttp_raw_premium >= 0) {
+              if (echttp_raw_other[echttp_raw_premium].mode == 0) continue;
+              int fd = echttp_raw_other[echttp_raw_premium].fd;
+              int mode = 0;
+              if (FD_ISSET(fd, &readset)) mode |= 1;
+              if (FD_ISSET(fd, &writeset)) mode |= 2;
+              if (mode) {
+                  echttp_raw_other[echttp_raw_premium].listener (fd, mode);
+              }
+          }
+
           if (FD_ISSET(echttp_raw_server, &readset)) {
               echttp_raw_accept();
           }
 
-          for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+          for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
              int socket = echttp_raw_client[i].socket;
              if (socket >= 0) {
                  if (FD_ISSET(socket, &writeset)) {
@@ -334,10 +366,21 @@ void echttp_raw_loop (echttp_raw_callback *received) {
                  }
              }
           }
+          for (i = 0; i < echttp_raw_other_count; ++i) {
+              if (echttp_raw_other[i].mode == 0) continue;
+              if (i == echttp_raw_premium) continue; // Don't call it twice.
+              int fd = echttp_raw_other[i].fd;
+              int mode = 0;
+              if (FD_ISSET(fd, &readset)) mode |= 1;
+              if (FD_ISSET(fd, &writeset)) mode |= 2;
+              if (mode) {
+                  echttp_raw_other[i].listener (fd, mode);
+              }
+          }
       }
 
       time_t now = time(NULL);
-      for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+      for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
           if (echttp_raw_client[i].deadline == 0) continue;
           if (now > echttp_raw_client[i].deadline) {
               echttp_raw_close_client (i, "deadline reached");
@@ -346,9 +389,40 @@ void echttp_raw_loop (echttp_raw_callback *received) {
    }
 }
 
+void echttp_raw_register (int fd, int mode,
+                          echttp_listener *listener, int premium) {
+    int i;
+    if (listener == 0) mode = 0; // Ignore when no listener.
+    for (i = 0; i < echttp_raw_other_count; ++i) {
+        if (echttp_raw_other[i].fd == fd) {
+            echttp_raw_other[i].mode = mode;
+            if (mode) {
+                echttp_raw_other[i].listener = listener;
+                if (premium) echttp_raw_premium = i;
+                else if (i == echttp_raw_premium) echttp_raw_premium = -1;
+            } else {
+                if (i == echttp_raw_other_count-1) echttp_raw_other_count -= 1;
+                if (i == echttp_raw_premium) echttp_raw_premium = -1;
+            }
+            return;
+        }
+    }
+    if (mode == 0) return;
+
+    if (echttp_raw_other_count >= ECHTTP_RAW_MAXREGISTERED) {
+        fprintf (stderr, __FILE__ ": too many listeners\n");
+        return;
+    }
+    echttp_raw_other[echttp_raw_other_count].mode = mode;
+    echttp_raw_other[echttp_raw_other_count].listener = listener;
+    echttp_raw_other[echttp_raw_other_count].fd = fd;
+    if (premium) echttp_raw_premium = echttp_raw_other_count;
+    echttp_raw_other_count += 1;
+}
+
 void echttp_raw_close (void) {
    int i;
-   for (i = 0; i < EHTTP_CLIENT_MAX; ++i) {
+   for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
       if (echttp_raw_client[i].socket >= 0) {
           echttp_raw_close_client (i, "closing server");
       }

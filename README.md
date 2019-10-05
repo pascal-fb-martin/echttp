@@ -53,11 +53,13 @@ void echttp_redirect (const char *url);
 The HTTP response will return a redirect to the specified URL.
 ```
 typedef void *echttp_listener (int fd, int mode);
-void echttp_listen (int fd, int mode, echttp_listener *listener);
+void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 ```
 Listen to the specified file descriptor (mode=0: don't listen, mode=1: read only, mode=2: write only, mode=3: read & write).
 
 When the specified file descriptor is ready, the listener is called with the mode corresponding to the event.
+
+The premium option, if used, causes this file descriptor to be processed before any HTTP client and other listener. There can be only one listener marked as premium at a time: any new premium listener causes any previous premium listener to be downgraded. The premium option is meant for a high priority I/O.
 ```
 echttp_close (void);
 ```

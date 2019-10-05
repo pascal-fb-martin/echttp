@@ -8,6 +8,9 @@
  * (i.e. no other HTTP request is processed until the callback returns).
  */
 
+#ifndef ECHTTP_H__INCLUDED
+#define ECHTTP_H__INCLUDED
+
 /*
  * The open function understands the following options:
  * -http=N: port number or name to be used by the server.
@@ -29,8 +32,10 @@ void echttp_attribute_set (const char *name, const char *value);
 void echttp_error         (int code, const char *message);
 void echttp_redirect      (const char *url);
 
-typedef void *echttp_listener (int fd, int mode);
-void echttp_listen (int fd, int mode, echttp_listener *listener);
+typedef void echttp_listener (int fd, int mode);
+void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
  
 void echttp_loop (void);
+
+#endif
 
