@@ -1,7 +1,7 @@
 
 OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o
 
-all: httpserver
+all: libechttp.a
 
 install:
 	mkdir -p /usr/local/lib
@@ -14,7 +14,7 @@ install:
 	chmod 644 /usr/local/include/echttp.h
 
 clean:
-	rm -f *.o *.a httpserver
+	rm -f *.o *.a
 
 %.o: %.c
 	gcc -c -g -O -fPIC -o $@ $<
@@ -22,7 +22,4 @@ clean:
 libechttp.a: $(OBJS)
 	ar ru $@ $^
 	ranlib $@
-
-httpserver: httpserver.o libechttp.a
-	gcc -g -O -o httpserver httpserver.o -L. -lechttp
 
