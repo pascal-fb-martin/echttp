@@ -79,6 +79,12 @@ const char *echttp_static_page (const char *action,
     char filename[1024];
     char *sep;
 
+    if (strstr(uri, "../")) {
+        if (echttp_isdebug()) printf ("Security violation: %s\n", uri);
+        echttp_error (406, "Not Acceptable");
+        return "";
+    }
+
     strncpy (rooturi, uri, sizeof(rooturi)); // Make a writable copy.
     rooturi[sizeof(rooturi)-1] = 0;
 

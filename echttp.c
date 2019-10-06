@@ -280,7 +280,7 @@ static int echttp_route_search (const char *uri, int mode) {
 
 static int echttp_hextoi (char a) {
     if (isdigit(a)) return a - '0';
-    return 10 + 'a' - tolower(a);
+    return tolower(a) - 'a' + 10;
 }
 
 static char *echttp_unescape (char *data) {
