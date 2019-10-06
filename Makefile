@@ -1,5 +1,5 @@
 
-OBJS= echttp_static.o echttp.o echttp_raw.o
+OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o
 
 all: httpserver
 

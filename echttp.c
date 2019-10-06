@@ -98,25 +98,12 @@
 #include <ctype.h>
 
 #include "echttp.h"
+#include "echttp_catalog.h"
 #include "echttp_raw.h"
 #include "echttp_static.h"
 
 static int echttp_debug = 0;
 
-
-typedef struct {
-    const char *name;
-    const char *value;
-    int next;
-} echttp_symbol;
-
-#define ECHTTP_HASH 127
-#define ECHTTP_MAX_PARAMETER 256
-
-typedef struct {
-    int index[ECHTTP_HASH];
-    echttp_symbol item[ECHTTP_MAX_PARAMETER];
-} echttp_dictionary;
 
 #define ECHTTP_STATE_IDLE    0
 #define ECHTTP_STATE_CONTENT 1
@@ -127,16 +114,16 @@ typedef struct {
     char *method;
     char *uri;
     char *content;
-    echttp_dictionary in;
-    echttp_dictionary out;
-    echttp_dictionary params;
+    echttp_catalog in;
+    echttp_catalog out;
+    echttp_catalog params;
 
     int status;
     const char *reason;
 } echttp_request;
 
 static echttp_request *echttp_context = 0;
-static int            echttp_context_count = 0;
+static int             echttp_context_count = 0;
 static echttp_request *echttp_current = 0;
 
 #define ECHTTP_MODE_EXACT   1
@@ -144,14 +131,15 @@ static echttp_request *echttp_current = 0;
 
 typedef struct {
     const char *uri;
-    const char *path;
     echttp_callback *call;
+    unsigned int signature;
     int mode;
     int next;
 } echttp_route;
 
-#define ECHTTP_MAX_ROUTES 256
+#define ECHTTP_MAX_ROUTES 512
 static struct {
+    int count;
     int index[ECHTTP_HASH];
     echttp_route item[ECHTTP_MAX_ROUTES];
 } echttp_routing;
@@ -184,60 +172,6 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
     return count;
 }
 
-/* This hash function is derived from Daniel J. Bernstein's djb2 hash function.
- * It was made case independent because several HTTP entities are not case
- * sensitive.
- */
-static unsigned int echttp_hash (const char *name) {
-
-    unsigned int hash = 5381;
-    int c;
-
-    while (c = *name++)
-        hash = ((hash << 5) + hash) + tolower(c); /* hash * 33 + c */
-
-    return hash % ECHTTP_HASH;
-}
-
-static void echttp_symbol_reset (echttp_dictionary *table) {
-    int i;
-    for (i = 1; i < ECHTTP_MAX_PARAMETER; ++i) {
-        table->item[i].name = table->item[i].value = 0;
-        table->item[i].next = 0;
-    }
-    for (i = 1; i < ECHTTP_HASH; ++i) {
-        table->index[i] = 0;
-    }
-}
-
-static void echttp_symbol_add (echttp_dictionary *table,
-                               const char *name, const char *value) {
-
-    int i;
-    int index = echttp_hash (name);
-
-    for (i = 1; i < ECHTTP_MAX_PARAMETER; ++i) {
-        if (table->item[i].name == 0) {
-            table->item[i].name = name;
-            table->item[i].value = value;
-            table->item[i].next = table->index[index];
-            table->index[index] = i;
-            return;
-        }
-    }
-    fprintf (stderr, "Too many parameters.\n");
-}
-
-static const char *echttp_symbol_get (echttp_dictionary *d, const char *name) {
-    int i;
-    int hash = echttp_hash(name);
-    for (i = d->index[hash]; i > 0; i = d->item[i].next) {
-        if (strcasecmp(name, d->item[i].name) == 0) {
-            return d->item[i].value;
-        }
-    }
-    return 0;
-}
 
 static void echttp_execute (int route, int client,
                            const char *action, const char *uri,
@@ -251,7 +185,7 @@ static void echttp_execute (int route, int client,
     echttp_current = &(echttp_context[client]);
     echttp_current->status = 200;
     echttp_current->reason = "OK";
-    echttp_symbol_reset(&(echttp_current->out));
+    echttp_catalog_reset(&(echttp_current->out));
 
     const char *connection = echttp_attribute_get ("Connection");
     keep = (connection && (strcmp(connection, "keep-alive") == 0));
@@ -275,7 +209,7 @@ static void echttp_execute (int route, int client,
         echttp_raw_send (client, buffer, strlen(buffer), 0);
     }
 
-    for (i = 1; i < ECHTTP_MAX_PARAMETER; ++i) {
+    for (i = 1; i <= echttp_current->out.count; ++i) {
         if (echttp_current->out.item[i].name == 0) continue;
         snprintf (buffer, sizeof(buffer)-1, "%s: %s\r\n",
                   echttp_current->out.item[i].name,
@@ -306,12 +240,38 @@ static void echttp_invalid (int client) {
     echttp_raw_send (client, invalid, sizeof(invalid)-1, 1);
 }
 
-static int echttp_search (const char *uri, int mode) {
-   int i;
-   int index = echttp_hash (uri);
+static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
 
-   for (i = echttp_routing.index[index]; i > 0; i = echttp_routing.item[i].next) {
-       if (echttp_routing.item[i].mode == mode &&
+    int i = echttp_routing.count + 1;
+    unsigned int signature = echttp_catalog_signature (uri);
+    int index = signature % ECHTTP_HASH;
+
+    if (i >= ECHTTP_MAX_ROUTES) {
+        fprintf (stderr, "Too many routes.\n");
+        return -1;
+    }
+    echttp_routing.item[i].uri = uri;
+    echttp_routing.item[i].call = call;
+    echttp_routing.item[i].mode = mode;
+    echttp_routing.item[i].signature = signature;
+    echttp_routing.item[i].next = echttp_routing.index[index];
+    echttp_routing.index[index] = i;
+    echttp_routing.count = i;
+    return i;
+}
+
+static int echttp_route_search (const char *uri, int mode) {
+   int i;
+   unsigned int signature = echttp_catalog_signature (uri);
+   int index = signature % ECHTTP_HASH;
+
+   if (echttp_debug) printf ("Searching route for %s\n", uri);
+   for (i = echttp_routing.index[index];
+        i > 0; i = echttp_routing.item[i].next) {
+       if (echttp_debug)
+           printf ("Matching with %s\n", echttp_routing.item[i].uri);
+       if ((echttp_routing.item[i].mode == mode) &&
+           (echttp_routing.item[i].signature == signature) &&
            strcmp (echttp_routing.item[i].uri, uri) == 0) return i;
    }
    return -1;
@@ -405,7 +365,7 @@ static int echttp_received (int client, char *data, int length) {
            return length; // Consume everything, since we are closing.
        }
 
-       echttp_symbol_reset(&(context->params));
+       echttp_catalog_reset(&(context->params));
        wordcount = echttp_split (context->uri, "?", request, 4);
        if (wordcount == 2) {
            char *arg[32];
@@ -413,20 +373,20 @@ static int echttp_received (int client, char *data, int length) {
            for (i = 0; i < wordcount; ++i) {
                char *param[4];
                if (echttp_split (arg[i], "=", param, 4) >= 2) {
-                   echttp_symbol_add (&(context->params), param[0], param[1]);
+                   echttp_catalog_add (&(context->params), param[0], param[1]);
                }
            }
        }
 
        // Search for a uri mapping: try exact match first, then for a parent.
        //
-       i = echttp_search (context->uri, ECHTTP_MODE_EXACT);
+       i = echttp_route_search (context->uri, ECHTTP_MODE_EXACT);
        if (i <= 0) {
            char *uri = strdup(context->uri);
            char *sep = strrchr (uri+1, '/');
            while (sep) {
                *sep = 0;
-               i = echttp_search (uri, ECHTTP_MODE_PARENT);
+               i = echttp_route_search (uri, ECHTTP_MODE_PARENT);
                if (i > 0) break;
                sep = strrchr (uri+1, '/');
            }
@@ -440,17 +400,17 @@ static int echttp_received (int client, char *data, int length) {
 
        // Decode the header parameters after the request line.
        //
-       echttp_symbol_reset(&(context->in));
+       echttp_catalog_reset(&(context->in));
        for (i = 1; i < linecount; ++i) {
            char *param[4];
            if (echttp_split (line[i], ": ", param, 4) >= 2) {
-               echttp_symbol_add (&(context->in), param[0], param[1]);
+               echttp_catalog_add (&(context->in), param[0], param[1]);
            }
        }
 
        // Make sure that all the content has been received.
        //
-       const char *field = echttp_symbol_get(&(context->in), "Content-Length");
+       const char *field = echttp_catalog_get(&(context->in), "Content-Length");
        context->contentlength = 0;
        context->content = endreq;
        if (field) {
@@ -495,6 +455,7 @@ int echttp_open (int argc, const char **argv) {
        }
        shift += 1;
    }
+   echttp_routing.count = 0;
    if (! echttp_raw_open (service, echttp_debug)) return -1;
    return shift;
 }
@@ -508,50 +469,30 @@ void echttp_close (void) {
    echttp_raw_close ();
 }
 
-
-static int echttp_route_add (const char *uri, const char *path,
-                            echttp_callback *call, int mode) {
-
-    int i;
-    int index = echttp_hash (uri);
-
-    for (i = 1; i < ECHTTP_MAX_ROUTES; ++i) {
-        if (echttp_routing.item[i].uri == 0) {
-            echttp_routing.item[i].uri = uri;
-            echttp_routing.item[i].path = path;
-            echttp_routing.item[i].call = call;
-            echttp_routing.item[i].mode = mode;
-            echttp_routing.item[i].next = echttp_routing.index[index];
-            echttp_routing.index[index] = i;
-            return i;
-        }
-    }
-    fprintf (stderr, "Too many routes.\n");
-}
-
 int echttp_route_uri (const char *uri, echttp_callback *call) {
-    return echttp_route_add (uri, 0, call, ECHTTP_MODE_EXACT);
+    return echttp_route_add (uri, call, ECHTTP_MODE_EXACT);
 }
 
 int echttp_route_match (const char *root, echttp_callback *call) {
-    return echttp_route_add (root, 0, call, ECHTTP_MODE_PARENT);
+    return echttp_route_add (root, call, ECHTTP_MODE_PARENT);
 }
 
 int echttp_route_static (const char *uri, const char *path) {
-    return echttp_route_add (uri, path, echttp_static_page, ECHTTP_MODE_PARENT);
+    echttp_static_map (uri, path);
+    return echttp_route_add (uri, echttp_static_page, ECHTTP_MODE_PARENT);
 }
 
 
 const char *echttp_attribute_get (const char *name) {
-    return echttp_symbol_get (&(echttp_current->in), name);
+    return echttp_catalog_get (&(echttp_current->in), name);
 }
 
 const char *echttp_parameter_get (const char *name) {
-    return echttp_symbol_get (&(echttp_current->params), name);
+    return echttp_catalog_get (&(echttp_current->params), name);
 }
 
 void echttp_attribute_set (const char *name, const char *value) {
-    echttp_symbol_add (&(echttp_current->out), name, value);
+    echttp_catalog_add (&(echttp_current->out), name, value);
 }
 
 void echttp_error (int code, const char *message) {
