@@ -43,6 +43,8 @@ Retrieve the value of the specified HTTP attribute, or 0 if not found. This func
 const char *echttp_parameter_get  (const char *name);
 ```
 Retrieve the value of the specified HTTP parameter, or 0 if not found. This function should be called from within an HTTP callback, while processing an HTTP request.
+
+Parameter names are case insensitive: __NaMe__ is the same as __name__.
 ```
 void echttp_attribute_set (const char *name, const char *value);
 ```

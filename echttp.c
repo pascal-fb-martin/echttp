@@ -185,6 +185,8 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
 }
 
 /* This hash function is derived from Daniel J. Bernstein's djb2 hash function.
+ * It was made case independent because several HTTP entities are not case
+ * sensitive.
  */
 static unsigned int echttp_hash (const char *name) {
 
@@ -192,7 +194,7 @@ static unsigned int echttp_hash (const char *name) {
     int c;
 
     while (c = *name++)
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+        hash = ((hash << 5) + hash) + tolower(c); /* hash * 33 + c */
 
     return hash % ECHTTP_HASH;
 }
@@ -230,7 +232,7 @@ static const char *echttp_symbol_get (echttp_dictionary *d, const char *name) {
     int i;
     int hash = echttp_hash(name);
     for (i = d->index[hash]; i > 0; i = d->item[i].next) {
-        if (strcmp(name, d->item[i].name) == 0) {
+        if (strcasecmp(name, d->item[i].name) == 0) {
             return d->item[i].value;
         }
     }
