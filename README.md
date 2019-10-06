@@ -8,6 +8,17 @@ There is no security mechanism planned at this time: use this library only for a
 
 After initializing the HTTP server, and then its own initialization, the application reacts to file descriptor events and HTTP requests as provided by the HTTP server.
 
+## Installation
+* Clone the repository.
+* cd echttp
+* make
+* sudo make install (this installs files in the /usr/local tree)
+
+Use the -lechttp option when building your application. For example:
+```
+cc -o httpserver httpserver.c -lechttp
+```
+
 ## API
 ```
 int echttp_open (int argc, const char **argv);
