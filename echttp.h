@@ -32,6 +32,8 @@ void echttp_attribute_set (const char *name, const char *value);
 void echttp_error         (int code, const char *message);
 void echttp_redirect      (const char *url);
 
+void echttp_content_type_set (const char *value);
+
 typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
  

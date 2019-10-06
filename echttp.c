@@ -202,12 +202,9 @@ static void echttp_execute (int route, int client,
         echttp_raw_send (client, text, sizeof(text)-1, 0);
     }
 
+    snprintf (buffer, sizeof(buffer)-1, "Content-Length: %d\r\n", length);
     buffer[sizeof(buffer)-1] = 0;
-    if (length > 0) {
-        snprintf (buffer, sizeof(buffer)-1,
-                  "Content-Length: %d\r\n", length);
-        echttp_raw_send (client, buffer, strlen(buffer), 0);
-    }
+    echttp_raw_send (client, buffer, strlen(buffer), 0);
 
     for (i = 1; i <= echttp_current->out.count; ++i) {
         if (echttp_current->out.item[i].name == 0) continue;
@@ -373,7 +370,7 @@ static int echttp_received (int client, char *data, int length) {
            for (i = 0; i < wordcount; ++i) {
                char *param[4];
                if (echttp_split (arg[i], "=", param, 4) >= 2) {
-                   echttp_catalog_add (&(context->params), param[0], param[1]);
+                   echttp_catalog_set (&(context->params), param[0], param[1]);
                }
            }
        }
@@ -404,7 +401,7 @@ static int echttp_received (int client, char *data, int length) {
        for (i = 1; i < linecount; ++i) {
            char *param[4];
            if (echttp_split (line[i], ": ", param, 4) >= 2) {
-               echttp_catalog_add (&(context->in), param[0], param[1]);
+               echttp_catalog_set (&(context->in), param[0], param[1]);
            }
        }
 
@@ -492,7 +489,11 @@ const char *echttp_parameter_get (const char *name) {
 }
 
 void echttp_attribute_set (const char *name, const char *value) {
-    echttp_catalog_add (&(echttp_current->out), name, value);
+    echttp_catalog_set (&(echttp_current->out), name, value);
+}
+
+void echttp_content_type_set (const char *value) {
+    echttp_catalog_set (&(echttp_current->out), "Content-Type", value);
 }
 
 void echttp_error (int code, const char *message) {

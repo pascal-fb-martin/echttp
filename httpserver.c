@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "echttp.h"
 
@@ -34,21 +35,21 @@ const char *http_welcome (const char *method, const char *uri,
     static char buffer[1024];
     const char *host = echttp_attribute_get("Host");
     if (host == 0) host = "(unknown)";
-    echttp_attribute_set ("Content-Type", "text/html");
+    echttp_content_type_set ("text/html");
     snprintf (buffer, sizeof(buffer), "<e>Your are welcome on %s!</e>", host);
     return buffer;
 }
 
 const char *http_whoami (const char *method, const char *uri,
                          const char *data, int length) {
-    echttp_attribute_set ("Content-Type", "text/html");
+    echttp_content_type_set ("text/html");
     return "<i>Who knows?</i>";
 }
 
 const char *http_echo (const char *method, const char *uri,
                          const char *data, int length) {
     static char buffer[1024];
-    echttp_attribute_set ("Content-Type", "text/html");
+    echttp_content_type_set ("text/html");
     snprintf (buffer, sizeof(buffer),
               "<e>You called <b>%s</b></e> with what = %s",
               uri, echttp_parameter_get("what"));
@@ -72,6 +73,7 @@ int main (int argc, const char **argv) {
     echttp_route_uri ("/welcome", http_welcome);
     echttp_route_uri ("/whoami", http_whoami);
     echttp_route_match ("/echo", http_echo);
+    echttp_route_static ("/static", getcwd(0, 0));
 
     echttp_listen (0, 1, http_console, 1);
 

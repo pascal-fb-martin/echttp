@@ -59,36 +59,52 @@ void echttp_catalog_reset (echttp_catalog *d) {
     d->count = 0;
 }
 
-void echttp_catalog_add (echttp_catalog *d,
-                         const char *name, const char *value) {
-
-    int index = d->count + 1;
-    unsigned int signature = echttp_catalog_signature(name);
-    int hash = signature % ECHTTP_HASH;
-
-    if (index >= ECHTTP_MAX_SYMBOL) {
-        fprintf (stderr, "Too many parameters.\n");
-        return;
-    }
-    d->item[index].name = name;
-    d->item[index].value = value;
-    d->item[index].signature = signature;
-    d->item[index].next = d->index[hash];
-    d->index[hash] = index;
-    d->count = index;
-}
-
-const char *echttp_catalog_get (echttp_catalog *d, const char *name) {
-
+static int echttp_catalog_search (echttp_catalog *d,
+                                  unsigned int signature, const char *name) {
     int i;
-    unsigned int signature = echttp_catalog_signature(name);
     int hash = signature % ECHTTP_HASH;
     for (i = d->index[hash]; i > 0; i = d->item[i].next) {
         if (d->item[i].signature != signature) continue;
         if (strcasecmp(name, d->item[i].name) == 0) {
-            return d->item[i].value;
+            return i;
         }
     }
+    return 0;
+}
+
+int echttp_catalog_find (echttp_catalog *d, const char *name) {
+    return echttp_catalog_search (d, echttp_catalog_signature(name), name);
+}
+
+void echttp_catalog_set (echttp_catalog *d,
+                         const char *name, const char *value) {
+
+    unsigned int signature = echttp_catalog_signature(name);
+    int index = echttp_catalog_search (d, signature, name);
+
+    if (index > 0) {
+        d->item[index].value = value;
+    } else {
+        index = d->count + 1;
+        int hash = signature % ECHTTP_HASH;
+
+        if (index >= ECHTTP_MAX_SYMBOL) {
+            fprintf (stderr, "Too many symbols in catalog.\n");
+            return;
+        }
+        d->item[index].name = name;
+        d->item[index].value = value;
+        d->item[index].signature = signature;
+        d->item[index].next = d->index[hash];
+        d->index[hash] = index;
+        d->count = index;
+    }
+}
+
+const char *echttp_catalog_get (echttp_catalog *d, const char *name) {
+
+    int i = echttp_catalog_find (d, name);
+    if (i > 0) return d->item[i].value;
     return 0;
 }
 

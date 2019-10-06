@@ -50,6 +50,10 @@ void echttp_attribute_set (const char *name, const char *value);
 ```
 Set an attribute for the HTTP response. This function should be called from within an HTTP callback, while processing an HTTP request.
 ```
+void echttp_content_type_set (const char *value);
+```
+A shorthand for setting the Content-Type attribute.
+```
 void echttp_error (int code, const char *message);
 ```
 The HTTP response will return the specified error instead of OK.
