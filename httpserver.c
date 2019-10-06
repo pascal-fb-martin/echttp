@@ -66,9 +66,11 @@ int main (int argc, const char **argv) {
     argc = echttp_open (argc, argv);
     if (argc <= 0) exit(1);
 
-    printf("Remaining arguments:\n");
-    for (i = 1; i < argc; ++i) {
-        printf ("  %d: %s\n", i, argv[i]);
+    if (echttp_isdebug()) {
+        printf("Remaining arguments:\n");
+        for (i = 1; i < argc; ++i) {
+            printf ("  %d: %s\n", i, argv[i]);
+        }
     }
     echttp_route_uri ("/welcome", http_welcome);
     echttp_route_uri ("/whoami", http_whoami);

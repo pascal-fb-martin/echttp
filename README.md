@@ -71,6 +71,10 @@ When the specified file descriptor is ready, the listener is called with the mod
 
 The premium option, if used, causes this file descriptor to be processed before any HTTP client and other listener. There can be only one listener marked as premium at a time: any new premium listener causes any previous premium listener to be downgraded. The premium option is meant for a high priority I/O.
 ```
-echttp_close (void);
+int echttp_isdebug (void);
+```
+Return true if the HTTP debug option was selected. Only used for debug or troubleshooting.
+```
+void echttp_close (void);
 ```
 Immediately close the HTTP server and all current HTTP connections.

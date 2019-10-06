@@ -87,6 +87,10 @@
  * or listener fucntion, in any order.
  * 
  *
+ * int echttp_isdebug (void);
+ *
+ * Return true if the HTTP debug option was set.
+ *
  * echttp_close (void);
  *
  *    Immediately close the HTTP server and all current HTTP connections.
@@ -504,6 +508,10 @@ void echttp_error (int code, const char *message) {
 void echttp_redirect (const char *url) {
     echttp_error (301, "Redirected");
     echttp_attribute_set ("Location", url);
+}
+
+int echttp_isdebug (void) {
+    return echttp_debug;
 }
 
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {

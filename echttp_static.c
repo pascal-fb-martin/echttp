@@ -83,6 +83,7 @@ const char *echttp_static_page (const char *action,
     rooturi[sizeof(rooturi)-1] = 0;
 
     for(;;) {
+        if (echttp_isdebug()) printf ("Searching static map for %s\n", rooturi);
         path = echttp_catalog_get (&echttp_static_roots, rooturi);
         if (path) break;
         sep = strrchr (rooturi, '/');
@@ -92,11 +93,14 @@ const char *echttp_static_page (const char *action,
         }
         *sep = 0;
     }
+    if (echttp_isdebug()) printf ("found match for %s: %s\n", rooturi, path);
+
     strncpy (filename, path, sizeof(filename));
     strncpy (filename+strlen(path),
              uri+strlen(rooturi), sizeof(filename)-strlen(path));
     filename[sizeof(filename)-1] = 0;
 
+    if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
     FILE *page = fopen (filename, "r");
     if (page == 0) {
         echttp_error (404, "Not found");
