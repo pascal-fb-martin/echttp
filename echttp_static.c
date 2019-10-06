@@ -38,6 +38,7 @@
 #include <stdio.h>
 
 #include "echttp.h"
+#include "echttp_static.h"
 #include "echttp_catalog.h"
 
 static echttp_catalog echttp_static_roots;
@@ -61,19 +62,9 @@ static void echttp_static_initialize (void) {
     }
 }
 
-void echttp_static_content_map (const char *extension, const char *content) {
-    echttp_static_initialize();
-    echttp_catalog_set (&echttp_static_type, extension, content);
-}
-
-void echttp_static_map (const char *uri, const char *path) {
-    echttp_static_initialize();
-    echttp_catalog_set (&echttp_static_roots, uri, path);
-}
-
-const char *echttp_static_page (const char *action,
-                                const char *uri,
-                                const char *data, int length) {
+static const char *echttp_static_page (const char *action,
+                                       const char *uri,
+                                       const char *data, int length) {
     const char *path;
     char rooturi[1024];
     char filename[1024];
@@ -133,5 +124,16 @@ const char *echttp_static_page (const char *action,
         }
     }
     return echttp_static_buffer;
+}
+
+void echttp_static_content_map (const char *extension, const char *content) {
+    echttp_static_initialize();
+    echttp_catalog_set (&echttp_static_type, extension, content);
+}
+
+int echttp_static_route (const char *uri, const char *path) {
+    echttp_static_initialize();
+    echttp_catalog_set (&echttp_static_roots, uri, path);
+    echttp_route_match (uri, echttp_static_page);
 }
 

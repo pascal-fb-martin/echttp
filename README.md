@@ -20,6 +20,10 @@ cc -o httpserver httpserver.c -lechttp
 ```
 
 ## API
+### Base HTTP Server
+The application must include echttp.h as a prerequisit to using the echttp API.
+
+The echttp primitives are:
 ```
 int echttp_open (int argc, const char **argv);
 ```
@@ -42,10 +46,6 @@ Define a route for processing the exact specified URI.
 int echttp_route_match (const char *root, echttp_callback *call);
 ```
 Defines a route for a parent URI and all its children.
-```
-int echttp_route_static (const char *uri, const char *path);
-```
-Associate a parent URI with a local directory path: a child of the specified URI must match an existing file at the specified path.
 ```
 const char *echttp_attribute_get (const char *name); 
 ```
@@ -89,3 +89,16 @@ Return true if the HTTP debug option was selected. Only used for debug or troubl
 void echttp_close (void);
 ```
 Immediately close the HTTP server and all current HTTP connections.
+### Static Pages Extension
+The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include echttp_static.h.
+The static page extension primitives are:
+```
+void echttp_static_content_map (const char *extension, const char *content);
+```
+Define the content type associated with a specific file extension. The content type is implicitely defined for the following file extensions: html, htm, json, jsn, css.
+```
+int  echttp_static_route (const char *uri, const char *path);
+```
+Associate a parent URI with a local directory path: a child of the specified URI will match an existing file at the specified path (including the URI's child relative path).
+
+For example if one defines a static route from /static to /home/doe/public, the URI /static/fancy/interface.html will route to /home/doe/public/fancy/interface.html.

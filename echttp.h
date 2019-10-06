@@ -23,7 +23,6 @@ typedef const char *echttp_callback (const char *method, const char *uri,
 
 int echttp_route_uri (const char *uri, echttp_callback *call);
 int echttp_route_match (const char *root, echttp_callback *call);
-int echttp_route_static (const char *uri, const char *path);
 
 const char *echttp_attribute_get (const char *name);
 const char *echttp_parameter_get  (const char *name);

@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include "echttp.h"
+#include "echttp_static.h"
 
 const char *http_welcome (const char *method, const char *uri,
                           const char *data, int length) {
@@ -81,7 +82,7 @@ int main (int argc, const char **argv) {
     echttp_route_uri ("/welcome", http_welcome);
     echttp_route_uri ("/whoami", http_whoami);
     echttp_route_match ("/echo", http_echo);
-    echttp_route_static ("/static", getcwd(0, 0));
+    echttp_static_route ("/static", getcwd(0, 0));
 
     echttp_listen (0, 1, http_console, 1);
 

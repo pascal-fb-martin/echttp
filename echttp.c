@@ -40,12 +40,6 @@
  * Defines a route for a parent URI and all its children.
  *
  *
- * int echttp_route_static (const char *uri, const char *path);
- *
- * Associate a parent URI with a local directory path: a child of
- * the specified URI must match an existing file at the specified path.
- *
- *
  * const char *echttp_attribute_get (const char *name);
  *
  * Get the value of the specified HTTP attribute, or 0 if not found.
@@ -102,9 +96,8 @@
 #include <ctype.h>
 
 #include "echttp.h"
-#include "echttp_catalog.h"
 #include "echttp_raw.h"
-#include "echttp_static.h"
+#include "echttp_catalog.h"
 
 static int echttp_debug = 0;
 
@@ -477,12 +470,6 @@ int echttp_route_uri (const char *uri, echttp_callback *call) {
 int echttp_route_match (const char *root, echttp_callback *call) {
     return echttp_route_add (root, call, ECHTTP_MODE_PARENT);
 }
-
-int echttp_route_static (const char *uri, const char *path) {
-    echttp_static_map (uri, path);
-    return echttp_route_add (uri, echttp_static_page, ECHTTP_MODE_PARENT);
-}
-
 
 const char *echttp_attribute_get (const char *name) {
     return echttp_catalog_get (&(echttp_current->in), name);

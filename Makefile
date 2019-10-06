@@ -9,9 +9,10 @@ install:
 	chown root:root /usr/local/lib/libechttp.a
 	chmod 644 /usr/local/lib/libechttp.a
 	mkdir -p /usr/local/include
-	cp echttp.h /usr/local/include
+	cp echttp.h echttp_static.h /usr/local/include
 	chown root:root /usr/local/include/echttp.h
-	chmod 644 /usr/local/include/echttp.h
+	chown root:root /usr/local/include/echttp_static.h
+	chmod 644 /usr/local/include/echttp.h /usr/local/include/echttp_static.h
 
 clean:
 	rm -f *.o *.a
