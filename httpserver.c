@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "echttp.h"
@@ -58,7 +59,12 @@ const char *http_echo (const char *method, const char *uri,
 
 static void http_console (int fd, int mode) {
     char buffer[1024];
-    printf ("Console: %s\n", fgets(buffer, sizeof(buffer), stdin));
+    fgets(buffer, sizeof(buffer), stdin);
+    if (echttp_isdebug()) printf ("Console: %s\n", buffer);
+    if (strncmp (buffer, "exit\n", 5) == 0) {
+        echttp_close();
+        exit(0);
+    }
 }
 
 int main (int argc, const char **argv) {
