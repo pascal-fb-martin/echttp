@@ -48,16 +48,39 @@ static echttp_catalog echttp_static_type;
 static char *echttp_static_buffer = 0;
 static int echttp_static_buffer_size = 0;
 
+/* Define default content type for the most frequent file extensions.
+ * Don't define too many: it would load the catalog with lot of unused items.
+ */
+static struct {
+    const char *extension;
+    const char *content;
+} echttp_static_default_types[] = {
+    {"html", "text/html"},
+    {"htm",  "text/html"},
+    {"css",  "text/css"},
+    {"json", "application/json"},
+    {"jsn",  "application/json"},
+    {"js",   "application/javascript"},
+    {"xml",  "text/xml"},
+    {"txt",  "text/plain"},
+    {"jpeg", "image/jpeg"},
+    {"png",  "image/png"},
+    {"gif",  "image/gif"},
+    {"svg",  "image/svg+xml"},
+    {0, 0}
+};
+
 static void echttp_static_initialize (void) {
 
     static int Initialized = 0;
     if (!Initialized) {
         // Create some common default content types.
-        echttp_catalog_set (&echttp_static_type, "html", "text/html");
-        echttp_catalog_set (&echttp_static_type, "htm",  "text/html");
-        echttp_catalog_set (&echttp_static_type, "json", "application/json");
-        echttp_catalog_set (&echttp_static_type, "jsn",  "application/json");
-        echttp_catalog_set (&echttp_static_type, "css",  "text/css");
+        int i;
+        for (i = 0; echttp_static_default_types[i].extension; ++i) {
+            echttp_catalog_set (&echttp_static_type,
+                                echttp_static_default_types[i].extension,
+                                echttp_static_default_types[i].content);
+        }
         Initialized = 1;
     }
 }
