@@ -67,6 +67,8 @@ static echttp_raw_registration echttp_raw_other[ECHTTP_RAW_MAXREGISTERED];
 static int echttp_raw_other_count = 0;
 static int echttp_raw_premium = -1;
 
+static echttp_listener *echttp_raw_backgrounder = 0;
+
 
 #define ECHTTP_CLIENT_BUFFER 102400
 typedef struct {
@@ -326,6 +328,10 @@ void echttp_raw_loop (echttp_raw_callback *received) {
           }
       }
 
+      if (echttp_raw_backgrounder) {
+          echttp_raw_backgrounder (0, 0);
+      }
+
       for (i = 0; i < echttp_raw_other_count; ++i) {
           if (echttp_raw_other[i].mode & 1) {
               FD_SET(echttp_raw_other[i].fd, &readset);
@@ -429,5 +435,9 @@ void echttp_raw_close (void) {
    }
    close(echttp_raw_server);
    echttp_raw_server = -1;
+}
+
+void echttp_raw_background (echttp_listener *listener) {
+    echttp_raw_backgrounder = listener;
 }
 

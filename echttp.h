@@ -35,6 +35,7 @@ void echttp_content_type_set (const char *value);
 
 typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
+void echttp_background (echttp_listener *listener);
  
 int echttp_isdebug (void);
 

@@ -74,6 +74,11 @@
  * When the specified file descriptor is ready, the listener is called
  * with the mode corresponding to the event.
  *
+ * void echttp_background (echttp_listener *listener);
+ *
+ * Call this listener completing I/O operations, before waiting for
+ * new I/O. This background listener is called with fd 0 and mode 0,
+ * and should not block on I/O itself.
  *
  * void echttp_loop (void);
  * 
@@ -505,3 +510,7 @@ void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {
     echttp_raw_register (fd, mode, listener, premium);
 }
  
+void echttp_background (echttp_listener *listener) {
+    echttp_raw_background (listener);
+}
+
