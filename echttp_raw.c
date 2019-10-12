@@ -59,13 +59,13 @@ static int echttp_raw_debug = 0;
 #define ECHTTP_RAW_MAXREGISTERED  256
 typedef struct {
     int mode;
+    int premium;
     int fd;
     echttp_listener *listener;
 } echttp_raw_registration;
 
 static echttp_raw_registration echttp_raw_other[ECHTTP_RAW_MAXREGISTERED];
 static int echttp_raw_other_count = 0;
-static int echttp_raw_premium = -1;
 
 static echttp_listener *echttp_raw_backgrounder = 0;
 
@@ -346,14 +346,15 @@ void echttp_raw_loop (echttp_raw_callback *received) {
       count = select(maxfd+1, &readset, &writeset, NULL, &timeout);
 
       if (count > 0) {
-          if (echttp_raw_premium >= 0) {
-              if (echttp_raw_other[echttp_raw_premium].mode == 0) continue;
-              int fd = echttp_raw_other[echttp_raw_premium].fd;
+          for (i = 0; i < echttp_raw_other_count; ++i) {
+              if (echttp_raw_other[i].premium == 0) continue;
+              if (echttp_raw_other[i].mode == 0) continue;
+              int fd = echttp_raw_other[i].fd;
               int mode = 0;
               if (FD_ISSET(fd, &readset)) mode |= 1;
               if (FD_ISSET(fd, &writeset)) mode |= 2;
               if (mode) {
-                  echttp_raw_other[echttp_raw_premium].listener (fd, mode);
+                  echttp_raw_other[i].listener (fd, mode);
               }
           }
 
@@ -374,7 +375,7 @@ void echttp_raw_loop (echttp_raw_callback *received) {
           }
           for (i = 0; i < echttp_raw_other_count; ++i) {
               if (echttp_raw_other[i].mode == 0) continue;
-              if (i == echttp_raw_premium) continue; // Don't call it twice.
+              if (echttp_raw_other[i].premium) continue; // Don't call it twice.
               int fd = echttp_raw_other[i].fd;
               int mode = 0;
               if (FD_ISSET(fd, &readset)) mode |= 1;
@@ -404,11 +405,8 @@ void echttp_raw_register (int fd, int mode,
             echttp_raw_other[i].mode = mode;
             if (mode) {
                 echttp_raw_other[i].listener = listener;
-                if (premium) echttp_raw_premium = i;
-                else if (i == echttp_raw_premium) echttp_raw_premium = -1;
             } else {
                 if (i == echttp_raw_other_count-1) echttp_raw_other_count -= 1;
-                if (i == echttp_raw_premium) echttp_raw_premium = -1;
             }
             return;
         }
@@ -420,10 +418,14 @@ void echttp_raw_register (int fd, int mode,
         return;
     }
     echttp_raw_other[echttp_raw_other_count].mode = mode;
+    echttp_raw_other[echttp_raw_other_count].premium = premium;
     echttp_raw_other[echttp_raw_other_count].listener = listener;
     echttp_raw_other[echttp_raw_other_count].fd = fd;
-    if (premium) echttp_raw_premium = echttp_raw_other_count;
     echttp_raw_other_count += 1;
+}
+
+void echttp_raw_background (echttp_listener *listener) {
+    echttp_raw_backgrounder = listener;
 }
 
 void echttp_raw_close (void) {
@@ -435,9 +437,5 @@ void echttp_raw_close (void) {
    }
    close(echttp_raw_server);
    echttp_raw_server = -1;
-}
-
-void echttp_raw_background (echttp_listener *listener) {
-    echttp_raw_backgrounder = listener;
 }
 

@@ -80,11 +80,13 @@ Listen to the specified file descriptor (mode=0: don't listen, mode=1: read only
 
 When the specified file descriptor is ready, the listener is called with the mode corresponding to the event.
 
-The premium option, if used, causes this file descriptor to be processed before any HTTP client and other listener. There can be only one listener marked as premium at a time: any new premium listener causes any previous premium listener to be downgraded. The premium option is meant for a high priority I/O.
+The premium option, if used, causes this file descriptor to be processed before any HTTP client and other listener. The premium option is meant for a high priority I/O.
 ```
 void echttp_background (echttp_listener *listener);
 ```
-Call the specified listener before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to next. Expect this listener to be once once a second at least, if not a lot more.
+Call the specified listener before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to on the next cycle. Expect this listener to be called once a second at least, if not a lot more.
+
+There is only one background listener.
 ```
 int echttp_isdebug (void);
 ```
