@@ -65,15 +65,15 @@ void echttp_content_type_set (const char *value);
 ```
 A shorthand for setting the Content-Type attribute.
 ```
-void echttp_content_type_html (const char *value);
+void echttp_content_type_html (void);
 ```
 A shorthand for setting the Content-Type attribute to HTML.
 ```
-void echttp_content_type_json (const char *value);
+void echttp_content_type_json (void);
 ```
 A shorthand for setting the Content-Type attribute to JSON.
 ```
-void echttp_content_type_css (const char *value);
+void echttp_content_type_css (void);
 ```
 A shorthand for setting the Content-Type attribute to CSS.
 ```
