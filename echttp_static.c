@@ -70,19 +70,34 @@ static struct {
     {0, 0}
 };
 
-static void echttp_static_initialize (void) {
+static const char *echttp_static_file (FILE *page, const char *filename) {
 
-    static int Initialized = 0;
-    if (!Initialized) {
-        // Create some common default content types.
-        int i;
-        for (i = 0; echttp_static_default_types[i].extension; ++i) {
-            echttp_catalog_set (&echttp_static_type,
-                                echttp_static_default_types[i].extension,
-                                echttp_static_default_types[i].content);
-        }
-        Initialized = 1;
+    if (page == 0) {
+        echttp_error (404, "Not found");
+        return "";
     }
+    if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
+
+    fseek (page, 0, SEEK_END);
+    size_t size = ftell (page) + 1;
+    rewind(page);
+    if (size > echttp_static_buffer_size) {
+        echttp_static_buffer_size = size;
+        echttp_static_buffer = realloc (echttp_static_buffer, size);
+    }
+    echttp_static_buffer[0] = 0;
+    fread (echttp_static_buffer, 1, size, page);
+    echttp_static_buffer[size-1] = 0;
+    fclose (page);
+
+    const char *sep = strrchr (filename, '.');
+    if (sep) {
+        const char *content = echttp_catalog_get (&echttp_static_type, sep+1);
+        if (content) {
+            echttp_content_type_set (content);
+        }
+    }
+    return echttp_static_buffer;
 }
 
 static const char *echttp_static_page (const char *action,
@@ -120,33 +135,42 @@ static const char *echttp_static_page (const char *action,
              uri+strlen(rooturi), sizeof(filename)-strlen(path));
     filename[sizeof(filename)-1] = 0;
 
-    if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
-    FILE *page = fopen (filename, "r");
-    if (page == 0) {
-        echttp_error (404, "Not found");
-        return "";
-    }
+    return echttp_static_file (fopen (filename, "r"), filename);
+}
 
-    fseek (page, 0, SEEK_END);
-    size_t size = ftell (page) + 1;
-    rewind(page);
-    if (size > echttp_static_buffer_size) {
-        echttp_static_buffer_size = size;
-        echttp_static_buffer = realloc (echttp_static_buffer, size);
-    }
-    echttp_static_buffer[0] = 0;
-    fread (echttp_static_buffer, 1, size, page);
-    echttp_static_buffer[size-1] = 0;
-    fclose (page);
+static const char *echttp_static_root (const char *method, const char *uri,
+                                  const char *data, int length) {
+    char filename[1024];
+    FILE *page = 0;
+    int i;
 
-    sep = strrchr (filename, '.');
-    if (sep) {
-        const char *content = echttp_catalog_get (&echttp_static_type, sep+1);
-        if (content) {
-            echttp_content_type_set (content);
+    for (i = 1; i <= echttp_static_roots.count; ++i) {
+        const char *path = echttp_static_roots.item[i].value;
+        if (path == 0) continue;
+        snprintf (filename, sizeof(filename), "%s/index.html", path);
+        filename[sizeof(filename)-1] = 0;
+        if (echttp_isdebug())
+            printf ("Searching static map for %s\n", filename);
+        page = fopen (filename, "r");
+        if (page) break;
+    }
+    return echttp_static_file (page, filename);
+}
+
+static void echttp_static_initialize (void) {
+
+    static int Initialized = 0;
+    if (!Initialized) {
+        // Create some common default content types.
+        int i;
+        for (i = 0; echttp_static_default_types[i].extension; ++i) {
+            echttp_catalog_set (&echttp_static_type,
+                                echttp_static_default_types[i].extension,
+                                echttp_static_default_types[i].content);
         }
+        echttp_route_uri ("/", echttp_static_root);
+        Initialized = 1;
     }
-    return echttp_static_buffer;
 }
 
 void echttp_static_content_map (const char *extension, const char *content) {
