@@ -1,4 +1,4 @@
-## Overview
+# Overview
 A minimal HTTP server to serve as an application console for configuration and monitoring.
 
 This is a small HTTP/1.1 server designed for simple API and minimal dependencies. The target use case is an application that needs to be administrated or monitored remotely.
@@ -8,7 +8,7 @@ There is no security mechanism planned at this time: use this library only for a
 
 After initializing the HTTP server, and then its own initialization, the application reacts to file descriptor events and HTTP requests as provided by the HTTP server.
 
-## Installation
+# Installation
 * Clone the repository.
 * cd echttp
 * make
@@ -18,9 +18,39 @@ Use the -lechttp option when building your application. For example:
 ```
 cc -o httpserver httpserver.c -lechttp
 ```
+# Example
+Below is an example of a small, but fully functional web server written using echttp. This server returns pages from the current directory as well as an embedded welcome message.
+```
+#include <stdio.h>
+#include <unistd.h>
 
-## API
-### Base HTTP Server
+#include "echttp.h"
+#include "echttp_static.h"
+
+static const char *welcome (const char *method, const char *uri,
+                            const char *data, int length) {
+    static char buffer[1024];
+    const char *host = echttp_attribute_get("Host");
+    const char *who = echttp_parameter_get("who");
+    if (host == 0) host = "(unknown)";
+    if (who == 0) who = "Anonymous";
+    echttp_content_type_html ();
+    snprintf (buffer, sizeof(buffer),
+              "<e>You are welcome on <b>%s</b>, dear <i>%s</i>!</e>", host, who);
+    return buffer;
+}
+
+int main (int argc, const char **argv) {
+    if (echttp_open (argc, argv) >= 0) {
+        echttp_route_uri ("/welcome", welcome);
+        echttp_static_route ("/static", getcwd(0, 0));
+        echttp_loop();
+    }
+    return 1;
+}
+```
+# API
+## Base HTTP Server
 The application must include echttp.h as a prerequisit to using the echttp API.
 
 The echttp primitives are:
@@ -111,7 +141,7 @@ Run the HTTP server. This function typically never return. If it does, all HTTP 
 void echttp_close (void);
 ```
 Immediately close the HTTP server and all current HTTP connections.
-### Static Pages Extension
+## Static Pages Extension
 The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include echttp_static.h.
 The static page extension primitives are:
 ```
