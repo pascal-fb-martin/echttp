@@ -492,6 +492,19 @@ void echttp_content_type_set (const char *value) {
     echttp_catalog_set (&(echttp_current->out), "Content-Type", value);
 }
 
+void echttp_content_type_json (void) {
+    echttp_catalog_set (&(echttp_current->out),
+                        "Content-Type", "application/json");
+}
+
+void echttp_content_type_html (void) {
+    echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/html");
+}
+
+void echttp_content_type_css (void) {
+    echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/css");
+}
+
 void echttp_error (int code, const char *message) {
     echttp_current->status = code;
     echttp_current->reason = message;

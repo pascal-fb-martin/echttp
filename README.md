@@ -65,6 +65,18 @@ void echttp_content_type_set (const char *value);
 ```
 A shorthand for setting the Content-Type attribute.
 ```
+void echttp_content_type_html (const char *value);
+```
+A shorthand for setting the Content-Type attribute to HTML.
+```
+void echttp_content_type_json (const char *value);
+```
+A shorthand for setting the Content-Type attribute to JSON.
+```
+void echttp_content_type_css (const char *value);
+```
+A shorthand for setting the Content-Type attribute to CSS.
+```
 void echttp_error (int code, const char *message);
 ```
 The HTTP response will return the specified error instead of OK.
