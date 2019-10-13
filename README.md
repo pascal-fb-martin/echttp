@@ -104,6 +104,10 @@ int echttp_isdebug (void);
 ```
 Return true if the HTTP debug option was selected. Only used for debug or troubleshooting.
 ```
+void echttp_loop (void);
+```
+Run the HTTP server. This function typically never return. If it does, all HTTP server resources have been closed and deallocated. The most reasonable thing to do at this point is to exit.
+```
 void echttp_close (void);
 ```
 Immediately close the HTTP server and all current HTTP connections.

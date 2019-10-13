@@ -460,8 +460,8 @@ int echttp_open (int argc, const char **argv) {
 }
 
 void echttp_loop (void) {
-
    echttp_raw_loop (echttp_received);
+   echttp_raw_close ();
 }
 
 void echttp_close (void) {

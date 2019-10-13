@@ -87,6 +87,5 @@ int main (int argc, const char **argv) {
     echttp_listen (0, 1, http_console, 1);
 
     echttp_loop();
-    echttp_close();
 }
 
