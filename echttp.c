@@ -35,6 +35,13 @@
  * Define a route for processing the exact specified URI.
  *
  *
+ * typedef void echttp_protect_callback (const char *method, const char *uri);
+ *
+ * int echttp_protect (int route, echttp_protect_callback *call);
+ *
+ * Define a protect callback for the specified route.
+ *
+ *
  * int echttp_route_match (const char *root, echttp_callback *call);
  *
  * Defines a route for a parent URI and all its children.
@@ -134,6 +141,7 @@ static echttp_request *echttp_current = 0;
 typedef struct {
     const char *uri;
     echttp_callback *call;
+    echttp_protect_callback *protect;
     unsigned int signature;
     int mode;
     int next;
@@ -189,10 +197,18 @@ static void echttp_execute (int route, int client,
     echttp_current->reason = "OK";
     echttp_catalog_reset(&(echttp_current->out));
 
-    const char *connection = echttp_attribute_get ("Connection");
-    keep = (connection && (strcmp(connection, "keep-alive") == 0));
+    if (echttp_routing.item[route].protect) {
+        echttp_routing.item[route].protect (action, uri);
+    }
+    if (echttp_current->status != 200) {
+        keep = 0;
+        data = 0;
+    } else {
+        const char *connection = echttp_attribute_get ("Connection");
+        keep = (connection && (strcmp(connection, "keep-alive") == 0));
 
-    data = echttp_routing.item[route].call (action, uri, data, length);
+        data = echttp_routing.item[route].call (action, uri, data, length);
+    }
     length = data?strlen(data):0;
 
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
@@ -251,6 +267,7 @@ static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
     }
     echttp_routing.item[i].uri = uri;
     echttp_routing.item[i].call = call;
+    echttp_routing.item[i].protect = 0;
     echttp_routing.item[i].mode = mode;
     echttp_routing.item[i].signature = signature;
     echttp_routing.item[i].next = echttp_routing.index[index];
@@ -474,6 +491,12 @@ int echttp_route_uri (const char *uri, echttp_callback *call) {
 
 int echttp_route_match (const char *root, echttp_callback *call) {
     return echttp_route_add (root, call, ECHTTP_MODE_PARENT);
+}
+
+int echttp_protect (int route, echttp_protect_callback *call) {
+    if (route < 0 || route > echttp_routing.count) return -1;
+    echttp_routing.item[route].protect = call;
+    return route;
 }
 
 const char *echttp_attribute_get (const char *name) {

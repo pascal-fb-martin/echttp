@@ -71,11 +71,18 @@ The profile for any HTTP request processing function.
 ```
 int echttp_route_uri (const char *uri, echttp_callback *call);
 ```
-Define a route for processing the exact specified URI.
+Define a route for processing the exact specified URI. Return the route descriptor or -1 on failure.
 ```
 int echttp_route_match (const char *root, echttp_callback *call);
 ```
-Defines a route for a parent URI and all its children.
+Defines a route for a parent URI and all its children. Return the route descriptor or -1 on failure.
+```
+typedef void echttp_protect_callback (const char *method, const char *uri);
+int echttp_protect (int route, echttp_protect_callback *call);
+```
+Declare a protect callback for the specified route. The route descriptor is the value returned by echttp_route_uri() or echttp_route_match(). A protect callback is called before the route's callback and may change the HTTP status to not OK and set the response's attributes; in that case the route's callback function is not called.
+
+This is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
 ```
 const char *echttp_attribute_get (const char *name); 
 ```
@@ -156,3 +163,6 @@ Associate a parent URI with a local directory path: a child of the specified URI
 For example if one defines a static route from /static to /home/doe/public, the URI /static/fancy/interface.html will route to /home/doe/public/fancy/interface.html.
 
 As soon as a static route has been declared, the extension takes over the root URI "/". If the root URI is requested, the extension seaches for file index.html in every path provided and returns the content of the first one found.
+
+This function returns the route descriptor or -1 on failure. This route descriptor can be used to protect the whole path.
+

@@ -32,8 +32,20 @@
 #include "echttp.h"
 #include "echttp_static.h"
 
-const char *http_welcome (const char *method, const char *uri,
-                          const char *data, int length) {
+static void http_protected (const char *method, const char *uri) {
+    printf ("%s %s was protected.\n", method, uri);
+    if (strcmp (uri, "/forbidden") == 0) {
+        echttp_error (401, "Unauthorized");
+    }
+}
+
+static const char *http_forbidden (const char *method, const char *uri,
+                                   const char *data, int length) {
+    return "<e>This is protected content!</e>";
+}
+
+static const char *http_welcome (const char *method, const char *uri,
+                                 const char *data, int length) {
     static char buffer[1024];
     const char *host = echttp_attribute_get("Host");
     if (host == 0) host = "(unknown)";
@@ -42,14 +54,14 @@ const char *http_welcome (const char *method, const char *uri,
     return buffer;
 }
 
-const char *http_whoami (const char *method, const char *uri,
-                         const char *data, int length) {
+static const char *http_whoami (const char *method, const char *uri,
+                                const char *data, int length) {
     echttp_content_type_set ("text/html");
     return "<i>Who knows?</i>";
 }
 
-const char *http_echo (const char *method, const char *uri,
-                         const char *data, int length) {
+static const char *http_echo (const char *method, const char *uri,
+                              const char *data, int length) {
     static char buffer[1024];
     echttp_content_type_set ("text/html");
     snprintf (buffer, sizeof(buffer),
@@ -79,8 +91,11 @@ int main (int argc, const char **argv) {
             printf ("  %d: %s\n", i, argv[i]);
         }
     }
-    echttp_route_uri ("/welcome", http_welcome);
+    echttp_protect
+        (echttp_route_uri ("/welcome", http_welcome), http_protected);
     echttp_route_uri ("/whoami", http_whoami);
+    echttp_protect
+        (echttp_route_uri ("/forbidden", http_forbidden), http_protected);
     echttp_route_match ("/echo", http_echo);
     echttp_static_route ("/static", getcwd(0, 0));
 

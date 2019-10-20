@@ -22,7 +22,7 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
- * void echttp_static_map (const char *uri, const char *path);
+ * int echttp_static_map (const char *uri, const char *path);
  *
  *    Declare a mapping between an URI and a local file or folder.
  *
@@ -181,6 +181,6 @@ void echttp_static_content_map (const char *extension, const char *content) {
 int echttp_static_route (const char *uri, const char *path) {
     echttp_static_initialize();
     echttp_catalog_set (&echttp_static_roots, uri, path);
-    echttp_route_match (uri, echttp_static_page);
+    return echttp_route_match (uri, echttp_static_page);
 }
 
