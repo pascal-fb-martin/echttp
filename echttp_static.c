@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "echttp.h"
 #include "echttp_static.h"
@@ -46,7 +47,7 @@ static echttp_catalog echttp_static_roots;
 static echttp_catalog echttp_static_type;
 
 static char *echttp_static_buffer = 0;
-static int echttp_static_buffer_size = 0;
+static int   echttp_static_buffer_size = 0;
 
 /* Define default content type for the most frequent file extensions.
  * Don't define too many: it would load the catalog with lot of unused items.
@@ -76,14 +77,22 @@ static const char *echttp_static_file (FILE *page, const char *filename) {
         echttp_error (404, "Not found");
         return "";
     }
+    struct stat fileinfo;
+    if (fstat(fileno(page), &fileinfo) < 0) goto unsupported;
+    if (fileinfo.st_mode & S_IFMT != S_IFREG) goto unsupported;
+    if (fileinfo.st_size < 0 ||
+        fileinfo.st_size >= 1024*1024*1024) goto unsupported;
+
     if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
 
-    fseek (page, 0, SEEK_END);
-    size_t size = ftell (page) + 1;
-    rewind(page);
+    size_t size = fileinfo.st_size + 1;
     if (size > echttp_static_buffer_size) {
         echttp_static_buffer_size = size;
-        echttp_static_buffer = realloc (echttp_static_buffer, size);
+        echttp_static_buffer = realloc (echttp_static_buffer, (size_t)size);
+        if (echttp_static_buffer == 0) {
+            fprintf (stderr, "realloc failed for size %d\n", size);
+            exit(1);
+        }
     }
     echttp_static_buffer[0] = 0;
     fread (echttp_static_buffer, 1, size, page);
@@ -98,6 +107,10 @@ static const char *echttp_static_file (FILE *page, const char *filename) {
         }
     }
     return echttp_static_buffer;
+
+    unsupported:
+        echttp_error (406, "Not Acceptable");
+        return "";
 }
 
 static const char *echttp_static_page (const char *action,
@@ -121,18 +134,23 @@ static const char *echttp_static_page (const char *action,
         if (echttp_isdebug()) printf ("Searching static map for %s\n", rooturi);
         path = echttp_catalog_get (&echttp_static_roots, rooturi);
         if (path) break;
-        sep = strrchr (rooturi, '/');
-        if ((sep == 0) || (sep == path)) {
+        sep = strrchr (rooturi+1, '/');
+        if (sep == 0) break;
+        *sep = 0;
+    }
+    if (path == 0) {
+        rooturi[0] = 0;
+        path = echttp_catalog_get (&echttp_static_roots, "/");
+        if (path == 0) {
             echttp_error (404, "Page was lost.."); // Should never happen, but.
             return "";
         }
-        *sep = 0;
     }
     if (echttp_isdebug()) printf ("found match for %s: %s\n", rooturi, path);
 
+    size_t pathlen = strlen(path);
     strncpy (filename, path, sizeof(filename));
-    strncpy (filename+strlen(path),
-             uri+strlen(rooturi), sizeof(filename)-strlen(path));
+    strncpy (filename+pathlen, uri+strlen(rooturi), sizeof(filename)-pathlen);
     filename[sizeof(filename)-1] = 0;
 
     return echttp_static_file (fopen (filename, "r"), filename);
@@ -150,7 +168,7 @@ static const char *echttp_static_root (const char *method, const char *uri,
         snprintf (filename, sizeof(filename), "%s/index.html", path);
         filename[sizeof(filename)-1] = 0;
         if (echttp_isdebug())
-            printf ("Searching static map for %s\n", filename);
+            printf ("Trying static file %s\n", filename);
         page = fopen (filename, "r");
         if (page) break;
     }

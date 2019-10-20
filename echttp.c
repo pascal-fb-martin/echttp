@@ -284,10 +284,10 @@ static int echttp_route_search (const char *uri, int mode) {
    if (echttp_debug) printf ("Searching route for %s\n", uri);
    for (i = echttp_routing.index[index];
         i > 0; i = echttp_routing.item[i].next) {
+       if (echttp_routing.item[i].mode != mode) continue;
        if (echttp_debug)
            printf ("Matching with %s\n", echttp_routing.item[i].uri);
-       if ((echttp_routing.item[i].mode == mode) &&
-           (echttp_routing.item[i].signature == signature) &&
+       if ((echttp_routing.item[i].signature == signature) &&
            strcmp (echttp_routing.item[i].uri, uri) == 0) return i;
    }
    return -1;
@@ -405,6 +405,9 @@ static int echttp_received (int client, char *data, int length) {
                i = echttp_route_search (uri, ECHTTP_MODE_PARENT);
                if (i > 0) break;
                sep = strrchr (uri+1, '/');
+           }
+           if (i <= 0) {
+               i = echttp_route_search ("/", ECHTTP_MODE_PARENT);
            }
            free(uri);
            if (i <= 0) {

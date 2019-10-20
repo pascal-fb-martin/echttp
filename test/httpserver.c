@@ -97,6 +97,7 @@ int main (int argc, const char **argv) {
     echttp_protect
         (echttp_route_uri ("/forbidden", http_forbidden), http_protected);
     echttp_route_match ("/echo", http_echo);
+    echttp_static_route ("/", getcwd(0, 0));
     echttp_static_route ("/static", getcwd(0, 0));
 
     echttp_listen (0, 1, http_console, 1);
