@@ -80,9 +80,11 @@ Defines a route for a parent URI and all its children. Return the route descript
 typedef void echttp_protect_callback (const char *method, const char *uri);
 int echttp_protect (int route, echttp_protect_callback *call);
 ```
-Declare a protect callback for the specified route. The route descriptor is the value returned by echttp_route_uri() or echttp_route_match(). A protect callback is called before the route's callback and may change the HTTP status to not OK and set the response's attributes; in that case the route's callback function is not called.
+Declare a protect callback for the specified route. The route descriptor is the value returned by echttp_route_uri() or echttp_route_match(). A protect callback is called before the route's callback and may change the HTTP status to not OK (by calling echttp_error()--see later) and set the response's attributes; in that case the route's callback function is not called.
 
-This is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
+Note that the protect callback is associated with the route, i.e. the URI string, not with the callback function: one may define two routes to the same callback function, and protect one route but not the other. This is intentional, as this allows protecting specific file paths without protecting all file paths (see the static page extention later).
+
+This mechanism is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
 ```
 const char *echttp_attribute_get (const char *name); 
 ```
