@@ -451,6 +451,17 @@ static int echttp_received (int client, char *data, int length) {
    return consumed;
 }
 
+const char *echttp_help (int level) {
+    static const char *httpHelp[] = {
+        " [-http-service=NAME] [-http-debug]",
+        "-http-service=NAME:  name or port number for the HTTP socket.",
+        "-http-debug:         set debug mode (verbose traces).",
+        NULL
+    };
+
+    return httpHelp[level];
+}
+
 int echttp_open (int argc, const char **argv) {
 
    int i;
@@ -462,7 +473,7 @@ int echttp_open (int argc, const char **argv) {
 
    for (i = 1, shift = 1; i < argc; ++i) {
        if (shift != i) argv[shift] = argv[i];
-       value = echttp_match ("-http-port=", argv[i]);
+       value = echttp_match ("-http-service=", argv[i]);
        if (value) {
            service = value;
            continue;

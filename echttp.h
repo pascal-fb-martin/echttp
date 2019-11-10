@@ -13,8 +13,11 @@
 
 /*
  * The open function understands the following options:
- * -http=N: port number or name to be used by the server.
+ * -http-service=N: service name or port number to be used by the server.
+ * -http-debug:     enable debug mode (verbose traces).
  */
+const char *echttp_help (int level);
+
 int  echttp_open (int argc, const char **argv);
 void echttp_close (void);
 

@@ -55,12 +55,17 @@ The application must include echttp.h as a prerequisit to using the echttp API.
 
 The echttp primitives are:
 ```
+const char *echttp_help (int level);
+```
+Return a help text to print. If level is 0, it returns the short list of options in a single line, otherwise it returnas the detailed description for option N. To print the detailed descriptions for all options, the caller should loop starting at 1 and stop when the return is 0 (null).
+
+```
 int echttp_open (int argc, const char **argv);
 ```
 Initialize the HTTP server. The HTTP-specific arguments are removed from the argument list and the count of remaining arguments is returned.
 
 The arguments consumed by echttp_open are:
-* -http-port=_port_ (Port number or service name to listen to; default is "http", i.e. port 80.)
+* -http-service=_name_ (Service name or port number to listen to; default is "http", i.e. port 80.)
 * -http-debug (If present, expect to see a lot of debug traces.)
 
 ```
