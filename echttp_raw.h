@@ -17,5 +17,7 @@ void echttp_raw_background (echttp_listener *listener);
 
 void echttp_raw_loop (echttp_raw_callback *received);
 
+int  echttp_raw_is_local (int client);
+
 void echttp_raw_close (void);
 

@@ -48,6 +48,7 @@ void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 void echttp_background (echttp_listener *listener);
  
 int echttp_isdebug (void);
+int echttp_islocal (void);
 
 void echttp_loop (void);
 

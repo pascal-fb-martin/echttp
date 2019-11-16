@@ -46,6 +46,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ifaddrs.h>
 
 #include "echttp.h"
 #include "echttp_raw.h"
@@ -80,12 +81,22 @@ typedef struct {
 #define ECHTTP_CLIENT_MAX 16
 static struct {
     int socket;
+    struct sockaddr_in peer;
     int hangup;
     time_t deadline;
     echttp_buffer in;
     echttp_buffer out;
 } echttp_raw_client[ECHTTP_CLIENT_MAX];
 
+
+#define ECHTTP_IF_MAX 16
+static struct {
+    uint32_t ifaddr;
+    uint32_t ifmask;
+} echttp_raw_if[ECHTTP_IF_MAX];
+
+static int echttp_raw_ifcount = 0;
+static time_t echttp_raw_timestamp = 0;
 
 static void echttp_raw_cleanup (int i) {
    echttp_raw_client[i].socket = -1;
@@ -103,6 +114,53 @@ static const char *echttp_printip (long ip) {
     snprintf (ascii, sizeof(ascii), "%d.%d.%d.%d",
               (ip>>24) & 0xff, (ip>>16) & 0xff, (ip>>8) & 0xff, ip & 0xff);
     return ascii;
+}
+
+static void echttp_raw_enumerate (void) {
+
+    struct ifaddrs *cards;
+    time_t now = time(0);
+
+    if (echttp_raw_timestamp + 10 > now) return; // Keep last result for 10s.
+
+    if (getifaddrs(&cards) == 0) {
+
+        struct ifaddrs *cursor;
+
+        if (echttp_raw_debug)
+            printf ("Network interfaces:\n");
+
+        echttp_raw_ifcount = 0;
+
+        for (cursor = cards; cursor != 0; cursor = cursor->ifa_next) {
+
+            if (echttp_raw_debug)
+                printf ("   name: %s:\n", cursor->ifa_name);
+
+            if ((cursor->ifa_addr == 0) || (cursor->ifa_netmask == 0)) continue;
+            if (cursor->ifa_addr->sa_family != AF_INET)  continue;
+
+            if (echttp_raw_debug) {
+                struct sockaddr_in *ia;
+                ia = (struct sockaddr_in *) (cursor->ifa_addr);
+                printf ("      address: %s\n",
+                        echttp_printip(ntohl((long)(ia->sin_addr.s_addr))));
+                ia = (struct sockaddr_in *) (cursor->ifa_netmask);
+                printf ("      mask: %s\n",
+                        echttp_printip(ntohl((long)(ia->sin_addr.s_addr))));
+            }
+
+            if (echttp_raw_ifcount >= ECHTTP_IF_MAX) continue;
+
+            echttp_raw_if[echttp_raw_ifcount].ifaddr =
+                ((struct sockaddr_in *) cursor->ifa_addr)->sin_addr.s_addr;
+            echttp_raw_if[echttp_raw_ifcount].ifmask =
+                ((struct sockaddr_in *) cursor->ifa_netmask)->sin_addr.s_addr;
+            echttp_raw_ifcount += 1;
+        }
+        freeifaddrs(cards);
+        echttp_raw_timestamp = now;
+    }
 }
 
 static void echttp_raw_accept (void) {
@@ -126,6 +184,7 @@ static void echttp_raw_accept (void) {
            }
            echttp_raw_cleanup(i);
            echttp_raw_client[i].socket = client;
+           echttp_raw_client[i].peer = peer;
            return;
        }
    }
@@ -286,6 +345,28 @@ static int echttp_raw_invalid (int client) {
        return 1;
    }
    return 0;
+}
+
+int  echttp_raw_is_local (int client) {
+
+    int i;
+    uint32_t ipaddr = echttp_raw_client[client].peer.sin_addr.s_addr;
+
+    echttp_raw_enumerate();
+
+    if (echttp_raw_debug) {
+        printf ("Comparing %s to:\n", echttp_printip (ntohl((long)ipaddr)));
+    }
+    for (i = 0; i < echttp_raw_ifcount; ++i) {
+        uint32_t ifmask = echttp_raw_if[i].ifmask;
+        if (echttp_raw_debug) {
+            printf ("   %s\n",
+                    echttp_printip (ntohl((long)echttp_raw_if[i].ifaddr)));
+        }
+        if ((echttp_raw_if[i].ifaddr & ifmask) == (ipaddr & ifmask))
+            return 1;
+    }
+    return 0;
 }
 
 void echttp_raw_send (int client, const char *data, int length, int hangup) {

@@ -129,6 +129,10 @@ void echttp_redirect (const char *url);
 ```
 The HTTP response will return a redirect to the specified URL.
 ```
+void echttp_islocal (void);
+```
+Return 1 if the HTTP client is on a local network, 0 otherwise. This is a crude protection mechanism that can be used to decide if private information should be concealed, or the command be rejected, with the assumption that local machine can be trusted. An application might also decide to not request user authentication if the client is on a local network. This function should be called from within an HTTP callback, while processing an HTTP request.
+```
 typedef void *echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 ```

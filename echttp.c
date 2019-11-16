@@ -71,7 +71,12 @@
  * 
  * Send a redirect response instead of OK.
  * 
- * 
+ *
+ * int echttp_islocal (void);
+ *
+ * Return 1 if the current client is on a local network.
+ *
+ *
  * typedef void *echttp_listener (int fd, int mode);
  * void echttp_listen (int fd, int mode, echttp_listener *listener);
  *
@@ -119,6 +124,7 @@ static int echttp_debug = 0;
 typedef struct {
     int state;
     int route;
+    int client;
     int contentlength;
     char *method;
     char *uri;
@@ -193,6 +199,7 @@ static void echttp_execute (int route, int client,
     char buffer[256];
 
     echttp_current = &(echttp_context[client]);
+    echttp_current->client = client;
     echttp_current->status = 200;
     echttp_current->reason = "OK";
     echttp_catalog_reset(&(echttp_current->out));
@@ -454,8 +461,8 @@ static int echttp_received (int client, char *data, int length) {
 const char *echttp_help (int level) {
     static const char *httpHelp[] = {
         " [-http-service=NAME] [-http-debug]",
-        "-http-service=NAME:  name or port number for the HTTP socket.",
-        "-http-debug:         set debug mode (verbose traces).",
+        "-http-service=NAME:  name or port number for the HTTP socket (http).",
+        "-http-debug:         enable debug traces.",
         NULL
     };
 
@@ -550,6 +557,10 @@ void echttp_error (int code, const char *message) {
 void echttp_redirect (const char *url) {
     echttp_error (301, "Redirected");
     echttp_attribute_set ("Location", url);
+}
+
+int echttp_islocal (void) {
+    return echttp_raw_is_local(echttp_current->client);
 }
 
 int echttp_isdebug (void) {
