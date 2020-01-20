@@ -57,7 +57,7 @@ The echttp primitives are:
 ```
 const char *echttp_help (int level);
 ```
-Return a help text to print. If level is 0, it returns the short list of options in a single line, otherwise it returnas the detailed description for option N. To print the detailed descriptions for all options, the caller should loop starting at 1 and stop when the return is 0 (null).
+Return a help text to print. If level is 0, it returns the short list of options in a single line, otherwise it returns the detailed description for option N. To print the detailed descriptions for all options, the caller should loop starting at 1 and stop when the return is 0 (null).
 
 ```
 int echttp_open (int argc, const char **argv);
