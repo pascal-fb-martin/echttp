@@ -22,15 +22,14 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
- * int echttp_static_map (const char *uri, const char *path);
+ * int echttp_static_route (const char *uri, const char *path);
  *
  *    Declare a mapping between an URI and a local file or folder.
  *
- * const char *echttp_static_page (const char *action,
- *                                 const char *uri,
- *                                 const char *data, int length);
+ * void echttp_static_content_map (const char *extension, const char *content);
  *
- *    Execute an HTTP request for a static page (i.e. file).
+ *    Declare an additional file content type. The most common file types are
+ *    already declared, so this function should only be used in rare cases.
  */
 
 #include <stdlib.h>
