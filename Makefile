@@ -1,5 +1,5 @@
 
-OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o
+OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o echttp_option.o
 
 all: libechttp.a
 

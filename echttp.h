@@ -18,6 +18,11 @@
  */
 const char *echttp_help (int level);
 
+const char *echttp_option_match (const char *reference,
+                                 const char *input, const char **value);
+
+int echttp_option_present (const char *reference, const char *input);
+
 int  echttp_open (int argc, const char **argv);
 void echttp_close (void);
 

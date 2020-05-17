@@ -11,9 +11,9 @@ cc -o httpserver httpserver.c -lechttp
 ```
 * Run httpserver:
 ```
-./httpserver -http-port=8080
+./httpserver -http-service=8080
 ```
 * If you want to see the debug traces:
 ```
-./httpserver -http-port=8080 -http-debug
+./httpserver -http-service=8080 -http-debug
 ```

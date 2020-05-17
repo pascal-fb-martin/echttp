@@ -86,9 +86,13 @@ int main (int argc, const char **argv) {
     if (argc <= 0) exit(1);
 
     if (echttp_isdebug()) {
-        printf("Remaining arguments:\n");
-        for (i = 1; i < argc; ++i) {
-            printf ("  %d: %s\n", i, argv[i]);
+        if (argc <= 1)
+           printf("No remaining argument\n");
+        else {
+           printf("Remaining arguments:\n");
+           for (i = 1; i < argc; ++i) {
+               printf ("  %d: %s\n", i, argv[i]);
+           }
         }
     }
     echttp_protect

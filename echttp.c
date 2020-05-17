@@ -161,14 +161,6 @@ static struct {
 } echttp_routing;
 
 
-static const char *echttp_match (const char *reference, const char *value) {
-   int l = strlen(reference);
-   if (strncmp (reference, value, l) == 0) {
-      return value + l;
-   }
-   return 0;
-}
-
 static int echttp_split (char *data, const char *sep, char **items, int max) {
     int count = 0;
     int length = strlen(sep);
@@ -480,13 +472,8 @@ int echttp_open (int argc, const char **argv) {
 
    for (i = 1, shift = 1; i < argc; ++i) {
        if (shift != i) argv[shift] = argv[i];
-       value = echttp_match ("-http-service=", argv[i]);
-       if (value) {
-           service = value;
-           continue;
-       }
-       value = echttp_match ("-http-debug", argv[i]);
-       if (value) {
+       if (echttp_option_match ("-http-service=", argv[i], &service)) continue;
+       if (echttp_option_present ("-http-debug", argv[i])) {
            echttp_debug = 1;
            continue;
        }

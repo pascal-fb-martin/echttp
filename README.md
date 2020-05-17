@@ -176,4 +176,20 @@ For example if one defines a static route from /static to /home/doe/public, the 
 As soon as a static route has been declared, the extension takes over the root URI "/". If the root URI is requested, the extension seaches for file index.html in every path provided and returns the content of the first one found.
 
 This function returns the route descriptor or -1 on failure. This route descriptor can be used to protect the whole path.
+```
+const char *echttp_option_match (const char *reference,
+                                 const char *input, const char **value);
+```
+This is a convenience function to help decode command line arguments.
+
+It returns 0 if the argument input does not match the reference string, a pointer to the value otherwise. (If there is no value, the result points to an end of string character).
+
+This function supports the syntax option '=' value, if the reference string ends with a '='. In this case, and if there is a match, value points to the string after the '='. Otherwise value is not touched, so that the caller can initialize it with a default value.
+```
+int echttp_option_present (const char *reference, const char *input);
+```
+
+This is a convenience function to help decode command line arguments.
+
+It returns 1 if there is an exact match, 0 otherwise.
 
