@@ -108,3 +108,18 @@ const char *echttp_catalog_get (echttp_catalog *d, const char *name) {
     return 0;
 }
 
+void echttp_catalog_join (echttp_catalog *d,
+                          const char *sep, char *text, int size) {
+
+    int i;
+    int length = 0;
+
+    text[0] = 0;
+
+    for (i = 1; i <= d->count; ++i) {
+        snprintf (text+length, size-length, "%s%s=%s",
+                  length?sep:"", d->item[i].name, d->item[i].value);
+        length += strlen(text+length);
+    }
+}
+

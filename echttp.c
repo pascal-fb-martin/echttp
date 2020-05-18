@@ -143,6 +143,7 @@ static echttp_request *echttp_current = 0;
 
 #define ECHTTP_MODE_EXACT   1
 #define ECHTTP_MODE_PARENT  2
+#define ECHTTP_MODE_ANY     (ECHTTP_MODE_EXACT|ECHTTP_MODE_PARENT)
 
 typedef struct {
     const char *uri;
@@ -280,12 +281,17 @@ static int echttp_route_search (const char *uri, int mode) {
    unsigned int signature = echttp_catalog_signature (uri);
    int index = signature % ECHTTP_HASH;
 
-   if (echttp_debug) printf ("Searching route for %s\n", uri);
+   static char *toascii[] = {"(invalid)", "exact", "parent", "any"};
+
+   if (echttp_debug)
+       printf ("Searching route for %s (mode %s)\n", uri, toascii[mode]);
    for (i = echttp_routing.index[index];
         i > 0; i = echttp_routing.item[i].next) {
-       if (echttp_routing.item[i].mode != mode) continue;
+       if ((echttp_routing.item[i].mode & mode) == 0) continue;
        if (echttp_debug)
-           printf ("Matching with %s\n", echttp_routing.item[i].uri);
+           printf ("Matching with %s (%s entry)\n",
+                   echttp_routing.item[i].uri,
+                   toascii[echttp_routing.item[i].mode]);
        if ((echttp_routing.item[i].signature == signature) &&
            strcmp (echttp_routing.item[i].uri, uri) == 0) return i;
    }
@@ -393,9 +399,9 @@ static int echttp_received (int client, char *data, int length) {
            }
        }
 
-       // Search for a uri mapping: try exact match first, then for a parent.
+       // Search for a uri mapping: try any match first, then for a parent.
        //
-       i = echttp_route_search (context->uri, ECHTTP_MODE_EXACT);
+       i = echttp_route_search (context->uri, ECHTTP_MODE_ANY);
        if (i <= 0) {
            char *uri = strdup(context->uri);
            char *sep = strrchr (uri+1, '/');
@@ -515,6 +521,10 @@ const char *echttp_parameter_get (const char *name) {
     return echttp_catalog_get (&(echttp_current->params), name);
 }
 
+void echttp_parameter_join (char *text, int size) {
+    echttp_catalog_join (&(echttp_current->params), "&", text, size);
+}
+
 void echttp_attribute_set (const char *name, const char *value) {
     echttp_catalog_set (&(echttp_current->out), name, value);
 }
@@ -542,7 +552,12 @@ void echttp_error (int code, const char *message) {
 }
 
 void echttp_redirect (const char *url) {
-    echttp_error (301, "Redirected");
+    echttp_error (302, "Redirected");
+    echttp_attribute_set ("Location", url);
+}
+
+void echttp_permanent_redirect (const char *url) {
+    echttp_error (301, "Redirected permanently");
     echttp_attribute_set ("Location", url);
 }
 

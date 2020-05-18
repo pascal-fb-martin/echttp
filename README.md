@@ -101,9 +101,13 @@ Retrieve the value of the specified HTTP parameter, or 0 if not found. This func
 
 Parameter names are case insensitive: __NaMe__ is the same as __name__.
 ```
+void echttp_parameter_join (char *text, int size);
+```
+Retrieve all HTTP parameters and rebuild the HTTP parameter string. This function should be called from within an HTTP callback, while processing an HTTP request.
+```
 void echttp_attribute_set (const char *name, const char *value);
 ```
-Set an attribute for the HTTP response. This function should be called from within an HTTP callback, while processing an HTTP request.
+Set an attribute for the HTTP response. This function should be called from within an HTTP callback, while processing an HTTP request. The value must not be a local variable (it must be static) because it will be used after the HTTP callback returns.
 ```
 void echttp_content_type_set (const char *value);
 ```

@@ -33,3 +33,6 @@ void echttp_catalog_set (echttp_catalog *d,
 
 const char *echttp_catalog_get (echttp_catalog *d, const char *name);
 
+void echttp_catalog_join (echttp_catalog *d,
+                          const char *sep, char *text, int size);
+

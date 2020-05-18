@@ -38,6 +38,7 @@ int echttp_protect (int route, echttp_protect_callback *call);
 
 const char *echttp_attribute_get (const char *name);
 const char *echttp_parameter_get  (const char *name);
+void        echttp_parameter_join (char *text, int size);
 
 void echttp_attribute_set (const char *name, const char *value);
 void echttp_error         (int code, const char *message);
