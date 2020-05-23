@@ -17,6 +17,8 @@ install:
 clean:
 	rm -f *.o *.a
 
+rebuild: clean all
+
 %.o: %.c
 	gcc -c -g -O -fPIC -o $@ $<
 
