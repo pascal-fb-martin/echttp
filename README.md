@@ -6,7 +6,9 @@ This is a small HTTP/1.1 server designed for simple API and minimal dependencies
 There is no security mechanism planned at this time: use this library only for applications accessible from a protected network.
 (In the long term, it will eventually interface with a TLS library and manage accounts, but don't hold your breath..)
 
-After initializing the HTTP server, and then its own initialization, the application reacts to file descriptor events and HTTP requests as provided by the HTTP server.
+After initializing the HTTP server, and then completing its own initialization, the application reacts to file descriptor events and HTTP requests as provided by the HTTP server.
+
+This web server can be configured to use dynamic port allocation for its server socket. Before you hit your head against the proverbial wall trying to understand why the hell this is even allowed, please take a look at [houseportal](https://github.com/pascal-fb-martin/houseportal).
 
 # Installation
 * Clone the repository.
@@ -65,7 +67,7 @@ int echttp_open (int argc, const char **argv);
 Initialize the HTTP server. The HTTP-specific arguments are removed from the argument list and the count of remaining arguments is returned.
 
 The arguments consumed by echttp_open are:
-* -http-service=_name_ (Service name or port number to listen to; default is "http", i.e. port 80.)
+* -http-service=_name_ (Service name or port number to listen to; default is "http", i.e. port 80. A dynamic port number will be used if the service name is "dynamic".)
 * -http-debug (If present, expect to see a lot of debug traces.)
 
 ```
@@ -136,6 +138,10 @@ The HTTP response will return a redirect to the specified URL.
 void echttp_islocal (void);
 ```
 Return 1 if the HTTP client is on a local network, 0 otherwise. This is a crude protection mechanism that can be used to decide if private information should be concealed, or the command be rejected, with the assumption that local machine can be trusted. An application might also decide to not request user authentication if the client is on a local network. This function should be called from within an HTTP callback, while processing an HTTP request.
+```
+int echttp_port (int ip);
+```
+Return the web server's port number for IPv4 (ip=4) or IPv6 (ip=6). If the port number returned is 0, the web server is not listening on the specified address space. (IPv6 is not currently supported by echttp, and the port number returned for IPv6 is always 0 at this time.)
 ```
 typedef void *echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);

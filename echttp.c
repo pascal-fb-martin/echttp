@@ -76,6 +76,11 @@
  *
  * Return 1 if the current client is on a local network.
  *
+ * int echttp_port (int ip);
+ *
+ * Return the web server's port number for IPv4 (ip==4) or IPv6 (ip==6).
+ * If the port number is 0, the web server is not listening on the specified
+ * IP namespace.
  *
  * typedef void *echttp_listener (int fd, int mode);
  * void echttp_listen (int fd, int mode, echttp_listener *listener);
@@ -563,6 +568,10 @@ void echttp_permanent_redirect (const char *url) {
 
 int echttp_islocal (void) {
     return echttp_raw_is_local(echttp_current->client);
+}
+
+int echttp_port (int ip) {
+    return echttp_raw_server_port (ip);
 }
 
 int echttp_isdebug (void) {

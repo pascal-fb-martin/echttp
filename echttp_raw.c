@@ -26,6 +26,8 @@
  * typedef int echttp_raw_callback (int client, char *data, int length);
  * int echttp_raw_open (const char *service, int debug);
  *
+ * int echttp_raw_server_port (int ip);
+ *
  * int echttp_raw_send (int client, const char *data, int length, int hangup);
  *
  * void echttp_raw_loop (echttp_raw_callback *received);
@@ -69,6 +71,8 @@ static echttp_raw_registration echttp_raw_other[ECHTTP_RAW_MAXREGISTERED];
 static int echttp_raw_other_count = 0;
 
 static echttp_listener *echttp_raw_backgrounder = 0;
+
+static int echttp_raw_serverport = 0;
 
 
 #define ECHTTP_CLIENT_BUFFER 102400
@@ -218,6 +222,7 @@ int echttp_raw_open (const char *service, int debug) {
            fprintf (stderr, "invalid service name %s\n", service);
            return 0;
        }
+       echttp_raw_serverport = port;
    }
 
    if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
@@ -239,6 +244,15 @@ int echttp_raw_open (const char *service, int debug) {
        fprintf (stderr, "cannot bind to service %s: %s\n",
                 service, strerror(errno));
        return 0;
+   }
+
+   if (port == 0) {
+       int addrlen = sizeof(netaddress);
+       getsockname (echttp_raw_server,
+                    (struct sockaddr *)&netaddress, &addrlen);
+       echttp_raw_serverport = ntohs(netaddress.sin_port);
+       if (echttp_raw_debug)
+           printf ("Dynamic port allocated: %d\n", echttp_raw_serverport);
    }
 
    if (listen (echttp_raw_server, 4) < 0) {
@@ -371,6 +385,14 @@ int  echttp_raw_is_local (int client) {
             return 1;
     }
     return 0;
+}
+
+int  echttp_raw_server_port (int ip) {
+    switch (ip) {
+        case 4: return echttp_raw_serverport;
+        case 6: return 0; // No IPv6 support for now.
+    }
+    return 0; // Not a known IP version.
 }
 
 void echttp_raw_send (int client, const char *data, int length, int hangup) {

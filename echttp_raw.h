@@ -8,6 +8,8 @@ typedef int echttp_raw_callback (int client, char *data, int length);
 
 int  echttp_raw_open (const char *service, int debug);
 
+int  echttp_raw_server_port (int ip);
+
 void echttp_raw_send (int client, const char *data, int length, int hangup);
 
 void echttp_raw_register (int fd, int mode,
