@@ -176,7 +176,7 @@ static void echttp_raw_accept (void) {
                        (struct sockaddr *)(&peer), &peerlength);
    if (client < 0) {
        fprintf (stderr, "cannot accept new client: %s\n", strerror(errno));
-       return;
+       exit(1);
    }
 
    for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
