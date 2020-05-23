@@ -202,18 +202,22 @@ int echttp_raw_open (const char *service, int debug) {
 
    echttp_raw_debug = debug;
 
-   struct servent *entry = getservbyname(service, "tcp");
-   if (entry == NULL) {
-       if (isdigit (service[0])) {
-          port = atoi(service);
-       }
+   if (strcmp ("dynamic", service) == 0) {
+       port = 0;
    } else {
-       port = ntohs(entry->s_port);
-   }
+       struct servent *entry = getservbyname(service, "tcp");
+       if (entry == NULL) {
+           if (isdigit (service[0])) {
+              port = atoi(service);
+           }
+       } else {
+           port = ntohs(entry->s_port);
+       }
 
-   if (port <= 0) {
-       fprintf (stderr, "invalid service name %s\n", service);
-       return 0;
+       if (port <= 0) {
+           fprintf (stderr, "invalid service name %s\n", service);
+           return 0;
+       }
    }
 
    if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
@@ -414,11 +418,15 @@ void echttp_raw_loop (echttp_raw_callback *received) {
       }
 
       for (i = 0; i < echttp_raw_other_count; ++i) {
-          if (echttp_raw_other[i].mode & 1) {
-              FD_SET(echttp_raw_other[i].fd, &readset);
-          }
-          if (echttp_raw_other[i].mode & 2) {
-              FD_SET(echttp_raw_other[i].fd, &writeset);
+          if (echttp_raw_other[i].mode) {
+              int socket = echttp_raw_other[i].fd;
+              if (echttp_raw_other[i].mode & 1) {
+                  FD_SET(socket, &readset);
+              }
+              if (echttp_raw_other[i].mode & 2) {
+                  FD_SET(socket, &writeset);
+              }
+              if (socket > maxfd) maxfd = socket;
           }
       }
 
