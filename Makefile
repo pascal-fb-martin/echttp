@@ -19,6 +19,12 @@ clean:
 
 rebuild: clean all
 
+uninstall:
+	rm -f /usr/local/lib/libechttp.a
+	rm -f /usr/local/include/echttp.h /usr/local/include/echttp_static.h
+
+purge: uninstall
+
 %.o: %.c
 	gcc -c -g -O -fPIC -o $@ $<
 
