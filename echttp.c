@@ -175,6 +175,7 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
     while (*data) {
        if (strncmp(sep, data, length) == 0) {
            *data = 0;
+           if (count >= max) return count;
            items[count++] = start;
            data += length;
            start = data;
