@@ -29,6 +29,6 @@ purge: uninstall
 	gcc -c -g -O -fPIC -o $@ $<
 
 libechttp.a: $(OBJS)
-	ar ru $@ $^
+	ar r $@ $^
 	ranlib $@
 
