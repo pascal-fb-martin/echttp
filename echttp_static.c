@@ -58,6 +58,7 @@ static struct {
     {"html", "text/html"},
     {"htm",  "text/html"},
     {"css",  "text/css"},
+    {"csv",  "text/csv"},
     {"json", "application/json"},
     {"jsn",  "application/json"},
     {"js",   "application/javascript"},
