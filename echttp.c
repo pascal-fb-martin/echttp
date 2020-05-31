@@ -82,6 +82,15 @@
  * If the port number is 0, the web server is not listening on the specified
  * IP namespace.
  *
+ * int echttp_dynamic_port (void);
+ *
+ * Return true if the HTTP server uses a dynamic port, false otherwise.
+ * Dynamic ports are typically used when multiple HTTP servers run on
+ * the same machine (e.g. micro services), but require using a discovery
+ * service (e.g. houseportal). Dynamic port mode is activated using the
+ * command line option -http-service=dynamic.
+ *
+ *
  * typedef void *echttp_listener (int fd, int mode);
  * void echttp_listen (int fd, int mode, echttp_listener *listener);
  *
@@ -145,6 +154,8 @@ typedef struct {
 static echttp_request *echttp_context = 0;
 static int             echttp_context_count = 0;
 static echttp_request *echttp_current = 0;
+
+static int echttp_dynamic_flag = 0;
 
 #define ECHTTP_MODE_EXACT   1
 #define ECHTTP_MODE_PARENT  2
@@ -493,6 +504,7 @@ int echttp_open (int argc, const char **argv) {
    }
    echttp_routing.count = 0;
    if (! echttp_raw_open (service, echttp_debug)) return -1;
+   echttp_dynamic_flag = (strcmp(service, "dynamic") == 0);
    return shift;
 }
 
@@ -573,6 +585,10 @@ int echttp_islocal (void) {
 
 int echttp_port (int ip) {
     return echttp_raw_server_port (ip);
+}
+
+int echttp_dynamic_port (void) {
+   return echttp_dynamic_flag;
 }
 
 int echttp_isdebug (void) {

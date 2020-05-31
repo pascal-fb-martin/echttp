@@ -143,6 +143,14 @@ int echttp_port (int ip);
 ```
 Return the web server's port number for IPv4 (ip=4) or IPv6 (ip=6). If the port number returned is 0, the web server is not listening on the specified address space. (IPv6 is not currently supported by echttp, and the port number returned for IPv6 is always 0 at this time.)
 ```
+int echttp_dynamic_port (void);
+```
+Return true if the HTTP server uses a dynamic port, false otherwise.
+
+Dynamic ports are typically used when multiple HTTP servers run on the same machine (e.g. micro services), but require using a discovery service (e.g. HousePortal).
+
+Dynamic port mode is activated using the command line option -http-service=dynamic.
+```
 typedef void *echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 ```

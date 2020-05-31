@@ -25,6 +25,7 @@ int echttp_option_present (const char *reference, const char *input);
 
 int  echttp_open (int argc, const char **argv);
 int  echttp_port (int ip);
+int  echttp_dynamic_port (void);
 void echttp_close (void);
 
 typedef const char *echttp_callback (const char *method, const char *uri,
