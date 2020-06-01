@@ -75,7 +75,7 @@ static echttp_listener *echttp_raw_backgrounder = 0;
 static int echttp_raw_serverport = 0;
 
 
-#define ECHTTP_CLIENT_BUFFER 102400
+#define ECHTTP_CLIENT_BUFFER 512000
 typedef struct {
     char data[ECHTTP_CLIENT_BUFFER];
     int start;
