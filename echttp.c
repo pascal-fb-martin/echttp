@@ -149,6 +149,12 @@ typedef struct {
 
     int status;
     const char *reason;
+
+    struct {
+        int fd;
+        int size;
+    } transfer;
+
 } echttp_request;
 
 static echttp_request *echttp_context = 0;
@@ -207,12 +213,16 @@ static void echttp_execute (int route, int client,
     int i;
     int keep;
     char buffer[256];
+    int datalength;
 
     echttp_current = &(echttp_context[client]);
     echttp_current->client = client;
     echttp_current->status = 200;
     echttp_current->reason = "OK";
     echttp_catalog_reset(&(echttp_current->out));
+
+    echttp_current->transfer.fd = -1;
+    echttp_current->transfer.size = 0;
 
     if (echttp_routing.item[route].protect) {
         echttp_routing.item[route].protect (action, uri);
@@ -226,7 +236,8 @@ static void echttp_execute (int route, int client,
 
         data = echttp_routing.item[route].call (action, uri, data, length);
     }
-    length = data?strlen(data):0;
+    datalength = data?strlen(data):0;
+    length = datalength + echttp_current->transfer.size;
 
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
              echttp_current->status, echttp_current->reason);
@@ -250,7 +261,18 @@ static void echttp_execute (int route, int client,
     }
     echttp_raw_send (client, eol, sizeof(eol)-1, (data == 0 && keep == 0));
     if (data != 0) {
-       echttp_raw_send (client, data, length, (keep == 0));
+       echttp_raw_send (client, data, datalength, (keep == 0));
+    }
+    if (echttp_current->transfer.size > 0) {
+        // This transfer must be submitted to the raw layer only after
+        // all the preamble was submitted. Otherwise the raw layer may
+        // start the file transfer before the HTTP preamble was sent..
+        //
+        echttp_raw_transfer (client,
+                             echttp_current->transfer.fd,
+                             echttp_current->transfer.size, (keep == 0));
+        echttp_current->transfer.fd = -1;
+        echttp_current->transfer.size = 0;
     }
 
     echttp_current = 0;
@@ -562,6 +584,13 @@ void echttp_content_type_html (void) {
 
 void echttp_content_type_css (void) {
     echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/css");
+}
+
+void echttp_transfer (int fd, int size) {
+    if (echttp_current->transfer.size <= 0) {
+        echttp_current->transfer.fd = fd;
+        echttp_current->transfer.size = size;
+    }
 }
 
 void echttp_error (int code, const char *message) {

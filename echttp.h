@@ -51,6 +51,8 @@ void echttp_content_type_html (void);
 void echttp_content_type_json (void);
 void echttp_content_type_css  (void);
 
+void echttp_transfer (int fd, int size);
+
 typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 void echttp_background (echttp_listener *listener);

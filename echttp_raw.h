@@ -11,6 +11,7 @@ int  echttp_raw_open (const char *service, int debug);
 int  echttp_raw_server_port (int ip);
 
 void echttp_raw_send (int client, const char *data, int length, int hangup);
+void echttp_raw_transfer (int client, int fd, int length, int hangup);
 
 void echttp_raw_register (int fd, int mode,
                           echttp_listener *listener, int premium);

@@ -35,7 +35,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include "echttp.h"
 #include "echttp_static.h"
@@ -44,9 +46,6 @@
 static echttp_catalog echttp_static_roots;
 
 static echttp_catalog echttp_static_type;
-
-static char *echttp_static_buffer = 0;
-static int   echttp_static_buffer_size = 0;
 
 /* Define default content type for the most frequent file extensions.
  * Don't define too many: it would load the catalog with lot of unused items.
@@ -71,33 +70,18 @@ static struct {
     {0, 0}
 };
 
-static const char *echttp_static_file (FILE *page, const char *filename) {
+static const char *echttp_static_file (int page, const char *filename) {
 
-    if (page == 0) {
+    if (page < 0) {
         echttp_error (404, "Not found");
         return "";
     }
     struct stat fileinfo;
-    if (fstat(fileno(page), &fileinfo) < 0) goto unsupported;
+    if (fstat(page, &fileinfo) < 0) goto unsupported;
     if (fileinfo.st_mode & S_IFMT != S_IFREG) goto unsupported;
-    if (fileinfo.st_size < 0 ||
-        fileinfo.st_size >= 1024*1024*1024) goto unsupported;
+    if (fileinfo.st_size < 0) goto unsupported;
 
     if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
-
-    size_t size = fileinfo.st_size + 1;
-    if (size > echttp_static_buffer_size) {
-        echttp_static_buffer_size = size;
-        echttp_static_buffer = realloc (echttp_static_buffer, (size_t)size);
-        if (echttp_static_buffer == 0) {
-            fprintf (stderr, "realloc failed for size %d\n", size);
-            exit(1);
-        }
-    }
-    echttp_static_buffer[0] = 0;
-    fread (echttp_static_buffer, 1, size, page);
-    echttp_static_buffer[size-1] = 0;
-    fclose (page);
 
     const char *sep = strrchr (filename, '.');
     if (sep) {
@@ -106,7 +90,8 @@ static const char *echttp_static_file (FILE *page, const char *filename) {
             echttp_content_type_set (content);
         }
     }
-    return echttp_static_buffer;
+    echttp_transfer (page, fileinfo.st_size);
+    return "";
 
     unsupported:
         echttp_error (406, "Not Acceptable");
@@ -153,13 +138,13 @@ static const char *echttp_static_page (const char *action,
     strncpy (filename+pathlen, uri+strlen(rooturi), sizeof(filename)-pathlen);
     filename[sizeof(filename)-1] = 0;
 
-    return echttp_static_file (fopen (filename, "r"), filename);
+    return echttp_static_file (open (filename, O_RDONLY), filename);
 }
 
 static const char *echttp_static_root (const char *method, const char *uri,
                                   const char *data, int length) {
     char filename[1024];
-    FILE *page = 0;
+    int page = 0;
     int i;
 
     for (i = 1; i <= echttp_static_roots.count; ++i) {
@@ -169,8 +154,8 @@ static const char *echttp_static_root (const char *method, const char *uri,
         filename[sizeof(filename)-1] = 0;
         if (echttp_isdebug())
             printf ("Trying static file %s\n", filename);
-        page = fopen (filename, "r");
-        if (page) break;
+        page = open (filename, O_RDONLY);
+        if (page >= 0) break;
     }
     return echttp_static_file (page, filename);
 }

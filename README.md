@@ -74,7 +74,7 @@ The arguments consumed by echttp_open are:
 typedef const char *echttp_callback (const char *method, const char *uri,
                                      const char *data, int length);
 ```
-The profile for any HTTP request processing function.
+The profile for any HTTP request processing function. The string returned contains the data to send back to the client; it must not be a local (stack) variable, since it is used after the callback returned.
 ```
 int echttp_route_uri (const char *uri, echttp_callback *call);
 ```
@@ -134,6 +134,10 @@ The HTTP response will return the specified error instead of OK.
 void echttp_redirect (const char *url);
 ```
 The HTTP response will return a redirect to the specified URL.
+```
+void echttp_transfer (int fd, int size);
+```
+Declare a file descriptor to transfer after the returned response. This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred from the file to the client. This transfer only happens after the HTTP preamble and the response string returned by the callback have been sent.
 ```
 void echttp_islocal (void);
 ```

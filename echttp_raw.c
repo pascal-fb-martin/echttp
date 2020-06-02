@@ -45,6 +45,7 @@
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -75,7 +76,7 @@ static echttp_listener *echttp_raw_backgrounder = 0;
 static int echttp_raw_serverport = 0;
 
 
-#define ECHTTP_CLIENT_BUFFER 512000
+#define ECHTTP_CLIENT_BUFFER 102400
 typedef struct {
     char data[ECHTTP_CLIENT_BUFFER];
     int start;
@@ -90,6 +91,10 @@ static struct {
     time_t deadline;
     echttp_buffer in;
     echttp_buffer out;
+    struct {
+        int fd;
+        int size;
+    } transfer;
 } echttp_raw_client[ECHTTP_CLIENT_MAX];
 
 
@@ -110,6 +115,8 @@ static void echttp_raw_cleanup (int i) {
    echttp_raw_client[i].out.end = 0;
    echttp_raw_client[i].deadline = 0;
    echttp_raw_client[i].hangup = 0;
+   echttp_raw_client[i].transfer.fd = -1;
+   echttp_raw_client[i].transfer.size = 0;
 }
 
 static const char *echttp_printip (long ip) {
@@ -268,9 +275,13 @@ int echttp_raw_open (const char *service, int debug) {
 }
 
 static void echttp_raw_close_client (int i, const char *reason) {
+
     if (echttp_raw_client[i].socket >= 0) {
         if (echttp_raw_debug) printf ("closing client %d: %s\n", i, reason);
         close (echttp_raw_client[i].socket);
+        if (echttp_raw_client[i].transfer.size > 0) {
+            close (echttp_raw_client[i].transfer.fd);
+        }
         echttp_raw_cleanup(i);
     }
 }
@@ -280,7 +291,7 @@ static int echttp_raw_consume (echttp_buffer *buffer, int length) {
    if (buffer->start >= buffer->end) {
        buffer->start = buffer->end = 0;
    }
-   return buffer->start == 0;
+   return buffer->end == 0;
 }
 
 static void echttp_raw_transmit (int i) {
@@ -288,20 +299,48 @@ static void echttp_raw_transmit (int i) {
    echttp_buffer *buffer = &(echttp_raw_client[i].out);
 
    ssize_t length = buffer->end - buffer->start;
-   if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
+   if (length > 0) {
 
-   length = send (echttp_raw_client[i].socket,
-                  buffer->data + buffer->start, (size_t)length, 0);
-   if (length <= 0) {
-       echttp_raw_close_client (i, strerror(errno));
-       return;
-   }
-   if (echttp_raw_debug) {
-       printf ("Transmit data at %d: %*.*s\n",
-               buffer->start, 0-length, length, buffer->data + buffer->start);
-   }
-   if (echttp_raw_consume (buffer, length)) {
-       echttp_raw_client[i].deadline = time(NULL) + 10;
+      if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
+
+      length = send (echttp_raw_client[i].socket,
+                     buffer->data + buffer->start, (size_t)length, 0);
+      if (length <= 0) {
+          echttp_raw_close_client (i, strerror(errno));
+          return;
+      }
+      if (echttp_raw_debug) {
+          printf ("Transmit data at %d: %*.*s\n",
+                  buffer->start, 0-length, length, buffer->data + buffer->start);
+      }
+      if (echttp_raw_consume (buffer, length)) {
+          if (echttp_raw_client[i].transfer.size <= 0) {
+              echttp_raw_client[i].deadline = time(NULL) + 10;
+          } else if (echttp_raw_debug) {
+              printf ("Initiating fiel transfer (%d bytes)\n",
+                      echttp_raw_client[i].transfer.size);
+          }
+      }
+
+   } else if (echttp_raw_client[i].transfer.size > 0) {
+
+       length = echttp_raw_client[i].transfer.size;
+       if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
+
+       length = sendfile (echttp_raw_client[i].socket,
+                          echttp_raw_client[i].transfer.fd, 0, length);
+       if (length <= 0) {
+           echttp_raw_close_client (i, strerror(errno));
+           return;
+       }
+       echttp_raw_client[i].transfer.size -= length;
+       if (echttp_raw_client[i].transfer.size <= 0) {
+           close (echttp_raw_client[i].transfer.fd);
+           echttp_raw_client[i].transfer.fd = -1;
+           echttp_raw_client[i].transfer.size = 0;
+
+           echttp_raw_client[i].deadline = time(NULL) + 10;
+       }
    }
 }
 
@@ -407,6 +446,13 @@ void echttp_raw_send (int client, const char *data, int length, int hangup) {
    echttp_raw_client[client].hangup |= hangup;
 }
 
+void echttp_raw_transfer (int client, int fd, int length, int hangup) {
+   if (echttp_raw_invalid(client)) return;
+   echttp_raw_client[client].transfer.fd = fd;
+   echttp_raw_client[client].transfer.size = length;
+   echttp_raw_client[client].hangup |= hangup;
+}
+
 void echttp_raw_loop (echttp_raw_callback *received) {
 
    struct timeval timeout;
@@ -425,7 +471,8 @@ void echttp_raw_loop (echttp_raw_callback *received) {
       for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
           int socket = echttp_raw_client[i].socket;
           if (socket >= 0) {
-              if (echttp_raw_client[i].out.end > 0) {
+              if (echttp_raw_client[i].out.end > 0 ||
+                  echttp_raw_client[i].transfer.size > 0) {
                   FD_SET(socket, &writeset);
               } else {
                   // Receive only after the previous response has been sent.
