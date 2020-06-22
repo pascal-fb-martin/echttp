@@ -240,7 +240,7 @@ typedef struct {
     int type;
     union {
         int bool;
-        int integer;
+        long integer;
         double real;
         char *string;
     } value;
