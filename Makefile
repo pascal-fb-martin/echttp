@@ -1,7 +1,7 @@
 
-OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o echttp_option.o
+OBJS= echttp_static.o echttp.o echttp_raw.o echttp_catalog.o echttp_option.o echttp_json.o
 
-all: libechttp.a
+all: libechttp.a echttp_jsonprint echttp_jsonget
 
 install:
 	mkdir -p /usr/local/lib
@@ -15,7 +15,7 @@ install:
 	chmod 644 /usr/local/include/echttp.h /usr/local/include/echttp_static.h
 
 clean:
-	rm -f *.o *.a
+	rm -f *.o *.a echttp_jsonprint echttp_jsonget
 
 rebuild: clean all
 
@@ -31,4 +31,10 @@ purge: uninstall
 libechttp.a: $(OBJS)
 	ar r $@ $^
 	ranlib $@
+
+echttp_jsonprint: echttp_jsonprint.o libechttp.a
+	gcc -g -O -fPIC -o $@ echttp_jsonprint.o libechttp.a
+
+echttp_jsonget: echttp_jsonget.o libechttp.a
+	gcc -g -O -fPIC -o $@ echttp_jsonget.o libechttp.a
 
