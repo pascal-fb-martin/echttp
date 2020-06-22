@@ -97,7 +97,7 @@ static void print_json (JsonToken *token, int i) {
             printf ("array, length %d\n", token[i].length);
             break;
         case JSON_OBJECT:
-            printf ("objects, %d elements\n", token[i].length);
+            printf ("object, %d elements\n", token[i].length);
             break;
         default:
             fprintf (stderr, "Invalid token type %d at index %d\n",

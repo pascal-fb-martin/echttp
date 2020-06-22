@@ -13,6 +13,9 @@ install:
 	chown root:root /usr/local/include/echttp.h
 	chown root:root /usr/local/include/echttp_static.h
 	chmod 644 /usr/local/include/echttp.h /usr/local/include/echttp_static.h
+	cp echttp_jsonprint echttp_jsonget /usr/local/bin
+	chown root:root /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
+	chmod 755 /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
 
 clean:
 	rm -f *.o *.a echttp_jsonprint echttp_jsonget
@@ -22,6 +25,7 @@ rebuild: clean all
 uninstall:
 	rm -f /usr/local/lib/libechttp.a
 	rm -f /usr/local/include/echttp.h /usr/local/include/echttp_static.h
+	rm -f /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
 
 purge: uninstall
 
