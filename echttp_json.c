@@ -119,6 +119,7 @@ static const char *echttp_json_literal (JsonContext *context) {
        return "invalid literal";
    }
    if (isalnum(context->json[context->cursor+1])) return "invalid literal";
+   token[context->count].length = 0;
    return 0;
 }
 
@@ -142,6 +143,7 @@ static const char *echttp_json_number (JsonContext *context) {
             context->cursor = (int) (json - context->json) - 1;
             break;
     }
+    context->token[context->count].length = 0;
     return 0;
 }
 
@@ -158,6 +160,7 @@ static const char *echttp_json_string (JsonContext *context) {
     int l, h;
 
     context->token[context->count].type = JSON_STRING;
+    context->token[context->count].length = 0;
     context->token[context->count].value.string = to;
 
     JSONTRACE ("string");
@@ -333,6 +336,7 @@ const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
    token[0].key = 0;
 
    switch (skip_spaces (&context)) {
+       case 0:   error = "no data"; break;
        case '{': error = echttp_json_object (&context); break;
        case '[': error = echttp_json_array(&context); break;
        default:  error = echttp_json_value (&context);
