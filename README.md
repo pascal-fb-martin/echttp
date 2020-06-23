@@ -219,15 +219,15 @@ It returns 1 if there is an exact match, 0 otherwise.
 
 ## JSON Parser
 
-The echttp library includes a small JSON parser, built with the same philosophy as echttp itself: make the API simple to use.
+The echttp library includes a small JSON parser, built with the same philosophy as echttp itself: make the API simple to use. This decoder is a separate extension and requires to include echttp_json.h.
 
 There are also two JSON utilities provided with echttp:
 * echttp_jsonprint reformats the content of the JSON files provided and prints that reformated data.
-* echttp_jsonget load the JSON data from the file name (first argument) and print the value associated with each JSON path provided (subsequent arguments). If the JSON data starts with an anonymous object, the path must start with a '.'; if the JSON data starts with an anonymous array, the path must start with an array index.
+* echttp_jsonget loads the JSON data from the file name (first argument) and prints the value associated with each JSON path provided (subsequent arguments). If the JSON data starts with an anonymous object, the path must start with a '.'; if the JSON data starts with an anonymous array, the path must start with an array index.
 
 Both tools have minimal features. They were created to test the JSON parser, but both can be useful to analyze the content of a JSON file, especially when the JSON data was not formatted for readability.
 
-Any JSON data can be decoded using two functions:
+Any JSON data can be decoded using three functions:
 ```
 const char *echttp_json_parse (char *json, JsonToken *token, int *count);
 ```
@@ -270,4 +270,8 @@ Its is valid to provide a path that ends on an object or array. Examples of vali
     .array[6].item2
     .rawobject.object
 ```
-
+Note that the JavaScript array syntax requires quoting in shell.
+```
+const char *echttp_json_enumerate (const JsonToken *parent, int *index);
+```
+This function populates the list of children items to a parent array or object. The index array must be large enough for the expected number of parent's element, as indicated by parent->length. The function always returns exactly parent->length items on success. The index values are offset relative to the parent's record. Return null on success, or an error string on failure.
