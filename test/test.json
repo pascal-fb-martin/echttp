@@ -1,5 +1,23 @@
 {
     "formattedobject": {
+        "innerobject" : {
+            "null": null,
+            "true": true,
+            "false":false,
+            "int":1234,
+            "real":1234.567e2,
+            "string":"small string",
+            "object": {
+                "item":123456
+            },
+            "emptyobject": {
+            },
+            "array": [
+                123456
+            ],
+            "emptyarray": [
+            ]
+        },
         "null": null,
         "true": true,
         "false":false,
@@ -12,7 +30,10 @@
         "emptyobject": {
         },
         "array": [
-            123456
+            123456,
+            [
+                890
+            ]
         ],
         "emptyarray": [
         ]

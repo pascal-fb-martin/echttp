@@ -33,7 +33,16 @@
  *
  * int echttp_json_search (const JsonToken *token, int max, const char *id);
  *
- *    retrieve a JSON item (after decoding).
+ *    Retrieve a JSON item (after decoding) and return its index. return -1
+ *    if the item was not found.
+ *
+ * const char *echttp_json_enumerate (const JsonToken *parent, int *index);
+ *
+ *    Populate the list of children items to an array or object's parent.
+ *    The index array must be large enough for the expected number of
+ *    children (as indicated by parent->length). The indexes provided are
+ *    relative to the parent's token.
+ *    Return null on success, an error text on failure.
  */
 
 #include <stdlib.h>
@@ -424,7 +433,6 @@ int echttp_json_search (const JsonToken *token, int count, const char *id) {
     int length = (int) (p - id);
     int depth = 0;
     int stack[32];
-    int match;
     int i;
 
     for (i = 0; i < count; i++) {
@@ -436,22 +444,60 @@ int echttp_json_search (const JsonToken *token, int count, const char *id) {
             if (stack[depth] > 0) break;
             depth -= 1;
         }
-        if (depth > 0) continue;
 
-        match = 0;
-        if (token[i].key && length) {
-            match = (strncmp (id, token[i].key, length) == 0);
-        } else if (token[i].key == 0 && length == 0) {
-            match = 1;
-        }
-        if (match) {
-            int d = apply_match (token+i, count-i, p);
-            if (d < 0) return -1;
-            return i + d;
+        if (depth == 0) {
+            int match = 0;
+            if (token[i].key && length) {
+                match = (strncmp (id, token[i].key, length) == 0);
+            } else if (token[i].key == 0 && length == 0) {
+                match = 1;
+            }
+            if (match) {
+                int d = apply_match (token+i, count-i, p);
+                if (d < 0) return -1;
+                return i + d;
+            }
         }
         if (token[i].length > 0) stack[++depth] = token[i].length + 1;
     }
 
     return -1;
+}
+
+const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
+
+    int depth = 0;
+    int stack[32];
+    int i;
+    int child = 0;
+    int count = parent->length;
+
+    if (count == 0) {
+        if (parent->type != JSON_ARRAY && parent->type != JSON_OBJECT)
+            return "invalid type";
+        return "no data";
+    }
+
+    for (i = 1; i <= count; i++) {
+
+        // Skip deeper elements.
+
+        while (depth > 0) {
+            stack[depth] -= 1;
+            if (stack[depth] > 0) break;
+            depth -= 1;
+        }
+        if (depth == 0) {
+            if (child >= parent->length) return "internal error";
+            index[child++] = i;
+        }
+
+        if (parent[i].length > 0) {
+            count += parent[i].length;
+            stack[++depth] = parent[i].length + 1;
+        }
+    }
+
+    return 0;
 }
 

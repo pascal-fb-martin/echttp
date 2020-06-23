@@ -80,7 +80,28 @@ static void print_string (const char *key, const char *value) {
     free(buffer);
 }
 
-static void print_json (JsonToken *token, int i) {
+static void print_json (JsonToken *token, int i, int deep);
+
+static void enumerate (JsonToken *parent) {
+
+    int i;
+    int index[JSON_PRINT_MAX];
+    const char *error = echttp_json_enumerate (parent, index);
+    if (error) {
+        printf ("error: %s\n", error);
+        return;
+    }
+
+    for (i = 0; i < parent->length; ++i) {
+        if (parent->type == JSON_OBJECT)
+            printf ("    %s: ", parent[index[i]].key);
+        else
+            printf ("    [%2d] ", i);
+        print_json (parent, index[i], 0);
+    }
+}
+
+static void print_json (JsonToken *token, int i, int deep) {
 
     switch (token[i].type) {
         case JSON_NULL:
@@ -95,9 +116,11 @@ static void print_json (JsonToken *token, int i) {
             print_string (token[i].key, token[i].value.string); break;
         case JSON_ARRAY:
             printf ("array, length %d\n", token[i].length);
+            if (deep) enumerate (token+i);
             break;
         case JSON_OBJECT:
             printf ("object, %d elements\n", token[i].length);
+            if (deep) enumerate (token+i);
             break;
         default:
             fprintf (stderr, "Invalid token type %d at index %d\n",
@@ -167,7 +190,7 @@ int main (int argc, const char **argv) {
         }
         index = echttp_json_search (token, count, argv[i]);
         printf ("%s (%d): ", argv[i], index);
-        if (index >= 0) print_json (token, index);
+        if (index >= 0) print_json (token, index, 1);
         else printf ("invalid name\n");
     }
 }
