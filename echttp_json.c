@@ -488,7 +488,7 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
             depth -= 1;
         }
         if (depth == 0) {
-            if (child >= parent->length) return "internal error";
+            if (child >= parent->length) return "too many items found";
             index[child++] = i;
         }
 
@@ -497,6 +497,7 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
             stack[++depth] = parent[i].length + 1;
         }
     }
+    if (child != parent->length) return "too few items found";
 
     return 0;
 }
