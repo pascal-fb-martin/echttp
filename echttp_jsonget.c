@@ -166,8 +166,8 @@ int main (int argc, const char **argv) {
                 return -1;
             }
             if (filestat.st_size > buffer_size) {
-                buffer = (char *) realloc (buffer, filestat.st_size);
-                buffer_size = filestat.st_size;
+                buffer_size = filestat.st_size + 1;
+                buffer = (char *) realloc (buffer, buffer_size);
             }
             fd = open (argv[i], O_RDONLY);
             if (fd < 0) {
@@ -179,6 +179,8 @@ int main (int argc, const char **argv) {
                 return -1;
             }
             close(fd);
+            buffer[filestat.st_size] = 0;
+
             count = JSON_PRINT_MAX;
             error = echttp_json_parse (buffer, token, &count);
             if (error) {
