@@ -9,13 +9,12 @@ install:
 	chown root:root /usr/local/lib/libechttp.a
 	chmod 644 /usr/local/lib/libechttp.a
 	mkdir -p /usr/local/include
-	cp echttp.h echttp_static.h /usr/local/include
-	chown root:root /usr/local/include/echttp.h
-	chown root:root /usr/local/include/echttp_static.h
-	chmod 644 /usr/local/include/echttp.h /usr/local/include/echttp_static.h
+	cp echttp.h echttp_static.h echttp_json.h /usr/local/include
+	chown root:root /usr/local/include/echttp*.h
+	chmod 644 /usr/local/include/echttp*.h
 	cp echttp_jsonprint echttp_jsonget /usr/local/bin
-	chown root:root /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
-	chmod 755 /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
+	chown root:root /usr/local/bin/echttp_*
+	chmod 755 /usr/local/bin/echttp_*
 
 clean:
 	rm -f *.o *.a echttp_jsonprint echttp_jsonget
