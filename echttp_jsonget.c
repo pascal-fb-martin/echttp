@@ -190,10 +190,10 @@ int main (int argc, const char **argv) {
             if (show_tokens) print_tokens (token, count);
             continue;
         }
-        index = echttp_json_search (token, count, argv[i]);
+        index = echttp_json_search (token, argv[i]);
         printf ("%s (%d): ", argv[i], index);
         if (index >= 0) print_json (token, index, 1);
-        else printf ("invalid name\n");
+        else printf ("invalid path\n");
     }
 }
 

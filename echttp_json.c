@@ -31,7 +31,7 @@
  *    Decode a JSON string and return a list of tokens. The decoding breaks
  *    the input string.
  *
- * int echttp_json_search (const JsonToken *token, int max, const char *id);
+ * int echttp_json_search (const JsonToken *token, int max, const char *path);
  *
  *    Retrieve a JSON item (after decoding) and return its index. return -1
  *    if the item was not found.
@@ -376,99 +376,98 @@ static const char *next_separator (const char *p) {
     return p;
 }
 
-static int move_to_array_element (const JsonToken *token, int count,
-                                  const char *id, int index);
-
-static int apply_match (const JsonToken *token, int count, const char *id) {
-
-    if (*id == 0) return 0; // End of search: any type is fine.
-
-    if (*id == '.' && token->type == JSON_OBJECT) {
-        int d = echttp_json_search (token+1, count-1, id+1);
-        if (d < 0) return -1;
-        return d + 1;
-    }
-
-    if (*id == '[' && token->type == JSON_ARRAY) {
-        char *end;
-        int d;
-        int i = strtol(id+1, &end, 0);
-        if (*end != ']' || i < 0 || i >= token->length) return -1;
-        d = move_to_array_element (token+1, count-1, end+1, i);
-        if (d < 0) return -1;
-        return d + 1;
-    }
-    return -1; // Not the type of token we expected.
-}
-
-static int move_to_array_element (const JsonToken *token,
-                                  int count, const char *id, int index) {
+static int search_array_element (const JsonToken *token,
+                                 const char *path, int index) {
     int depth = 0;
     int stack[JSON_MAX_DEPTH];
     int i;
+    int count = index;
 
-    for (i = 0; i < count; i++) {
+    for (i = 0; i <= count; i++) {
 
         // Skip deeper elements.
 
         while (depth > 0) {
-            stack[depth] -= 1;
-            if (stack[depth] > 0) break;
+            if (--stack[depth] > 0) break;
             depth -= 1;
         }
-        if (depth > 0) continue;
-
-        if (index == 0) {
-            int d = apply_match (token+i, count-i, id);
-            if (d < 0) return -1;
-            return i + d;
+        if (depth == 0) {
+            if (index == 0) {
+                int d = echttp_json_search (token+i, path);
+                if (d < 0) return -1;
+                return i + d;
+            }
+            index--;
         }
         if (token[i].length > 0) {
+            count += token[i].length;
             if (depth >= JSON_MAX_DEPTH) return -1;
             stack[++depth] = token[i].length + 1;
         }
-        index--;
     }
+    return -1;
 }
 
-int echttp_json_search (const JsonToken *token, int count, const char *id) {
+static int search_object_element (const JsonToken *parent, const char *path) {
 
-    const char *p = next_separator(id);
-    int length = (int) (p - id);
+    const char *p = next_separator(path);
+    int length = (int) (p - path);
     int depth = 0;
     int stack[JSON_MAX_DEPTH];
     int i;
+    int count = parent->length;
 
-    for (i = 0; i < count; i++) {
+    if (*path == 0) return 0;
+
+    for (i = 1; i <= count; i++) {
 
         // Skip deeper elements.
 
         while (depth > 0) {
-            stack[depth] -= 1;
-            if (stack[depth] > 0) break;
+            if (--stack[depth] > 0) break;
             depth -= 1;
         }
 
         if (depth == 0) {
             int match = 0;
-            if (token[i].key && length) {
-                match = (strncmp (id, token[i].key, length) == 0);
-            } else if (token[i].key == 0 && length == 0) {
+            if (parent[i].key && length) {
+                match = (strncmp (path, parent[i].key, length) == 0);
+            } else if (parent[i].key == 0 && length == 0) {
                 match = 1;
             }
             if (match) {
-                int d = apply_match (token+i, count-i, p);
+                int d = echttp_json_search (parent+i, p);
                 if (d < 0) return -1;
                 return i + d;
             }
         }
-        if (token[i].length > 0) {
+        if (parent[i].length > 0) {
+            count += parent[i].length;
             if (depth >= JSON_MAX_DEPTH) return -1;
-            stack[++depth] = token[i].length + 1;
+            stack[++depth] = parent[i].length + 1;
         }
     }
-
     return -1;
+}
+
+int echttp_json_search (const JsonToken *parent, const char *path) {
+
+    if (*path == 0) return 0; // End of search: any type is fine.
+
+    if (*path == '.' && parent->type == JSON_OBJECT) {
+        return search_object_element (parent, path+1);
+    }
+
+    if (*path == '[' && parent->type == JSON_ARRAY) {
+        char *end;
+        int d;
+        int i = strtol(path+1, &end, 0);
+        if (*end != ']' || i < 0 || i >= parent->length) return -1;
+        d = search_array_element (parent+1, end+1, i);
+        if (d < 0) return -1;
+        return d + 1;
+    }
+    return -1; // Not the type of token we expected.
 }
 
 const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
@@ -490,8 +489,7 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
         // Skip deeper elements.
 
         while (depth > 0) {
-            stack[depth] -= 1;
-            if (stack[depth] > 0) break;
+            if (--stack[depth] > 0) break;
             depth -= 1;
         }
         if (depth == 0) {

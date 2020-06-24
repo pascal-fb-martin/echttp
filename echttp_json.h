@@ -31,7 +31,7 @@ void echttp_json_enable_debug (void);
 
 const char *echttp_json_parse (char *json, JsonToken *token, int *count);
 
-int echttp_json_search (const JsonToken *token, int max, const char *id);
+int echttp_json_search (const JsonToken *parent, const char *path);
 
 const char *echttp_json_enumerate (const JsonToken *parent, int *index);
 
