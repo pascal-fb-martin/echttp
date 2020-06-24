@@ -56,6 +56,7 @@
 #include "echttp.h"
 #include "echttp_json.h"
 
+#define JSON_MAX_DEPTH 64
 
 /* This data structure holds the current state of the parser. It is meant
  * to make it easy to pass the current content from one level to the next.
@@ -403,7 +404,7 @@ static int apply_match (const JsonToken *token, int count, const char *id) {
 static int move_to_array_element (const JsonToken *token,
                                   int count, const char *id, int index) {
     int depth = 0;
-    int stack[32];
+    int stack[JSON_MAX_DEPTH];
     int i;
 
     for (i = 0; i < count; i++) {
@@ -422,7 +423,10 @@ static int move_to_array_element (const JsonToken *token,
             if (d < 0) return -1;
             return i + d;
         }
-        if (token[i].length > 0) stack[++depth] = token[i].length + 1;
+        if (token[i].length > 0) {
+            if (depth >= JSON_MAX_DEPTH) return -1;
+            stack[++depth] = token[i].length + 1;
+        }
         index--;
     }
 }
@@ -432,7 +436,7 @@ int echttp_json_search (const JsonToken *token, int count, const char *id) {
     const char *p = next_separator(id);
     int length = (int) (p - id);
     int depth = 0;
-    int stack[32];
+    int stack[JSON_MAX_DEPTH];
     int i;
 
     for (i = 0; i < count; i++) {
@@ -458,7 +462,10 @@ int echttp_json_search (const JsonToken *token, int count, const char *id) {
                 return i + d;
             }
         }
-        if (token[i].length > 0) stack[++depth] = token[i].length + 1;
+        if (token[i].length > 0) {
+            if (depth >= JSON_MAX_DEPTH) return -1;
+            stack[++depth] = token[i].length + 1;
+        }
     }
 
     return -1;
@@ -467,7 +474,7 @@ int echttp_json_search (const JsonToken *token, int count, const char *id) {
 const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
 
     int depth = 0;
-    int stack[32];
+    int stack[JSON_MAX_DEPTH];
     int i;
     int child = 0;
     int count = parent->length;
@@ -494,6 +501,7 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
 
         if (parent[i].length > 0) {
             count += parent[i].length;
+            if (depth >= JSON_MAX_DEPTH) return "data structure too deep";
             stack[++depth] = parent[i].length + 1;
         }
     }
