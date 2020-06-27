@@ -26,7 +26,7 @@
  *
  * SYNOPSYS:
  *
- *   echttp_jsonget [-d] <file> element ..
+ *   echttp_get [-d] <file> element ..
  */
 
 #include <stdlib.h>
