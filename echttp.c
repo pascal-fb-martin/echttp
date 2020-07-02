@@ -277,7 +277,7 @@ static void echttp_execute (int route, int client,
     // to submit a client request in reaction to the received request,
     // so the current context might have been replaced.
     //
-    const char *connection = echttp_attribute_get ("Connection");
+    const char *connection = echttp_catalog_get (&(context->in), "Connection");
     int keep = (connection && (strcmp(connection, "keep-alive") == 0));
 
     context->status = 200;
