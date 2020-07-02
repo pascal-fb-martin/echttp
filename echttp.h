@@ -62,5 +62,13 @@ int echttp_islocal (void);
 
 void echttp_loop (void);
 
+// Web client functions:
+
+typedef void echttp_response (void *origin, int status, char *data, int length);
+
+const char *echttp_client (const char *method, const char *url);
+
+void echttp_submit (const char *data, int length,
+                    echttp_response *response, void *origin);
 #endif
 

@@ -119,6 +119,26 @@
  * echttp_close (void);
  *
  *    Immediately close the HTTP server and all current HTTP connections.
+ *
+ * Web client functions:
+ *
+ * const char *echttp_client (const char *method, const char *url);
+ *
+ *    Establish a new web client context. Return a null pointer on success
+ *    or an error string on failure. At this point the application may set
+ *    attributes or set up a file for transfer before the last step: sending
+ *    the request.
+ *
+ * typedef void echttp_response
+ *                 (void *origin, int status, char *data, int length);
+ *
+ * void echttp_submit (const char *data, int length,
+ *                     echttp_response *response, void *origin);
+ *
+ *    Send the web request for the current web client context. This closes
+ *    the web client context. When a response will be received from the
+ *    server, the response function will be called, with the provided
+ *    origin pointer as its first parameter.
  */
 
 #include <stdlib.h>
@@ -135,6 +155,7 @@ static int echttp_debug = 0;
 
 #define ECHTTP_STATE_IDLE    0
 #define ECHTTP_STATE_CONTENT 1
+
 typedef struct {
     int state;
     int route;
@@ -154,6 +175,9 @@ typedef struct {
         int fd;
         int size;
     } transfer;
+
+    echttp_response *response;
+    void *origin;
 
 } echttp_request;
 
@@ -205,77 +229,89 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
 }
 
 
-static void echttp_execute (int route, int client,
-                           const char *action, const char *uri,
-                           const char *data, int length) {
+static void echttp_send (int client, const char *data, int length) {
+
+    echttp_request *context = &(echttp_context[client]);
     static const char eol[] = "\r\n";
-
     int i;
-    int keep;
     char buffer[256];
-    int datalength;
 
-    echttp_current = &(echttp_context[client]);
-    echttp_current->client = client;
-    echttp_current->status = 200;
-    echttp_current->reason = "OK";
-    echttp_catalog_reset(&(echttp_current->out));
+    snprintf (buffer, sizeof(buffer)-1, "Content-Length: %d\r\n",
+              length + context->transfer.size);
+    echttp_raw_send (client, buffer, strlen(buffer));
 
-    echttp_current->transfer.fd = -1;
-    echttp_current->transfer.size = 0;
-
-    if (echttp_routing.item[route].protect) {
-        echttp_routing.item[route].protect (action, uri);
-    }
-    if (echttp_current->status != 200) {
-        keep = 0;
-        data = 0;
-    } else {
-        const char *connection = echttp_attribute_get ("Connection");
-        keep = (connection && (strcmp(connection, "keep-alive") == 0));
-
-        data = echttp_routing.item[route].call (action, uri, data, length);
-    }
-    datalength = data?strlen(data):0;
-    length = datalength + echttp_current->transfer.size;
-
-    snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
-             echttp_current->status, echttp_current->reason);
-    echttp_raw_send (client, buffer, strlen(buffer), 0);
-
-    if (keep) {
-        static const char text[] = "Connection: keep-alive\r\n";
-        echttp_raw_send (client, text, sizeof(text)-1, 0);
-    }
-
-    snprintf (buffer, sizeof(buffer)-1, "Content-Length: %d\r\n", length);
-    buffer[sizeof(buffer)-1] = 0;
-    echttp_raw_send (client, buffer, strlen(buffer), 0);
-
-    for (i = 1; i <= echttp_current->out.count; ++i) {
-        if (echttp_current->out.item[i].name == 0) continue;
+    for (i = 1; i <= context->out.count; ++i) {
+        if (context->out.item[i].name == 0) continue;
         snprintf (buffer, sizeof(buffer)-1, "%s: %s\r\n",
-                  echttp_current->out.item[i].name,
-                  echttp_current->out.item[i].value);
-        echttp_raw_send (client, buffer, strlen(buffer), 0);
+                  context->out.item[i].name,
+                  context->out.item[i].value);
+        echttp_raw_send (client, buffer, strlen(buffer));
     }
-    echttp_raw_send (client, eol, sizeof(eol)-1, (data == 0 && keep == 0));
-    if (data != 0) {
-       echttp_raw_send (client, data, datalength, (keep == 0));
+    echttp_raw_send (client, eol, sizeof(eol)-1);
+    if (length > 0) {
+       echttp_raw_send (client, data, length);
     }
-    if (echttp_current->transfer.size > 0) {
+    if (context->transfer.size > 0) {
         // This transfer must be submitted to the raw layer only after
         // all the preamble was submitted. Otherwise the raw layer may
         // start the file transfer before the HTTP preamble was sent..
         //
         echttp_raw_transfer (client,
-                             echttp_current->transfer.fd,
-                             echttp_current->transfer.size, (keep == 0));
-        echttp_current->transfer.fd = -1;
-        echttp_current->transfer.size = 0;
+                             context->transfer.fd,
+                             context->transfer.size);
+        context->transfer.fd = -1;
+        context->transfer.size = 0;
+    }
+}
+
+static void echttp_execute (int route, int client,
+                           const char *action, const char *uri,
+                           const char *data, int length) {
+
+    int i;
+    char buffer[256];
+    int datalength;
+    echttp_request *context = &(echttp_context[client]);
+
+    // Do not rely on echttp_current internally: the application is allowed
+    // to submit a client request in reaction to the received request,
+    // so the current context might have been replaced.
+    //
+    const char *connection = echttp_attribute_get ("Connection");
+    int keep = (connection && (strcmp(connection, "keep-alive") == 0));
+
+    context->status = 200;
+    context->reason = "OK";
+    echttp_catalog_reset(&(context->out));
+
+    context->transfer.fd = -1;
+    context->transfer.size = 0;
+
+    echttp_current = context;
+    if (echttp_routing.item[route].protect) {
+        echttp_routing.item[route].protect (action, uri);
+    }
+    if (context->status != 200) {
+        keep = 0;
+        data = 0;
+    } else {
+        data = echttp_routing.item[route].call (action, uri, data, length);
+    }
+    echttp_current = 0;
+
+    datalength = data?strlen(data):0;
+    length = datalength + context->transfer.size;
+
+    snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
+             context->status, context->reason);
+    echttp_raw_send (client, buffer, strlen(buffer));
+
+    if (keep) {
+        static const char text[] = "Connection: keep-alive\r\n";
+        echttp_raw_send (client, text, sizeof(text)-1);
     }
 
-    echttp_current = 0;
+    echttp_send (client, data, length);
 }
 
 static void echttp_unknown (int client) {
@@ -283,7 +319,7 @@ static void echttp_unknown (int client) {
         "HTTP/1.1 404 Not found\r\n"
         "Content-Length: 0\r\n"
         "Connection: Closed\r\n\r\n";
-    echttp_raw_send (client, unknown, sizeof(unknown)-1, 1);
+    echttp_raw_send (client, unknown, sizeof(unknown)-1);
 }
 
 static void echttp_invalid (int client) {
@@ -291,7 +327,7 @@ static void echttp_invalid (int client) {
         "HTTP/1.1 406 Not Acceptable\r\n"
         "Content-Length: 0\r\n"
         "Connection: Closed\r\n\r\n";
-    echttp_raw_send (client, invalid, sizeof(invalid)-1, 1);
+    echttp_raw_send (client, invalid, sizeof(invalid)-1);
 }
 
 static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
@@ -360,6 +396,43 @@ static char *echttp_unescape (char *data) {
     return data;
 }
 
+static void echttp_respond (int client, char *data, int length) {
+
+   // Do not rely on echttp_current internally: the application is allowed
+   // to submit another request in reaction to the response, so the current
+   // context might be eradicated.
+   //
+   echttp_request *context = echttp_current = &(echttp_context[client]);
+
+   echttp_current = context;
+   context->response (context->origin, context->status, data, length);
+   echttp_current = 0;
+
+   context->response = 0;
+   context->origin = 0;
+   echttp_catalog_reset(&(context->in));
+   echttp_raw_close_client(context->client, "end of response");
+}
+
+static int echttp_newlink (int client) {
+
+   int i;
+
+   if (client >= echttp_context_count) {
+       fprintf (stderr, "Invalid client context\n");
+       return -1;
+   }
+   if (echttp_debug) printf ("New client %d\n", client);
+
+   echttp_request *context = &(echttp_context[client]);
+   context->state = ECHTTP_STATE_IDLE;
+   context->transfer.fd = -1;
+   context->transfer.size = 0;
+   context->response = 0;
+   context->origin = 0;
+   return 1;
+}
+
 static int echttp_received (int client, char *data, int length) {
 
    static const char endpattern[] = "\r\n\r\n";
@@ -368,22 +441,11 @@ static int echttp_received (int client, char *data, int length) {
    char *endreq;
    char *enddata = data + length;
    int consumed = 0;
-
-   if (client >= echttp_context_count) {
-       echttp_context =
-           realloc (echttp_context, (client+1) * sizeof(echttp_request));
-       if (! echttp_context) {
-           fprintf (stderr, "no more memory\n");
-           exit(1);
-       }
-       for (i = echttp_context_count; i <= client; ++i) {
-           echttp_context[i] = (echttp_request){0};
-       }
-       echttp_context_count = client + 1;
-   }
    echttp_request *context = &(echttp_context[client]);
 
-   if (echttp_debug) printf ("Received HTTP request (%d bytes)\n", length);
+   if (echttp_debug)
+       printf ("Received HTTP %s (%d bytes)\n",
+               echttp_context[client].response?"response":"request", length);
    data[length] = 0;
 
    // If there was content left to receive, and we just received it all,
@@ -391,18 +453,22 @@ static int echttp_received (int client, char *data, int length) {
    //
    if (context->state == ECHTTP_STATE_CONTENT) {
        if (context->contentlength > length) return 0; // Wait for more.
+       if (context->response) {
+           echttp_respond (client, data, context->contentlength);
+           return 0; // Connection was closed, nothing more to do.
+       }
        echttp_execute (context->route, client,
-                      context->method, context->uri,
-                      data, context->contentlength);
+                       context->method, context->uri,
+                       data, context->contentlength);
        consumed = context->contentlength;
        data += context->contentlength;
        context->state = ECHTTP_STATE_IDLE;
    }
 
-   // We are waiting for a new HTTP request.
+   // We are waiting for a new HTTP PDU.
    //
    while ((data < enddata) && ((endreq = strstr(data, endpattern)) != 0)) {
-       // Decode this complete request.
+       // Decode this complete HTTP header.
        char *line[256];
 
        *endreq = 0;
@@ -410,58 +476,70 @@ static int echttp_received (int client, char *data, int length) {
 
        int linecount = echttp_split (data, "\r\n", line, 256);
 
-       if (echttp_debug) printf("HTTP request: %s\n", line[0]);
-
-       char *request[4];
-       int wordcount = echttp_split (line[0], " ", request, 4);
-       if (wordcount != 3) {
-           echttp_invalid (client);
-           return length; // Consume everything, since we are closing.
-       }
-       context->method = echttp_unescape(request[0]);
-       context->uri = echttp_unescape(request[1]);
-       if (context->method == 0 || context->uri == 0) {
-           echttp_invalid (client);
-           return length; // Consume everything, since we are closing.
-       }
-
-       echttp_catalog_reset(&(context->params));
-       wordcount = echttp_split (context->uri, "?", request, 4);
-       if (wordcount == 2) {
-           char *arg[32];
-           wordcount = echttp_split (request[1], "&", arg, 32);
-           for (i = 0; i < wordcount; ++i) {
-               char *param[4];
-               if (echttp_split (arg[i], "=", param, 4) >= 2) {
-                   echttp_catalog_set (&(context->params), param[0], param[1]);
-               }
+       if (context->response) {
+           // Expect a status line.
+           if (echttp_debug) printf("HTTP status: %s\n", line[0]);
+           if (strncmp (line[0], "HTTP/1.1 ", 9)) {
+               context->status = 505;
+               echttp_respond (client, 0, 0);
+               return 0; // Connection was closed, nothing more to do.
            }
-       }
+           context->status = atoi(line[0]+9);
+       } else {
+           // Expect a request line.
+           if (echttp_debug) printf("HTTP request: %s\n", line[0]);
 
-       // Search for a uri mapping: try any match first, then for a parent.
-       //
-       i = echttp_route_search (context->uri, ECHTTP_MODE_ANY);
-       if (i <= 0) {
-           char *uri = strdup(context->uri);
-           char *sep = strrchr (uri+1, '/');
-           while (sep) {
-               *sep = 0;
-               i = echttp_route_search (uri, ECHTTP_MODE_PARENT);
-               if (i > 0) break;
-               sep = strrchr (uri+1, '/');
-           }
-           if (i <= 0) {
-               i = echttp_route_search ("/", ECHTTP_MODE_PARENT);
-           }
-           free(uri);
-           if (i <= 0) {
-               echttp_unknown (client);
+           char *request[4];
+           int wordcount = echttp_split (line[0], " ", request, 4);
+           if (wordcount != 3) {
+               echttp_invalid (client);
                return length; // Consume everything, since we are closing.
            }
-       }
-       context->route = i;
+           context->method = echttp_unescape(request[0]);
+           context->uri = echttp_unescape(request[1]);
+           if (context->method == 0 || context->uri == 0) {
+               echttp_invalid (client);
+               return length; // Consume everything, since we are closing.
+           }
 
-       // Decode the header parameters after the request line.
+           echttp_catalog_reset(&(context->params));
+           wordcount = echttp_split (context->uri, "?", request, 4);
+           if (wordcount == 2) {
+               char *arg[32];
+               wordcount = echttp_split (request[1], "&", arg, 32);
+               for (i = 0; i < wordcount; ++i) {
+                   char *param[4];
+                   if (echttp_split (arg[i], "=", param, 4) >= 2) {
+                       echttp_catalog_set (&(context->params), param[0], param[1]);
+                   }
+               }
+           }
+
+           // Search for a uri mapping: try any match first, then for a parent.
+           //
+           i = echttp_route_search (context->uri, ECHTTP_MODE_ANY);
+           if (i <= 0) {
+               char *uri = strdup(context->uri);
+               char *sep = strrchr (uri+1, '/');
+               while (sep) {
+                   *sep = 0;
+                   i = echttp_route_search (uri, ECHTTP_MODE_PARENT);
+                   if (i > 0) break;
+                   sep = strrchr (uri+1, '/');
+               }
+               if (i <= 0) {
+                   i = echttp_route_search ("/", ECHTTP_MODE_PARENT);
+               }
+               free(uri);
+               if (i <= 0) {
+                   echttp_unknown (client);
+                   return length; // Consume everything, since we are closing.
+               }
+           }
+           context->route = i;
+       }
+
+       // Decode the header parameters after the request/status line.
        //
        echttp_catalog_reset(&(context->in));
        for (i = 1; i < linecount; ++i) {
@@ -488,6 +566,10 @@ static int echttp_received (int client, char *data, int length) {
        consumed += ((int) (endreq - data) + context->contentlength);
        data = endreq + context->contentlength;
 
+       if (context->response) {
+           echttp_respond (client, context->content, context->contentlength);
+           return 0; // Nothing more to do with this connection.
+       }
        echttp_execute (context->route, client,
                       context->method, context->uri,
                       context->content, context->contentlength);
@@ -526,12 +608,15 @@ int echttp_open (int argc, const char **argv) {
    }
    echttp_routing.count = 0;
    if (! echttp_raw_open (service, echttp_debug)) return -1;
+   echttp_context_count = echttp_raw_capacity();
+   echttp_context = calloc (echttp_context_count, sizeof(echttp_request));
+   for (i = 0; i < echttp_context_count; ++i) echttp_context[i].client = i;
    echttp_dynamic_flag = (strcmp(service, "dynamic") == 0);
    return shift;
 }
 
 void echttp_loop (void) {
-   echttp_raw_loop (echttp_received);
+   echttp_raw_loop (echttp_newlink, echttp_received);
    echttp_raw_close ();
 }
 
@@ -630,5 +715,54 @@ void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {
  
 void echttp_background (echttp_listener *listener) {
     echttp_raw_background (listener);
+}
+
+const char *echttp_client (const char *method, const char *url) {
+
+    int i, j;
+    int client;
+    char host[64];
+    char service[16];
+    char buffer[256];
+
+    if (strncmp (url, "http://", 7)) return "unsupported";
+
+    for (i = 7; i < 70 && url[i] && url[i] != ':' && url[i] != '/'; ++i) {
+        host[i-7] = url[i];
+    }
+    host[i-7] = 0;
+    service[0] = ':';
+    if (url[i] == ':') {
+        for (j = 1, ++i; j < 15 && url[i] && url[i] != '/'; ++i, ++j) {
+            service[j] = url[i];
+        }
+        service[j] = 0;
+    } else {
+        service[1] = '8'; service[2] = '0'; service[3] = 0; // Port 80.
+        j = 0; // Mark that we use the default port.
+    }
+    if (echttp_debug) printf ("Connecting to %s%s\n", host, service);
+    client = echttp_raw_connect (host, service+1); // Skip the ':'
+    if (client < 0) return "connection failed";
+    echttp_newlink (client);
+    echttp_current = &(echttp_context[client]);
+
+    snprintf (buffer, sizeof(buffer), "%s %s HTTP/1.1\r\n", method, url+i);
+    echttp_raw_send (client, buffer, strlen(buffer));
+
+    snprintf (buffer, sizeof(buffer), "Host: %s%s\r\n", host, j?service:"");
+    echttp_raw_send (client, buffer, strlen(buffer));
+
+    return 0;
+}
+
+void echttp_submit (const char *data, int length,
+                    echttp_response *response, void *origin) {
+
+    echttp_current->response = response;
+    echttp_current->origin = origin;
+
+    echttp_send (echttp_current->client, data, length);
+    echttp_current = 0;
 }
 

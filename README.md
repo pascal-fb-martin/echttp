@@ -170,10 +170,6 @@ Call the specified listener before waiting for I/O. This listener is called with
 
 There is only one background listener.
 ```
-int echttp_isdebug (void);
-```
-Return true if the HTTP debug option was selected. Only used for debug or troubleshooting.
-```
 void echttp_loop (void);
 ```
 Run the HTTP server. This function typically never return. If it does, all HTTP server resources have been closed and deallocated. The most reasonable thing to do at this point is to exit.
@@ -200,26 +196,74 @@ For example if one defines a static route from /static to /home/doe/public, the 
 As soon as a static route has been declared, the extension takes over the root URI "/". If the root URI is requested, the extension seaches for file index.html in every path provided and returns the content of the first one found.
 
 This function returns the route descriptor or -1 on failure. This route descriptor can be used to protect the whole path.
+
+## Command Line Options
+
+The echttp library comes with a handful of functions to help decode command line arguments.
 ```
 const char *echttp_option_match (const char *reference,
                                  const char *input, const char **value);
 ```
-This is a convenience function to help decode command line arguments.
-
-It returns 0 if the argument input does not match the reference string, a pointer to the value otherwise. (If there is no value, the result points to an end of string character).
+Returns 0 if the argument input does not match the reference string, a pointer to the value otherwise. (If there is no value, the result points to an end of string character).
 
 This function supports the syntax option '=' value, if the reference string ends with a '='. In this case, and if there is a match, value points to the string after the '='. Otherwise value is not touched, so that the caller can initialize it with a default value.
 ```
 int echttp_option_present (const char *reference, const char *input);
 ```
+Returns 1 if there is an exact match, 0 otherwise.
+```
+int echttp_isdebug (void);
+```
+Return true if the HTTP debug option was selected. Only used for debug or troubleshooting.
 
-This is a convenience function to help decode command line arguments.
+## HTTP Client
 
-It returns 1 if there is an exact match, 0 otherwise.
+The echttp library includes support for the HTTP client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
 
+The intent is to allow an application using echttp to access other web server to collect information, or to access web services. For example a sprinkler controller may need to access public web sites to get weather information, or control relays through local web services.
+
+A web client request is processed in three steps:
+* Initialize the query context (providing the method and URL).
+* Set optional attributes if needed, using the standard echttp API (i.e. the same function as used to prepare a server response).
+* Send the request to the server.
+
+Note that the client functions support the echttp file transfer mechanism, i.e. it is possible to post a huge file without any size limit using echttp_transfer().
+
+The server response will be processed asynchronously, through a client callback.
+
+Only one client request can be prepared at a time: the current request must be sent before a subsequent request can be prepared. However there is no need to wait for the response: multiple client request may be pending at the same time and the order of the responses does not matter.
+
+A client request can be initiated from within an HTTP request callback (i.e. while the echttp server is processing an HTTP request from a remote client), from within a response callback (i.e. while processing the response from a previous request), from within a listener (see echttp_listen()) or from within a background function (see echttp_background()). However if a client request is initiated while processing a request or response, that request or response is no longer the current context: all the information from that request or response must have been retrieved prior to initiating any new request.
+````
+const char *echttp_client (const char *method, const char *url);
+````
+Initiate a client context. This function returns 0 (null pointer) on success, or an error text on failure. There is no specific assumption made regarding the method string: any name compatible with the HTTP syntax would do, as long as the server supports it.
+```
+typedef void echttp_response (void *origin, int status, char *data, int length);
+
+void echttp_submit (const char *data, int length,
+                    echttp_response *response, void *origin);
+```
+Send the HTTP request, including the specified content. If a file transfer was set up, the file data is sent in addition to, and after, the specified data. The data may be empty (length 0), in which case the data pointer can be null.
+
+Once a complete response has been received from the server, the response function is called with the provided origin value, the HTTP status from the server and the data content from the response, if any. The attributes from the response header can be accessed using the standard echttp API.
+
+The echttp client functions do not automatically follow redirection (HTTP status 302): the application must do this itself if this is the intent. For example:
+```
+static void response (void *origin, int status, char *data, int length) {
+    if (status == 302) {
+        const char *error =
+            echttp_client ("GET", echttp_attribute_get("Location"));
+        if (!error)
+            echttp_submit (0, 0, response, 0);
+        return;
+    }
+    ... application specific code ...
+}
+```
 ## JSON Parser
 
-The echttp library includes a small JSON parser, built with the same philosophy as echttp itself: make the API simple to use. This decoder is a separate extension and requires to include echttp_json.h.
+The echttp library provides a small JSON parser, built with the same philosophy as echttp itself: make the API simple to use. This decoder is a separate extension and requires to include echttp_json.h.
 
 Any JSON data can be decoded using three functions:
 ```

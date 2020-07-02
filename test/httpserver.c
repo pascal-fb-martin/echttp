@@ -70,13 +70,42 @@ static const char *http_echo (const char *method, const char *uri,
     return buffer;
 }
 
+static void http_response (void *origin, int status, char *data, int length) {
+    if (echttp_isdebug()) printf ("HTTP response status %d\n", status);
+    if (status == 302) { // Redirected
+        const char *to = echttp_attribute_get("Location");
+        const char *error;
+        if (echttp_isdebug()) printf ("HTTP redirected to: %s\n", to);
+        error = echttp_client ("GET", to);
+        if (error)
+            printf ("%s: %s\n", to, error);
+        else
+            echttp_submit (0, 0, http_response, 0);
+        return;
+    }
+    if (length > 0)
+        printf ("%*.*s\n", length, length, data);
+}
+
 static void http_console (int fd, int mode) {
+    char *eol;
     char buffer[1024];
     fgets(buffer, sizeof(buffer), stdin);
+    eol = strchr (buffer, '\n');
+    if (eol) *eol = 0;
     if (echttp_isdebug()) printf ("Console: %s\n", buffer);
-    if (strncmp (buffer, "exit\n", 5) == 0) {
+    if (strcmp (buffer, "exit") == 0) {
         echttp_close();
         exit(0);
+    }
+    if (strncmp(buffer, "get ", 4) == 0) {
+        if (echttp_isdebug()) printf ("HTTP request GET %s\n", buffer+4);
+        const char *error = echttp_client ("GET", buffer+4);
+        if (error) {
+            printf ("%s: %s\n", buffer+4, error);
+            return;
+        }
+        echttp_submit (0, 0, http_response, 0);
     }
 }
 
