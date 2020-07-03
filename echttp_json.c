@@ -135,25 +135,31 @@ static const char *echttp_json_literal (JsonContext *context) {
 
 static const char *echttp_json_number (JsonContext *context) {
 
+    static char isvalidnumber[128] = {0};
+
     char *json = context->json + context->cursor;
 
+    if (!isvalidnumber['0']) {
+        int i;
+        isvalidnumber['-'] = 1;
+        for (i = '0'; i <= '9'; ++i) isvalidnumber[i] = 1;
+        isvalidnumber['.'] = 2; // Presence indicates a real number.
+        isvalidnumber['e'] = 2;
+        isvalidnumber['E'] = 2;
+    }
     JSONTRACE ("number");
-    while (isdigit(*json)) json += 1;
-    switch (*json) {
-        case '.': case 'e': case 'E':
-            context->token[context->count].type = JSON_REAL;
-            context->token[context->count].value.real =
-                strtof(context->json + context->cursor, &json);
-            context->cursor = (int) (json - context->json) - 1;
-            break;
-        default:
-            context->token[context->count].type = JSON_INTEGER;
-            context->token[context->count].value.integer =
-                strtol(context->json + context->cursor, &json, 0);
-            context->cursor = (int) (json - context->json) - 1;
-            break;
+    while (*json > 0 && isvalidnumber[*json] == 1) json += 1;
+    if (*json > 0 && isvalidnumber[*json] == 2) {
+        context->token[context->count].type = JSON_REAL;
+        context->token[context->count].value.real =
+            strtof(context->json + context->cursor, &json);
+    } else {
+        context->token[context->count].type = JSON_INTEGER;
+        context->token[context->count].value.integer =
+            strtol(context->json + context->cursor, &json, 0);
     }
     context->token[context->count].length = 0;
+    context->cursor = (int) (json - context->json) - 1;
     return 0;
 }
 
@@ -235,6 +241,7 @@ static const char *echttp_json_value (JsonContext *context) {
 
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
+        case '-':
             error = echttp_json_number (context);
             break;
 
