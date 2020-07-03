@@ -144,7 +144,7 @@ static void print_json (const char *name, JsonToken *token, int count) {
 
     countdown[0] = 0;
 
-    printf ("--- %s:\n", name);
+    printf ("// File %s\n", name);
 
     for (i = 0; i < count; ++i) {
 
