@@ -44,7 +44,7 @@
 static char *buffer = 0;
 static int buffer_size = 0;
 
-#define JSON_PRINT_MAX 1024
+#define JSON_PRINT_MAX 20480
 
 static const char *indentation(int depth) {
     static char indent[81];
