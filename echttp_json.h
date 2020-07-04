@@ -27,6 +27,9 @@ typedef struct {
 #define JSON_ARRAY   6
 #define JSON_OBJECT  7
 
+struct JsonContext_s;
+typedef struct JsonContext_s *JsonContext;
+
 void echttp_json_enable_debug (void);
 
 const char *echttp_json_parse (char *json, JsonToken *token, int *count);

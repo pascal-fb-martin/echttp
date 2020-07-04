@@ -10,7 +10,7 @@
             "object": {
                 "item":123456
             },
-            "emptyobject": {
+            "emptyobject": {  // Comment 1.
             },
             "array": [
                 123456
@@ -29,7 +29,7 @@
         },
         "emptyobject": {
         },
-        "array": [
+        "array": [ // comment 2.
             123456,
             [
                 890
@@ -44,11 +44,11 @@
         null,
         true,
         false,
-        1234,
+        1234,           // comment 3.
         1234.567e2,
         "small string",
         {
-            "item1": true,
+            "item1": true, // comment 4.
             "item2": false
         }
     ],

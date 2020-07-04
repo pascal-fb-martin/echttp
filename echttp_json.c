@@ -45,6 +45,8 @@
  *    Return null on success, an error text on failure.
  */
 
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -60,8 +62,9 @@
 
 /* This data structure holds the current state of the parser. It is meant
  * to make it easy to pass the current content from one level to the next.
+ * (See echttp_json.h for the JsonContext opaque type.)
  */
-typedef struct {
+struct JsonContext_s {
     int cursor;
     int count;
 
@@ -72,43 +75,51 @@ typedef struct {
     char *json;
     JsonToken *token;
     int max;
-} JsonContext;
+};
 
 static int  echttp_json_debug = 0;
 static char echttp_json_error_text[160];
 
-static const char *echttp_json_object (JsonContext *context);
-static const char *echttp_json_array (JsonContext *context);
+static const char *echttp_json_object (JsonContext context);
+static const char *echttp_json_array (JsonContext context);
 
 #define JSONTRACE(x) if (echttp_json_debug) printf ("%s at line %d column %d: %s\n", x, context->line_count, context->cursor - context->line_start + 1, context->json + context->cursor);
 
-static char skip_spaces (JsonContext *context) {
+static char skip_spaces (JsonContext context) {
 
-    char *json = context->json;
+    char *json = context->json + context->cursor;
 
-    while (isspace(json[context->cursor])) {
-        if (json[context->cursor] == '\n') {
-            context->line_count += 1;
-            context->line_start = context->cursor + 1;
+    for (;;) {
+        while (isspace(*json)) {
+            if (*json == '\n') {
+                context->line_count += 1;
+                context->line_start = context->cursor + 1;
+            }
+            context->cursor += 1;
+            json += 1;
         }
-        context->cursor += 1;
+        if (json[0] != '/' || json[1] != '/') break;
+
+        json = strchrnul (json+2, '\n'); // Next line.
+        context->cursor = (int)(json - context->json);
     }
+
     JSONTRACE ("next word");
-    return json[context->cursor];
+    return *json;
 }
 
-static char next_word (JsonContext *context) {
+static char next_word (JsonContext context) {
     context->cursor += 1;
     return skip_spaces (context);
 }
 
-static const char *add_token (JsonContext *context) {
+static const char *add_token (JsonContext context) {
     context->count += 1;
     if (context->count > context->max) return "JSON structure is too long";
     return 0;
 }
 
-static const char *echttp_json_literal (JsonContext *context) {
+static const char *echttp_json_literal (JsonContext context) {
 
    char *json = context->json + context->cursor;
    JsonToken *token = context->token;
@@ -133,7 +144,7 @@ static const char *echttp_json_literal (JsonContext *context) {
    return 0;
 }
 
-static const char *echttp_json_number (JsonContext *context) {
+static const char *echttp_json_number (JsonContext context) {
 
     static char isvalidnumber[128] = {0};
 
@@ -170,7 +181,7 @@ static char hex2bin(char x) {
     return -1;
 }
 
-static const char *echttp_json_string (JsonContext *context) {
+static const char *echttp_json_string (JsonContext context) {
     char *from = context->json + context->cursor + 1;
     char *to = from;
     int l, h;
@@ -220,7 +231,7 @@ static const char *echttp_json_string (JsonContext *context) {
     return "unterminated string";
 }
 
-static const char *echttp_json_value (JsonContext *context) {
+static const char *echttp_json_value (JsonContext context) {
 
     const char *error = 0;
     char c = next_word(context);
@@ -251,7 +262,7 @@ static const char *echttp_json_value (JsonContext *context) {
     return error;
 }
 
-static const char *echttp_json_array (JsonContext *context) {
+static const char *echttp_json_array (JsonContext context) {
 
     const char *error = 0;
     int i = context->count;
@@ -288,7 +299,7 @@ static const char *echttp_json_array (JsonContext *context) {
     return "array processing error";
 }
 
-static const char *echttp_json_object (JsonContext *context) {
+static const char *echttp_json_object (JsonContext context) {
 
     const char *error = 0;
     int i = context->count;
@@ -336,7 +347,7 @@ void echttp_json_enable_debug (void) {
 const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
 
    const char *error;
-   JsonContext context;
+   struct JsonContext_s context;
 
    if (!count || !*count) return "invalid count parameter";
 
