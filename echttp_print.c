@@ -44,47 +44,53 @@
 static char *buffer = 0;
 static int buffer_size = 0;
 
+static int pretty = 1;
+
 #define JSON_PRINT_MAX 20480
 
 static const char *indentation(int depth) {
     static char indent[81];
+    if (!pretty) return "";
     if (indent[0] == 0) memset (indent, ' ',sizeof(indent)-1);
     return indent + sizeof(indent) -1 - (4 * depth);
 }
 
+static const char *jsoneol(int comma) {
+    if (pretty) {
+        if (comma) return ",\n";
+        return "\n";
+    }
+    if (comma) return ",";
+    return "";
+}
+
+static void print_key (int depth, const char *key) {
+    if (key) {
+        const char *sep = pretty ? " : " : ":";
+        printf ("%s\"%s\"%s", indentation(depth), key, sep);
+    } else {
+        printf ("%s", indentation(depth));
+    }
+}
+
 static void print_null (int depth, const char *key, int comma) {
-    if (key)
-        printf ("%s\"%s\" : null%s\n", indentation(depth),
-                key, comma?",":"");
-    else
-        printf ("%snull%s\n", indentation(depth), comma?",":"");
+    print_key (depth, key);
+    printf ("null%s", jsoneol(comma));
 }
 
 static void print_bool (int depth, const char *key, int value, int comma) {
-    if (key)
-        printf ("%s\"%s\" : %s%s\n", indentation(depth),
-                key, value?"true":"false", comma?",":"");
-    else
-        printf ("%s%s%s\n", indentation(depth),
-                value?"true":"false", comma?",":"");
+    print_key (depth, key);
+    printf ("%s%s", value?"true":"false", jsoneol(comma));
 }
 
 static void print_integer (int depth, const char *key, long value, int comma) {
-    if (key)
-        printf ("%s\"%s\" : %d%s\n", indentation(depth),
-                key, value, comma?",":"");
-    else
-        printf ("%s%d%s\n", indentation(depth),
-                value, comma?",":"");
+    print_key (depth, key);
+    printf ("%d%s", value, jsoneol(comma));
 }
 
 static void print_real (int depth, const char *key, double value, int comma) {
-    if (key)
-        printf ("%s\"%s\" : %e%s\n", indentation(depth),
-                key, value, comma?",":"");
-    else
-        printf ("%s%e%s\n", indentation(depth),
-                value, comma?",":"");
+    print_key (depth, key);
+    printf ("%e%s", value, jsoneol(comma));
 }
 
 static void print_string (int depth, const char *key, const char *value, int comma) {
@@ -117,22 +123,14 @@ static void print_string (int depth, const char *key, const char *value, int com
     }
     *to = 0;
 
-    if (key)
-        printf ("%s\"%s\" : \"%s\"%s\n", indentation(depth),
-                key, buffer, comma?",":"");
-    else
-        printf ("%s\"%s\"%s\n", indentation(depth),
-                buffer, comma?",":"");
+    print_key (depth, key);
+    printf ("\"%s\"%s", buffer, jsoneol(comma));
     free(buffer);
 }
 
 static void print_compound (int depth, const char *key, char value, int comma) {
-    if (key)
-        printf ("%s\"%s\" : %c%s\n", indentation(depth),
-                key, value, comma?",":"");
-    else
-        printf ("%s%c%s\n", indentation(depth),
-                value, comma?",":"");
+    print_key (depth, key);
+    printf ("%c%s", value, jsoneol(comma));
 }
 
 static void print_json (const char *name, JsonToken *token, int count) {
@@ -143,8 +141,6 @@ static void print_json (const char *name, JsonToken *token, int count) {
     int countdown[32];
 
     countdown[0] = 0;
-
-    printf ("// File %s\n", name);
 
     for (i = 0; i < count; ++i) {
 
@@ -212,6 +208,10 @@ int main (int argc, const char **argv) {
             show_tokens = 1;
             continue;
         }
+        if (strcmp (argv[i], "-r") == 0) {
+            pretty = 0;
+            continue;
+        }
         if (stat (argv[i], &filestat)) {
             fprintf (stderr, "Cannot access %s\n", argv[i]);
             continue;
@@ -240,6 +240,7 @@ int main (int argc, const char **argv) {
                 continue;
             }
             if (show_tokens) print_tokens (token, count);
+            printf ("// File %s\n", argv[i]);
             print_json (argv[i], token, count);
         }
     }
