@@ -6,7 +6,7 @@
             "false":false,
             "int":1234,
             "real":1234.567e2,
-            "string":"small string",
+            "string":"small:\/\/string",
             "object": {
                 "item":123456
             },
@@ -23,7 +23,7 @@
         "false":false,
         "int":1234,
         "real":1234.567e2,
-        "string":"small string",
+        "string":"small://string",
         "object": {
             "item":123456
         },
