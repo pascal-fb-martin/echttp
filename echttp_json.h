@@ -49,7 +49,7 @@ void echttp_json_add_null
 void echttp_json_add_bool
          (JsonContext context, int parent, const char *key, int value);
 void echttp_json_add_integer
-         (JsonContext context, int parent, const char *key, int value);
+         (JsonContext context, int parent, const char *key, long value);
 void echttp_json_add_real
          (JsonContext context, int parent, const char *key, double value);
 void echttp_json_add_string
@@ -62,4 +62,6 @@ int echttp_json_end (JsonContext context);
 
 const char *echttp_json_generate (JsonToken *token, int count,
                                   char *json, int size, int options);
+
+const char *echttp_json_format (JsonContext context, char *buffer, int size);
 

@@ -51,7 +51,7 @@
  * void echttp_json_add_bool
  *          (JsonContext context, int parent, const char *key, int value);
  * void echttp_json_add_integer
- *          (JsonContext context, int parent, const char *key, int value);
+ *          (JsonContext context, int parent, const char *key, long value);
  * void echttp_json_add_real
  *          (JsonContext context, int parent, const char *key, double value);
  * void echttp_json_add_string
@@ -69,6 +69,12 @@
  *                                   char *json, int size, int options);
  *
  *    Generate a JSON string give an array of tokens.
+ *
+ * const char *echttp_json_format (JsonContext context, char *buffer, int size);
+ *
+ *    This function combines echttp_json_end() and echttp_json_generate()
+ *    without pretty formatting, which is what most web server will tend
+ *    to do when generating a response..
  */
 
 #define _GNU_SOURCE
@@ -504,7 +510,7 @@ static void echttp_json_gen_bool (JsonContext context, int i) {
 
 static void echttp_json_gen_integer (JsonContext context, int i) {
     char buffer[32];
-    snprintf (buffer, sizeof(buffer), "%d", context->token[i].value.integer);
+    snprintf (buffer, sizeof(buffer), "%ld", context->token[i].value.integer);
     echttp_json_gen_append (context, buffer);
 }
 
@@ -889,7 +895,7 @@ void echttp_json_add_bool
 }
 
 void echttp_json_add_integer
-         (JsonContext context, int parent, const char *key, int value) {
+         (JsonContext context, int parent, const char *key, long value) {
     JsonToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
         token->type = JSON_INTEGER;
@@ -937,5 +943,12 @@ int echttp_json_end (JsonContext context) {
     int count = context->count;
     free (context);
     return count;
+}
+
+const char *echttp_json_format (JsonContext context, char *buffer, int size) {
+    const char *error =
+        echttp_json_generate (context->token, context->count, buffer, size, 0);
+    echttp_json_end (context);
+    return error;
 }
 
