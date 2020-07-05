@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include "echttp.h"
+#include "echttp_json.h"
 #include "echttp_static.h"
 
 static void http_protected (const char *method, const char *uri) {
@@ -49,24 +50,61 @@ static const char *http_welcome (const char *method, const char *uri,
     static char buffer[1024];
     const char *host = echttp_attribute_get("Host");
     if (host == 0) host = "(unknown)";
-    echttp_content_type_set ("text/html");
+    echttp_content_type_html();
     snprintf (buffer, sizeof(buffer), "<e>Your are welcome on %s!</e>", host);
     return buffer;
 }
 
 static const char *http_whoami (const char *method, const char *uri,
                                 const char *data, int length) {
-    echttp_content_type_set ("text/html");
+    echttp_content_type_html();
     return "<i>Who knows?</i>";
 }
 
 static const char *http_echo (const char *method, const char *uri,
                               const char *data, int length) {
     static char buffer[1024];
-    echttp_content_type_set ("text/html");
     snprintf (buffer, sizeof(buffer),
               "<e>You called <b>%s</b></e> with what = %s",
               uri, echttp_parameter_get("what"));
+    echttp_content_type_html();
+    return buffer;
+}
+
+static const char *http_json (const char *method, const char *uri,
+                              const char *data, int length) {
+    static char buffer[1024];
+    char pool[1024];
+    JsonToken token[10];
+
+    const char *prettyp = echttp_parameter_get("pretty");
+    const char *countp = echttp_parameter_get("count");
+
+    JsonContext context = echttp_json_start (token, 10, pool, 1024);
+    int root = echttp_json_add_object (context, 0, 0);
+    echttp_json_add_string (context, root, "uri", uri);
+    echttp_json_add_string (context, root, "what", echttp_parameter_get("what"));
+    if (countp)
+        echttp_json_add_integer (context, root, "count", atoi(countp));
+    else 
+        echttp_json_add_null (context, root, "count");
+
+    int array = echttp_json_add_array (context, root, "booleans");
+    echttp_json_add_bool (context, array, 0, 4);
+    echttp_json_add_bool (context, array, 0, 0);
+
+    echttp_json_add_real (context, root, "pi", 3.1415);
+    int count = echttp_json_end (context);
+
+    int pretty = prettyp ? atoi(prettyp) : 0;
+    const char *error =
+        echttp_json_generate (token, count, buffer, sizeof(buffer),
+                              pretty?JSON_OPTION_PRETTY:0);
+    if (error) {
+        echttp_error (501, error);
+        return "";
+    }
+    echttp_content_type_json();
     return buffer;
 }
 
@@ -130,6 +168,7 @@ int main (int argc, const char **argv) {
     echttp_protect
         (echttp_route_uri ("/forbidden", http_forbidden), http_protected);
     echttp_route_match ("/echo", http_echo);
+    echttp_route_match ("/json", http_json);
     echttp_static_route ("/", getcwd(0, 0));
     echttp_static_route ("/static", getcwd(0, 0));
 

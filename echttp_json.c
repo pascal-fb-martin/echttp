@@ -44,6 +44,27 @@
  *    relative to the parent's token.
  *    Return null on success, an error text on failure.
  *
+ * JsonContext echttp_json_start
+ *                 (JsonToken *token, int max, char *pool, int size);
+ * void echttp_json_add_null
+ *          (JsonContext context, int parent, const char *key);
+ * void echttp_json_add_bool
+ *          (JsonContext context, int parent, const char *key, int value);
+ * void echttp_json_add_integer
+ *          (JsonContext context, int parent, const char *key, int value);
+ * void echttp_json_add_real
+ *          (JsonContext context, int parent, const char *key, double value);
+ * void echttp_json_add_string
+ *          (JsonContext context, int parent, const char *key, const char *value);
+ * int echttp_json_add_object
+ *          (JsonContext context, int parent, const char *key);
+ * int echttp_json_add_array
+ *          (JsonContext context, int parent, const char *key);
+ * int echttp_json_end (JsonContext context);
+ *
+ *    The functions above can be used to generate a JSON token list without
+ *    parsing JSON text. This is typically used when building a JSON response.
+ *
  * const char *echttp_json_generate (JsonToken *token, int count,
  *                                   char *json, int size, int options);
  *
@@ -511,13 +532,18 @@ static void echttp_json_gen_string (JsonContext context, int i) {
     static char escapelist [128];
 
     const char *value = context->token[i].value.string;
-    char *buffer = (char *)malloc (3*strlen(value) + 3); // Worst case.
+    if (!value || value[0] == 0) {
+        echttp_json_gen_append (context, "\"\"");
+        return;
+    }
+
+    char *buffer = (char *)malloc (6*strlen(value) + 3); // Worst case.
     char *to = buffer;
 
     if (escapelist['n'] == 0) {
+        // Do not escape '/': used for URLs and not necessary anyway.
         escapelist['\"'] = '\"';
         escapelist['\\'] = '\\';
-        escapelist['/'] = '/';
         escapelist[8] = 'b';
         escapelist[12] = 'f';
         escapelist[10] = 'n';
@@ -792,5 +818,124 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
     if (child != parent->length) return "too few items found";
 
     return 0;
+}
+
+JsonContext echttp_json_start
+                (JsonToken *token, int max, char *pool, int size) {
+    JsonContext context = (JsonContext) malloc(sizeof(*context));
+
+    context->token = token;
+    context->max = max;
+    context->count = 0;
+
+    context->json = pool;
+    context->size = size;
+    context->cursor = 0;
+    return context;
+}
+
+static char *echttp_json_add_pool (JsonContext context, const char *text) {
+    if (!text) return 0;
+    if (context->cursor < context->size) {
+        char *p = context->json + context->cursor;
+        strncpy (p, text, context->size-context->cursor);
+        context->json[context->size-1] = 0;
+        context->cursor += strlen(context->json+context->cursor) + 1;
+        return p;
+    }
+    return 0;
+}
+
+static JsonToken *echttp_json_add_token
+                      (JsonContext context, int parent, const char *key) {
+
+    JsonToken *token = context->token + context->count;
+
+    if (context->count >= context->max) return 0;
+    token->length = 0;
+    if (context->count == 0) {
+        token->key = 0;
+        context->count = 1; // Root element.
+        return token;
+    } else if (parent >= 0 && parent < context->count) {
+        if (context->token[parent].type == JSON_OBJECT)
+            token->key = echttp_json_add_pool (context, key);
+        else if (context->token[parent].type == JSON_ARRAY)
+            token->key = 0;
+        else
+            return 0;
+        context->token[parent].length += 1;
+        context->count += 1;
+        return token;
+    }
+    return 0;
+}
+
+void echttp_json_add_null
+         (JsonContext context, int parent, const char *key) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_NULL;
+    }
+}
+
+void echttp_json_add_bool
+         (JsonContext context, int parent, const char *key, int value) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_BOOL;
+        token->value.bool = (value != 0);
+    }
+}
+
+void echttp_json_add_integer
+         (JsonContext context, int parent, const char *key, int value) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_INTEGER;
+        token->value.integer = value;
+    }
+}
+
+void echttp_json_add_real
+         (JsonContext context, int parent, const char *key, double value) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_REAL;
+        token->value.real = value;
+    }
+}
+
+void echttp_json_add_string
+         (JsonContext context, int parent, const char *key, const char *value) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_STRING;
+        token->value.string = echttp_json_add_pool (context, value);
+    }
+}
+
+int echttp_json_add_object
+         (JsonContext context, int parent, const char *key) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_OBJECT;
+    }
+    return (int)(token - context->token);
+}
+
+int echttp_json_add_array
+         (JsonContext context, int parent, const char *key) {
+    JsonToken *token = echttp_json_add_token (context, parent, key);
+    if (token) {
+        token->type = JSON_ARRAY;
+    }
+    return (int)(token - context->token);
+}
+
+int echttp_json_end (JsonContext context) {
+    int count = context->count;
+    free (context);
+    return count;
 }
 

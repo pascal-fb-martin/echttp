@@ -42,6 +42,24 @@ int echttp_json_search (const JsonToken *parent, const char *path);
 
 const char *echttp_json_enumerate (const JsonToken *parent, int *index);
 
+JsonContext echttp_json_start
+                (JsonToken *token, int max, char *pool, int size);
+void echttp_json_add_null
+         (JsonContext context, int parent, const char *key);
+void echttp_json_add_bool
+         (JsonContext context, int parent, const char *key, int value);
+void echttp_json_add_integer
+         (JsonContext context, int parent, const char *key, int value);
+void echttp_json_add_real
+         (JsonContext context, int parent, const char *key, double value);
+void echttp_json_add_string
+         (JsonContext context, int parent, const char *key, const char *value);
+int echttp_json_add_object
+         (JsonContext context, int parent, const char *key);
+int echttp_json_add_array
+         (JsonContext context, int parent, const char *key);
+int echttp_json_end (JsonContext context);
+
 const char *echttp_json_generate (JsonToken *token, int count,
                                   char *json, int size, int options);
 
