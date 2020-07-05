@@ -493,10 +493,22 @@ static void echttp_json_gen_real (JsonContext context, int i) {
     echttp_json_gen_append (context, buffer);
 }
 
+static char *echttp_json_gen_utf16 (JsonContext context, int value, char *to) {
+
+    static char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    *to++ = '\\';
+    *to++ = 'u';
+    *to++ = tohex[(value >> 12) & 0x0f];
+    *to++ = tohex[(value >> 8) & 0x0f];
+    *to++ = tohex[(value >> 4) & 0x0f];
+    *to++ = tohex[value & 0x0f];
+    return to;
+}
+
 static void echttp_json_gen_string (JsonContext context, int i) {
 
     static char escapelist [128];
-    static char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
     const char *value = context->token[i].value.string;
     char *buffer = (char *)malloc (3*strlen(value) + 3); // Worst case.
@@ -530,48 +542,29 @@ static void echttp_json_gen_string (JsonContext context, int i) {
             value += 1;
         } else {
             int ucode;
-            *to++ = '\\';
-            *to++ = 'u';
             if ((int)(*value) & 0xff < 0xe0) {
                 // UTF-16 (2 bytes).
                 ucode = ((int)(value[0]) & 0x1f) << 6 +
                         ((int)(value[1]) & 0x3f);
-                *to++ = tohex[((ucode >> 12) & 0x0f)];
-                *to++ = tohex[((ucode >> 8) & 0x0f)];
-                *to++ = tohex[((ucode >> 4) & 0x0f)];
-                *to++ = tohex[(ucode & 0x0f)];
+                to = echttp_json_gen_utf16 (context, ucode, to);
                 value += (value[1] < 0) ? 2 : 1;
             } else if ((int)(*value) & 0xff < 0xf0) {
                 // UTF-16 (3 bytes).
                 ucode = ((int)(value[0]) & 0x0f) << 12 +
                         ((int)(value[1]) & 0x3f) << 6 +
                         ((int)(value[2]) & 0x3f);
-                *to++ = tohex[((ucode >> 12) & 0x0f)];
-                *to++ = tohex[((ucode >> 8) & 0x0f)];
-                *to++ = tohex[((ucode >> 4) & 0x0f)];
-                *to++ = tohex[(ucode & 0x0f)];
+                to = echttp_json_gen_utf16 (context, ucode, to);
                 value += (value[1] < 0) ? 2 : 1;
                 if (value[2] < 0) value += 1;
             } else {
                 // UTF-16 surrogate pair (4 bytes).
                 int incr = 1;
-                int pair;
                 ucode = (((int)(value[0]) & 0xf) << 18) +
                         (((int)(value[1]) & 0x3f) << 12) +
                         (((int)(value[2]) & 0x3f) << 6) +
                         ((int)(value[3]) & 0x3f) - 0x10000;
-                pair = 0xd800 + (ucode >> 10);
-                *to++ = tohex[(pair >> 12) & 0x0f];
-                *to++ = tohex[(pair >> 8) & 0x0f];
-                *to++ = tohex[(pair >> 4) & 0x0f];
-                *to++ = tohex[pair & 0x0f];
-                *to++ = '\\';
-                *to++ = 'u';
-                pair = 0xdc00 + (ucode & 0x3ff);
-                *to++ = tohex[(pair >> 12) & 0x0f];
-                *to++ = tohex[(pair >> 8) & 0x0f];
-                *to++ = tohex[(pair >> 4) & 0x0f];
-                *to++ = tohex[pair & 0x0f];
+                to = echttp_json_gen_utf16 (context, 0xd800+(ucode>>10), to);
+                to = echttp_json_gen_utf16 (context, 0xdc00+(ucode&0x3ff), to);
                 if (value[1] < 0) {
                     incr += 1;
                     if (value[2] < 0) {
