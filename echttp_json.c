@@ -627,6 +627,7 @@ const char *echttp_json_generate (JsonToken *token, int count,
     context.max = context.count = count;
     context.options = options;
 
+    context.depth = 0;
     context.cursor = 0;
     context.countdown[0] = 0;
 
