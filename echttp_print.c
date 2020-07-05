@@ -73,27 +73,19 @@ static void print_key (int depth, const char *key) {
     }
 }
 
-static void print_null (int depth, const char *key, int comma) {
-    print_key (depth, key);
-    printf ("null%s", jsoneol(comma));
+static void print_bool (int value) {
+    printf ("%s", value?"true":"false");
 }
 
-static void print_bool (int depth, const char *key, int value, int comma) {
-    print_key (depth, key);
-    printf ("%s%s", value?"true":"false", jsoneol(comma));
+static void print_integer (long value) {
+    printf ("%d", value);
 }
 
-static void print_integer (int depth, const char *key, long value, int comma) {
-    print_key (depth, key);
-    printf ("%d%s", value, jsoneol(comma));
+static void print_real (double value) {
+    printf ("%e", value);
 }
 
-static void print_real (int depth, const char *key, double value, int comma) {
-    print_key (depth, key);
-    printf ("%e%s", value, jsoneol(comma));
-}
-
-static void print_string (int depth, const char *key, const char *value, int comma) {
+static void print_string (const char *value) {
     static char escapelist [128];
 
     char *buffer = (char *)malloc (3*strlen(value) + 1); // Worst case
@@ -123,14 +115,8 @@ static void print_string (int depth, const char *key, const char *value, int com
     }
     *to = 0;
 
-    print_key (depth, key);
-    printf ("\"%s\"%s", buffer, jsoneol(comma));
+    printf ("\"%s\"", buffer);
     free(buffer);
-}
-
-static void print_compound (int depth, const char *key, char value, int comma) {
-    print_key (depth, key);
-    printf ("%c%s", value, jsoneol(comma));
 }
 
 static void print_json (const char *name, JsonToken *token, int count) {
@@ -144,39 +130,45 @@ static void print_json (const char *name, JsonToken *token, int count) {
 
     for (i = 0; i < count; ++i) {
 
+        int comma = countdown[depth] > 1;
+
+        print_key (depth, token[i].key);
+
         switch (token[i].type) {
             case JSON_NULL:
-                print_null (depth, token[i].key, countdown[depth]>1); break;
+                printf ("null"); break;
             case JSON_BOOL:
-                print_bool (depth, token[i].key, token[i].value.bool, countdown[depth]>1); break;
+                print_bool (token[i].value.bool); break;
             case JSON_INTEGER:
-                print_integer (depth, token[i].key, token[i].value.integer, countdown[depth]>1); break;
+                print_integer (token[i].value.integer); break;
             case JSON_REAL:
-                print_real (depth, token[i].key, token[i].value.real, countdown[depth]>1); break;
+                print_real (token[i].value.real); break;
             case JSON_STRING:
-                print_string (depth, token[i].key, token[i].value.string, countdown[depth]>1); break;
+                print_string (token[i].value.string); break;
             case JSON_ARRAY:
-                print_compound (depth, token[i].key, '[', 0);
-                depth += 1;
-                ending[depth] = ']';
+                printf ("%c", '[');
+                ending[++depth] = ']';
                 countdown[depth] = token[i].length + 1;
+                comma = 0;
                 break;
             case JSON_OBJECT:
-                print_compound (depth, token[i].key, '{', 0);
-                depth += 1;
-                ending[depth] = '}';
+                printf ("%c", '{');
+                ending[++depth] = '}';
                 countdown[depth] = token[i].length + 1;
+                comma = 0;
                 break;
             default:
                 fprintf (stderr, "Invalid token type %d at index %d\n",
                          token[i].type, i);
+                printf ("null");
         }
+        printf ("%s", jsoneol(comma));
 
         while (depth > 0) {
             countdown[depth] -= 1;
             if (countdown[depth] > 0) break;
             depth -= 1;
-            print_compound (depth, 0, ending[depth+1], countdown[depth]>1);
+            printf ("%s%c%s", indentation(depth), ending[depth+1], jsoneol(countdown[depth]>1));
         }
     }
 }
