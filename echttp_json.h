@@ -27,6 +27,10 @@ typedef struct {
 #define JSON_ARRAY   6
 #define JSON_OBJECT  7
 
+// JSON generation options:
+
+#define JSON_OPTION_PRETTY   1
+
 struct JsonContext_s;
 typedef struct JsonContext_s *JsonContext;
 
@@ -37,4 +41,7 @@ const char *echttp_json_parse (char *json, JsonToken *token, int *count);
 int echttp_json_search (const JsonToken *parent, const char *path);
 
 const char *echttp_json_enumerate (const JsonToken *parent, int *index);
+
+const char *echttp_json_generate (JsonToken *token, int count,
+                                  char *json, int size, int options);
 

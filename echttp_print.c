@@ -41,137 +41,12 @@
 #include "echttp.h"
 #include "echttp_json.h"
 
-static char *buffer = 0;
+static char *inbuffer = 0;
+static char *outbuffer = 0;
 static int buffer_size = 0;
-
-static int pretty = 1;
 
 #define JSON_PRINT_MAX 20480
 
-static const char *indentation(int depth) {
-    static char indent[81];
-    if (!pretty) return "";
-    if (indent[0] == 0) memset (indent, ' ',sizeof(indent)-1);
-    return indent + sizeof(indent) -1 - (4 * depth);
-}
-
-static const char *jsoneol(int comma) {
-    if (pretty) {
-        if (comma) return ",\n";
-        return "\n";
-    }
-    if (comma) return ",";
-    return "";
-}
-
-static void print_key (int depth, const char *key) {
-    if (key) {
-        const char *sep = pretty ? " : " : ":";
-        printf ("%s\"%s\"%s", indentation(depth), key, sep);
-    } else {
-        printf ("%s", indentation(depth));
-    }
-}
-
-static void print_bool (int value) {
-    printf ("%s", value?"true":"false");
-}
-
-static void print_integer (long value) {
-    printf ("%d", value);
-}
-
-static void print_real (double value) {
-    printf ("%e", value);
-}
-
-static void print_string (const char *value) {
-    static char escapelist [128];
-
-    char *buffer = (char *)malloc (3*strlen(value) + 1); // Worst case
-    char *to = buffer;
-
-    if (escapelist['n'] == 0) {
-        escapelist['\"'] = '\"';
-        escapelist['\\'] = '\\';
-        escapelist['/'] = '/';
-        escapelist[8] = 'b';
-        escapelist[12] = 'f';
-        escapelist[10] = 'n';
-        escapelist[13] = 'r';
-        escapelist[9] = 't';
-    }
-
-    while (*value) {
-        char escape = escapelist[*value];
-        if (escape) {
-            *to++ = '\\';
-            *to++ = escape;
-            value++;
-        } else {
-            *to++ = *value++;
-        }
-        // TBD: Unicode?
-    }
-    *to = 0;
-
-    printf ("\"%s\"", buffer);
-    free(buffer);
-}
-
-static void print_json (const char *name, JsonToken *token, int count) {
-
-    int i;
-    int depth = 0;
-    int ending[32];
-    int countdown[32];
-
-    countdown[0] = 0;
-
-    for (i = 0; i < count; ++i) {
-
-        int comma = countdown[depth] > 1;
-
-        print_key (depth, token[i].key);
-
-        switch (token[i].type) {
-            case JSON_NULL:
-                printf ("null"); break;
-            case JSON_BOOL:
-                print_bool (token[i].value.bool); break;
-            case JSON_INTEGER:
-                print_integer (token[i].value.integer); break;
-            case JSON_REAL:
-                print_real (token[i].value.real); break;
-            case JSON_STRING:
-                print_string (token[i].value.string); break;
-            case JSON_ARRAY:
-                printf ("%c", '[');
-                ending[++depth] = ']';
-                countdown[depth] = token[i].length + 1;
-                comma = 0;
-                break;
-            case JSON_OBJECT:
-                printf ("%c", '{');
-                ending[++depth] = '}';
-                countdown[depth] = token[i].length + 1;
-                comma = 0;
-                break;
-            default:
-                fprintf (stderr, "Invalid token type %d at index %d\n",
-                         token[i].type, i);
-                printf ("null");
-        }
-        printf ("%s", jsoneol(comma));
-
-        while (depth > 0) {
-            countdown[depth] -= 1;
-            if (countdown[depth] > 0) break;
-            depth -= 1;
-            printf ("%s%c%s", indentation(depth), ending[depth+1], jsoneol(countdown[depth]>1));
-        }
-    }
-}
 
 static void print_tokens (JsonToken *token, int count) {
     int i;
@@ -187,6 +62,7 @@ int main (int argc, const char **argv) {
     int fd;
     int count;
     int show_tokens = 0;
+    int pretty = JSON_OPTION_PRETTY;
     const char *error;
     struct stat filestat;
     JsonToken token[JSON_PRINT_MAX];
@@ -211,29 +87,35 @@ int main (int argc, const char **argv) {
         if (filestat.st_size > 0) {
             if (filestat.st_size > buffer_size) {
                 buffer_size = filestat.st_size + 1;
-                buffer = (char *) realloc (buffer, buffer_size);
+                inbuffer = (char *) realloc (inbuffer, buffer_size);
+                outbuffer = (char *) realloc (outbuffer, 3*buffer_size);
             }
             fd = open (argv[i], O_RDONLY);
             if (fd < 0) {
                 fprintf (stderr, "Cannot open %s\n", argv[i]);
                 continue;
             }
-            if (read (fd, buffer, filestat.st_size) != filestat.st_size) {
+            if (read (fd, inbuffer, filestat.st_size) != filestat.st_size) {
                 fprintf (stderr, "Cannot read %s\n", argv[i]);
                 continue;
             }
             close(fd);
-            buffer[filestat.st_size] = 0; // Terminate the JSON string.
+            inbuffer[filestat.st_size] = 0; // Terminate the JSON string.
 
             count = JSON_PRINT_MAX;
-            error = echttp_json_parse (buffer, token, &count);
+            error = echttp_json_parse (inbuffer, token, &count);
             if (error) {
                 fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
                 continue;
             }
             if (show_tokens) print_tokens (token, count);
             printf ("// File %s\n", argv[i]);
-            print_json (argv[i], token, count);
+            error = echttp_json_generate (token, count, outbuffer, 3*buffer_size, pretty);
+            if (error) {
+                fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
+                continue;
+            }
+            printf ("%s", outbuffer);
         }
     }
 }

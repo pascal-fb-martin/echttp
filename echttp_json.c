@@ -43,6 +43,11 @@
  *    children (as indicated by parent->length). The indexes provided are
  *    relative to the parent's token.
  *    Return null on success, an error text on failure.
+ *
+ * const char *echttp_json_generate (JsonToken *token, int count,
+ *                                   char *json, int size, int options);
+ *
+ *    Generate a JSON string give an array of tokens.
  */
 
 #define _GNU_SOURCE
@@ -75,6 +80,12 @@ struct JsonContext_s {
     char *json;
     JsonToken *token;
     int max;
+
+    int size;
+    int depth;
+    int ending[32];
+    int countdown[32];
+    int options;
 };
 
 static int  echttp_json_debug = 0;
@@ -184,7 +195,7 @@ static char hex2bin(char x) {
 static const char *echttp_json_string (JsonContext context) {
     char *from = context->json + context->cursor + 1;
     char *to = from;
-    int l, h;
+    int l, h, ucode;
 
     context->token[context->count].type = JSON_STRING;
     context->token[context->count].length = 0;
@@ -211,12 +222,51 @@ static const char *echttp_json_string (JsonContext context) {
                        h = hex2bin(from[1]);
                        l = hex2bin(from[2]);
                        if (h < 0 || l < 0) return "invalid unicode";
-                       if (l > 0 || h > 0) *to++ = 16 * h + l;
+                       ucode = (16 * h + l) << 8;
                        h = hex2bin(from[3]);
                        l = hex2bin(from[4]);
                        if (h < 0 || l < 0) return "invalid unicode";
-                       *to++ = 16 * h + l;
-                       from += 4;
+                       ucode += 16 * h + l;
+                       if (from[5] != '\\' || from[6] != 'u') {
+                           // Convert UTF-16 to UTF-8:
+                           if (ucode < 0x80) {
+                               *to++ = (char) (ucode & 0x7f);
+                           } else if (ucode < 0x800) {
+                               *to++ = 0xc0 + ((ucode >> 6) & 0x1f);
+                               *to++ = 0x80 + (ucode & 0x3f);
+                           } else if (ucode >= 0xD800) {
+                               return "reserved UTF-16 character";
+                           } else {
+                               *to++ = 0xc0 + ((ucode >> 12) & 0x1f);
+                               *to++ = 0x80 + ((ucode > 6) & 0x3f);
+                               *to++ = 0x80 + (ucode & 0x3f);
+                           }
+                           from += 4;
+                       } else {
+                           // UTF-32 coded as a surrogate pair.
+                           ucode -= 0xd800;
+                           if (ucode < 0 || ucode > 0x3ff)
+                               return "invalid UTF-16 surrogate pair";
+                           int pair2;
+                           h = hex2bin(from[7]);
+                           l = hex2bin(from[8]);
+                           if (h < 0 || l < 0) return "invalid unicode";
+                           pair2 = (16 * h + l) << 8;
+                           h = hex2bin(from[9]);
+                           l = hex2bin(from[10]);
+                           if (h < 0 || l < 0) return "invalid unicode";
+                           pair2 = pair2 + 16 * h + l - 0xdc00;
+                           if (pair2 < 0 || pair2 > 0x3ff)
+                               return "invalid UTF-16 surrogate pair";
+                           ucode = 0x10000 + (ucode << 10) + pair2;
+                           // Convert UTF-32 to UTF-8:
+                           *to++ = 0xf0 + ((ucode >> 18) & 7);
+                           *to++ = 0x80 + ((ucode >> 12) & 0x3f);
+                           *to++ = 0x80 + ((ucode >> 6) & 0x3f);
+                           *to++ = 0x80 + (ucode & 0x3f);
+                           from += 10;
+                       }
+                       break;
                 }
                 from += 1;
                 break;
@@ -382,6 +432,231 @@ const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
    }
    *count = context.count + 1;
    return 0;
+}
+
+
+static void echttp_json_gen_append (JsonContext context, const char *text) {
+
+    if (context->cursor < context->size) {
+        strncpy (context->json+context->cursor,
+                 text, context->size-context->cursor);
+        context->json[context->size-1] = 0;
+        context->cursor += strlen(context->json+context->cursor);
+    }
+}
+
+static void echttp_json_gen_indent (JsonContext context) {
+
+    if (context->options & JSON_OPTION_PRETTY) {
+        static char indent[81];
+        if (indent[0] == 0) memset (indent, ' ',sizeof(indent)-1);
+        const char *sp = indent + sizeof(indent) -1 - (4 * context->depth);
+        echttp_json_gen_append (context, sp);
+    }
+}
+
+static void echttp_json_gen_key (JsonContext context, const char *key) {
+    echttp_json_gen_indent (context);
+    if (key) {
+        const char *sep = (context->options & JSON_OPTION_PRETTY)?"\" : ":"\":";
+        echttp_json_gen_append (context, "\"");
+        echttp_json_gen_append (context, key);
+        echttp_json_gen_append (context, sep);
+    }
+}
+
+static void echttp_json_gen_eol (JsonContext context, int comma) {
+    if (context->options & JSON_OPTION_PRETTY) {
+        if (comma)
+            echttp_json_gen_append (context, ",\n");
+        else
+            echttp_json_gen_append (context, "\n");
+    } else if (comma) {
+        echttp_json_gen_append (context, ",");
+    }
+}
+
+static void echttp_json_gen_bool (JsonContext context, int i) {
+    echttp_json_gen_append (context,
+                            context->token[i].value.bool?"true":"false");
+}
+
+static void echttp_json_gen_integer (JsonContext context, int i) {
+    char buffer[32];
+    snprintf (buffer, sizeof(buffer), "%d", context->token[i].value.integer);
+    echttp_json_gen_append (context, buffer);
+}
+
+static void echttp_json_gen_real (JsonContext context, int i) {
+    char buffer[64];
+    snprintf (buffer, sizeof(buffer), "%e", context->token[i].value.real);
+    echttp_json_gen_append (context, buffer);
+}
+
+static void echttp_json_gen_string (JsonContext context, int i) {
+
+    static char escapelist [128];
+    static char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    const char *value = context->token[i].value.string;
+    char *buffer = (char *)malloc (3*strlen(value) + 3); // Worst case.
+    char *to = buffer;
+
+    if (escapelist['n'] == 0) {
+        escapelist['\"'] = '\"';
+        escapelist['\\'] = '\\';
+        escapelist['/'] = '/';
+        escapelist[8] = 'b';
+        escapelist[12] = 'f';
+        escapelist[10] = 'n';
+        escapelist[13] = 'r';
+        escapelist[9] = 't';
+    }
+
+    *to++ = '"';
+
+    while (*value) {
+        if (*value > 0) {
+            char escape = escapelist[*value];
+            if (escape) {
+                *to++ = '\\';
+                *to++ = escape;
+                value++;
+            } else {
+                *to++ = *value++;
+            }
+        } else if ((int)(*value) & 0xff >= 0xf1) {
+            // Invalid UTF8 character, ignore.
+            value += 1;
+        } else {
+            int ucode;
+            *to++ = '\\';
+            *to++ = 'u';
+            if ((int)(*value) & 0xff < 0xe0) {
+                // UTF-16 (2 bytes).
+                ucode = ((int)(value[0]) & 0x1f) << 6 +
+                        ((int)(value[1]) & 0x3f);
+                *to++ = tohex[((ucode >> 12) & 0x0f)];
+                *to++ = tohex[((ucode >> 8) & 0x0f)];
+                *to++ = tohex[((ucode >> 4) & 0x0f)];
+                *to++ = tohex[(ucode & 0x0f)];
+                value += (value[1] < 0) ? 2 : 1;
+            } else if ((int)(*value) & 0xff < 0xf0) {
+                // UTF-16 (3 bytes).
+                ucode = ((int)(value[0]) & 0x0f) << 12 +
+                        ((int)(value[1]) & 0x3f) << 6 +
+                        ((int)(value[2]) & 0x3f);
+                *to++ = tohex[((ucode >> 12) & 0x0f)];
+                *to++ = tohex[((ucode >> 8) & 0x0f)];
+                *to++ = tohex[((ucode >> 4) & 0x0f)];
+                *to++ = tohex[(ucode & 0x0f)];
+                value += (value[1] < 0) ? 2 : 1;
+                if (value[2] < 0) value += 1;
+            } else {
+                // UTF-16 surrogate pair (4 bytes).
+                int incr = 1;
+                int pair;
+                ucode = (((int)(value[0]) & 0xf) << 18) +
+                        (((int)(value[1]) & 0x3f) << 12) +
+                        (((int)(value[2]) & 0x3f) << 6) +
+                        ((int)(value[3]) & 0x3f) - 0x10000;
+                pair = 0xd800 + (ucode >> 10);
+                *to++ = tohex[(pair >> 12) & 0x0f];
+                *to++ = tohex[(pair >> 8) & 0x0f];
+                *to++ = tohex[(pair >> 4) & 0x0f];
+                *to++ = tohex[pair & 0x0f];
+                *to++ = '\\';
+                *to++ = 'u';
+                pair = 0xdc00 + (ucode & 0x3ff);
+                *to++ = tohex[(pair >> 12) & 0x0f];
+                *to++ = tohex[(pair >> 8) & 0x0f];
+                *to++ = tohex[(pair >> 4) & 0x0f];
+                *to++ = tohex[pair & 0x0f];
+                if (value[1] < 0) {
+                    incr += 1;
+                    if (value[2] < 0) {
+                        incr += 1;
+                        if (value[3] < 0) incr += 1;
+                    }
+                }
+                value += incr;
+            }
+        }
+    }
+    *to++ = '"';
+    *to = 0;
+    echttp_json_gen_append (context, buffer);
+    free(buffer);
+}
+
+const char *echttp_json_generate (JsonToken *token, int count,
+                                  char *json, int size, int options) {
+
+    struct JsonContext_s context;
+
+    int i;
+
+    context.json = json;
+    context.size = size;
+    context.token = token;
+    context.max = context.count = count;
+    context.options = options;
+
+    context.cursor = 0;
+    context.countdown[0] = 0;
+
+    for (i = 0; i < count; ++i) {
+
+        int comma = context.countdown[context.depth] > 1;
+
+        echttp_json_gen_key (&context, token[i].key);
+
+        switch (token[i].type) {
+            case JSON_NULL:
+                echttp_json_gen_append (&context, "null"); break;
+            case JSON_BOOL:
+                echttp_json_gen_bool (&context, token[i].value.bool); break;
+            case JSON_INTEGER:
+                echttp_json_gen_integer (&context, i); break;
+            case JSON_REAL:
+                echttp_json_gen_real (&context, i); break;
+            case JSON_STRING:
+                echttp_json_gen_string (&context, i); break;
+            case JSON_ARRAY:
+                echttp_json_gen_append (&context, "[");
+                context.depth += 1;
+                context.ending[context.depth] = ']';
+                context.countdown[context.depth] = token[i].length + 1;
+                comma = 0;
+                break;
+            case JSON_OBJECT:
+                echttp_json_gen_append (&context, "{");
+                context.depth += 1;
+                context.ending[context.depth] = '}';
+                context.countdown[context.depth] = token[i].length + 1;
+                comma = 0;
+                break;
+            default:
+                fprintf (stderr, "Invalid token type %d at index %d\n",
+                         token[i].type, i);
+                return "invalid token type";
+        }
+
+        echttp_json_gen_eol (&context, comma);
+
+        while (context.depth > 0) {
+            char buffer[2];
+            context.countdown[context.depth] -= 1;
+            if (context.countdown[context.depth] > 0) break;
+            buffer[0] = context.ending[context.depth]; buffer[1] = 0;
+            context.depth -= 1;
+            echttp_json_gen_indent (&context);
+            echttp_json_gen_append (&context, buffer);
+            echttp_json_gen_eol (&context, context.countdown[context.depth]>1);
+        }
+    }
+    if (context.cursor >= context.size) return "not enough space";
+    return 0;
 }
 
 
