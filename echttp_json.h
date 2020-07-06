@@ -60,8 +60,8 @@ int echttp_json_add_array
          (JsonContext context, int parent, const char *key);
 int echttp_json_end (JsonContext context);
 
-const char *echttp_json_generate (JsonToken *token, int count,
-                                  char *json, int size, int options);
+const char *echttp_json_format (JsonToken *token, int count,
+                                char *json, int size, int options);
 
-const char *echttp_json_format (JsonContext context, char *buffer, int size);
+const char *echttp_json_export (JsonContext context, char *buffer, int size);
 

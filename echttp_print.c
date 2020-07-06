@@ -110,7 +110,7 @@ int main (int argc, const char **argv) {
             }
             if (show_tokens) print_tokens (token, count);
             printf ("// File %s\n", argv[i]);
-            error = echttp_json_generate (token, count, outbuffer, 3*buffer_size, pretty);
+            error = echttp_json_format (token, count, outbuffer, 3*buffer_size, pretty);
             if (error) {
                 fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
                 continue;

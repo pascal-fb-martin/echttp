@@ -65,16 +65,17 @@
  *    The functions above can be used to generate a JSON token list without
  *    parsing JSON text. This is typically used when building a JSON response.
  *
- * const char *echttp_json_generate (JsonToken *token, int count,
- *                                   char *json, int size, int options);
+ * const char *echttp_json_format (JsonToken *token, int count,
+ *                                 char *json, int size, int options);
  *
- *    Generate a JSON string give an array of tokens.
+ *    Format a JSON string given an array of tokens. Use the option
+ *    JSON_OPTION_PRETTY to make the output readable.
  *
- * const char *echttp_json_format (JsonContext context, char *buffer, int size);
+ * const char *echttp_json_export (JsonContext context, char *buffer, int size);
  *
- *    This function combines echttp_json_end() and echttp_json_generate()
- *    without pretty formatting, which is what most web server will tend
- *    to do when generating a response..
+ *    This function combines echttp_json_end() and echttp_json_format()
+ *    without pretty formatting, which is what most web servers will tend
+ *    to use when generating a response..
  */
 
 #define _GNU_SOURCE
@@ -614,8 +615,8 @@ static void echttp_json_gen_string (JsonContext context, int i) {
     free(buffer);
 }
 
-const char *echttp_json_generate (JsonToken *token, int count,
-                                  char *json, int size, int options) {
+const char *echttp_json_format (JsonToken *token, int count,
+                                char *json, int size, int options) {
 
     struct JsonContext_s context;
 
@@ -641,7 +642,7 @@ const char *echttp_json_generate (JsonToken *token, int count,
             case JSON_NULL:
                 echttp_json_gen_append (&context, "null"); break;
             case JSON_BOOL:
-                echttp_json_gen_bool (&context, token[i].value.bool); break;
+                echttp_json_gen_bool (&context, i); break;
             case JSON_INTEGER:
                 echttp_json_gen_integer (&context, i); break;
             case JSON_REAL:
@@ -946,9 +947,10 @@ int echttp_json_end (JsonContext context) {
     return count;
 }
 
-const char *echttp_json_format (JsonContext context, char *buffer, int size) {
+const char *echttp_json_export (JsonContext context, char *buffer, int size) {
     const char *error =
-        echttp_json_generate (context->token, context->count, buffer, size, 0);
+        echttp_json_format (context->token, context->count, buffer, size, 0);
+    if (!error && context->count >= context->max) error = "token array is full";
     echttp_json_end (context);
     return error;
 }
