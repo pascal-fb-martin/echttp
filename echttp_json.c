@@ -259,39 +259,44 @@ static const char *echttp_json_string (JsonContext context) {
                            // Convert UTF-16 to UTF-8:
                            if (ucode < 0x80) {
                                *to++ = (char) (ucode & 0x7f);
+                               if (echttp_json_debug) printf ("UTF-16 %04x to UTF-8 %02x\n", ucode, (int)(to[-1]) & 0xff);
                            } else if (ucode < 0x800) {
                                *to++ = 0xc0 + ((ucode >> 6) & 0x1f);
                                *to++ = 0x80 + (ucode & 0x3f);
+                               if (echttp_json_debug) printf ("UTF-16 %04x to UTF-8 %02x %02x\n", ucode, (int)(to[-2]) & 0xff, (int)(to[-1]) & 0xff);
                            } else {
-                               *to++ = 0xc0 + ((ucode >> 12) & 0x1f);
-                               *to++ = 0x80 + ((ucode > 6) & 0x3f);
+                               *to++ = 0xe0 + ((ucode >> 12) & 0x1f);
+                               *to++ = 0x80 + ((ucode >> 6) & 0x3f);
                                *to++ = 0x80 + (ucode & 0x3f);
+                               if (echttp_json_debug) printf ("UTF-16 %04x to UTF-8 %02x %02x %02x\n", ucode, (int)(to[-3]) & 0xff, (int)(to[-2]) & 0xff, (int)(to[-1]) & 0xff);
                            }
                            from += 4;
+                       } else if (ucode >= 0xdc00) {
+                           return "missing 1st half of surrogate pair";
                        } else {
                            if (from[5] != '\\' || from[6] != 'u')
                                return "missing 2nd half of surrogate pair";
                            // UTF-32 coded as a surrogate pair.
-                           ucode -= 0xd800;
-                           if (ucode < 0 || ucode > 0x3ff)
+                           int pair1 = ucode - 0xd800;
+                           if (pair1 < 0 || pair1 > 0x3ff)
                                return "invalid UTF-16 surrogate pair";
-                           int pair2;
                            h = hex2bin(from[7]);
                            l = hex2bin(from[8]);
                            if (h < 0 || l < 0) return "invalid unicode";
-                           pair2 = (16 * h + l) << 8;
+                           int pair2 = (16 * h + l) << 8;
                            h = hex2bin(from[9]);
                            l = hex2bin(from[10]);
                            if (h < 0 || l < 0) return "invalid unicode";
                            pair2 = pair2 + 16 * h + l - 0xdc00;
                            if (pair2 < 0 || pair2 > 0x3ff)
                                return "invalid UTF-16 surrogate pair";
-                           ucode = 0x10000 + (ucode << 10) + pair2;
+                           ucode = 0x10000 + (pair1 << 10) + pair2;
                            // Convert UTF-32 to UTF-8:
                            *to++ = 0xf0 + ((ucode >> 18) & 7);
                            *to++ = 0x80 + ((ucode >> 12) & 0x3f);
                            *to++ = 0x80 + ((ucode >> 6) & 0x3f);
                            *to++ = 0x80 + (ucode & 0x3f);
+                           if (echttp_json_debug) printf ("UTF-32 %06x to UTF-8 %02x %02x %02x %02x\n", ucode, (int)(to[-4]) & 0xff, (int)(to[-3]) & 0xff, (int)(to[-2]) & 0xff, (int)(to[-1]) & 0xff);
                            from += 10;
                        }
                        break;
@@ -570,34 +575,43 @@ static void echttp_json_gen_string (JsonContext context, int i) {
             } else {
                 *to++ = *value++;
             }
-        } else if ((int)(*value) & 0xff >= 0xf1) {
-            // Invalid UTF8 character, ignore.
-            value += 1;
         } else {
+            unsigned int lead = (unsigned int)(*value) & 0xff;
+            if (lead >= 0xf1) {
+                value += 1; // Invalid UTF8 character, ignore.
+                continue;
+            }
             int ucode;
-            if ((int)(*value) & 0xff < 0xe0) {
+            int incr = 1;
+            if (lead < 0xe0) {
                 // UTF-16 (2 bytes).
-                ucode = ((int)(value[0]) & 0x1f) << 6 +
+                ucode = (((int)(value[0]) & 0x1f) << 6) +
                         ((int)(value[1]) & 0x3f);
                 to = echttp_json_gen_utf16 (context, ucode, to);
-                value += (value[1] < 0) ? 2 : 1;
-            } else if ((int)(*value) & 0xff < 0xf0) {
+                if (echttp_json_debug) printf ("UTF-8 %02x %02x to UTF-16 %04x\n", (int)(value[0]) & 0xff, (int)(value[1]) & 0xff, ucode);
+                if (value[1] < 0) incr += 1;
+            } else if (lead < 0xf0) {
                 // UTF-16 (3 bytes).
-                ucode = ((int)(value[0]) & 0x0f) << 12 +
-                        ((int)(value[1]) & 0x3f) << 6 +
+                ucode = (((int)(value[0]) & 0x0f) << 12) +
+                        (((int)(value[1]) & 0x3f) << 6) +
                         ((int)(value[2]) & 0x3f);
                 to = echttp_json_gen_utf16 (context, ucode, to);
-                value += (value[1] < 0) ? 2 : 1;
-                if (value[2] < 0) value += 1;
+                if (echttp_json_debug) printf ("UTF-8 %02x %02x %02x to UTF-16 %04x\n", (int)(value[0]) & 0xff, (int)(value[1]) & 0xff, (int)(value[2]) & 0xff, ucode);
+                if (value[1] < 0) {
+                    incr += 1;
+                    if (value[2] < 0) incr += 1;
+                }
             } else {
                 // UTF-16 surrogate pair (4 bytes).
-                int incr = 1;
-                ucode = (((int)(value[0]) & 0xf) << 18) +
+                ucode = (((int)(value[0]) & 0x7) << 18) +
                         (((int)(value[1]) & 0x3f) << 12) +
                         (((int)(value[2]) & 0x3f) << 6) +
-                        ((int)(value[3]) & 0x3f) - 0x10000;
-                to = echttp_json_gen_utf16 (context, 0xd800+(ucode>>10), to);
-                to = echttp_json_gen_utf16 (context, 0xdc00+(ucode&0x3ff), to);
+                        ((int)(value[3]) & 0x3f);
+                int pair1 = 0xd800 + ((ucode - 0x10000) >> 10);
+                int pair2 = 0xdc00 + ((ucode - 0x10000) & 0x3ff);
+                if (echttp_json_debug) printf ("UTF-8 %02x %02x %02x %02x to UTF-32 %06x, UTF-16 %04x %04x\n", (int)(value[0]) & 0xff, (int)(value[1]) & 0xff, (int)(value[2]) & 0xff, (int)(value[3]) & 0xff, ucode, pair1, pair2);
+                to = echttp_json_gen_utf16 (context, pair1, to);
+                to = echttp_json_gen_utf16 (context, pair2, to);
                 if (value[1] < 0) {
                     incr += 1;
                     if (value[2] < 0) {
@@ -605,8 +619,8 @@ static void echttp_json_gen_string (JsonContext context, int i) {
                         if (value[3] < 0) incr += 1;
                     }
                 }
-                value += incr;
             }
+            value += incr;
         }
     }
     *to++ = '"';
