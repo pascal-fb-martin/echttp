@@ -255,15 +255,13 @@ static const char *echttp_json_string (JsonContext context) {
                        l = hex2bin(from[4]);
                        if (h < 0 || l < 0) return "invalid unicode";
                        ucode += 16 * h + l;
-                       if (from[5] != '\\' || from[6] != 'u') {
+                       if (ucode < 0xd800 || ucode >= 0xe000) {
                            // Convert UTF-16 to UTF-8:
                            if (ucode < 0x80) {
                                *to++ = (char) (ucode & 0x7f);
                            } else if (ucode < 0x800) {
                                *to++ = 0xc0 + ((ucode >> 6) & 0x1f);
                                *to++ = 0x80 + (ucode & 0x3f);
-                           } else if (ucode >= 0xD800) {
-                               return "reserved UTF-16 character";
                            } else {
                                *to++ = 0xc0 + ((ucode >> 12) & 0x1f);
                                *to++ = 0x80 + ((ucode > 6) & 0x3f);
@@ -271,6 +269,8 @@ static const char *echttp_json_string (JsonContext context) {
                            }
                            from += 4;
                        } else {
+                           if (from[5] != '\\' || from[6] != 'u')
+                               return "missing 2nd half of surrogate pair";
                            // UTF-32 coded as a surrogate pair.
                            ucode -= 0xd800;
                            if (ucode < 0 || ucode > 0x3ff)
