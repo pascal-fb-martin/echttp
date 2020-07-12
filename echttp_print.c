@@ -48,7 +48,7 @@ static int buffer_size = 0;
 #define JSON_PRINT_MAX 20480
 
 
-static void print_tokens (JsonToken *token, int count) {
+static void print_tokens (ParserToken *token, int count) {
     int i;
     for (i = 0; i < count; ++i) {
         printf ("Token type %d at index %d, length %d, key %s\n",
@@ -62,10 +62,10 @@ int main (int argc, const char **argv) {
     int fd;
     int count;
     int show_tokens = 0;
-    int pretty = JSON_OPTION_PRETTY;
+    int pretty = PRINT_OPTION_PRETTY;
     const char *error;
     struct stat filestat;
-    JsonToken token[JSON_PRINT_MAX];
+    ParserToken token[JSON_PRINT_MAX];
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {

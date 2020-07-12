@@ -6,62 +6,36 @@
  * echttp_json.h - An additional module to decode JSON text,
  */
 
-typedef struct {
-    const char *key;
-    int type;
-    union {
-        int bool;
-        long integer;
-        double real;
-        char *string;
-    } value;
-    int length;
-} JsonToken;
-
-// JSON types:
-#define JSON_NULL    1
-#define JSON_BOOL    2
-#define JSON_INTEGER 3
-#define JSON_REAL    4
-#define JSON_STRING  5
-#define JSON_ARRAY   6
-#define JSON_OBJECT  7
-
-// JSON generation options:
-
-#define JSON_OPTION_PRETTY   1
-
-struct JsonContext_s;
-typedef struct JsonContext_s *JsonContext;
+#include "echttp_parser.h"
 
 void echttp_json_enable_debug (void);
 
-const char *echttp_json_parse (char *json, JsonToken *token, int *count);
+const char *echttp_json_parse (char *json, ParserToken *token, int *count);
 
-int echttp_json_search (const JsonToken *parent, const char *path);
+int echttp_json_search (const ParserToken *parent, const char *path);
 
-const char *echttp_json_enumerate (const JsonToken *parent, int *index);
+const char *echttp_json_enumerate (const ParserToken *parent, int *index);
 
-JsonContext echttp_json_start
-                (JsonToken *token, int max, char *pool, int size);
+ParserContext echttp_json_start
+                  (ParserToken *token, int max, char *pool, int size);
 void echttp_json_add_null
-         (JsonContext context, int parent, const char *key);
+         (ParserContext context, int parent, const char *key);
 void echttp_json_add_bool
-         (JsonContext context, int parent, const char *key, int value);
+         (ParserContext context, int parent, const char *key, int value);
 void echttp_json_add_integer
-         (JsonContext context, int parent, const char *key, long value);
+         (ParserContext context, int parent, const char *key, long value);
 void echttp_json_add_real
-         (JsonContext context, int parent, const char *key, double value);
+         (ParserContext context, int parent, const char *key, double value);
 void echttp_json_add_string
-         (JsonContext context, int parent, const char *key, const char *value);
+         (ParserContext context, int parent, const char *key, const char *value);
 int echttp_json_add_object
-         (JsonContext context, int parent, const char *key);
+         (ParserContext context, int parent, const char *key);
 int echttp_json_add_array
-         (JsonContext context, int parent, const char *key);
-int echttp_json_end (JsonContext context);
+         (ParserContext context, int parent, const char *key);
+int echttp_json_end (ParserContext context);
 
-const char *echttp_json_format (JsonToken *token, int count,
+const char *echttp_json_format (ParserToken *token, int count,
                                 char *json, int size, int options);
 
-const char *echttp_json_export (JsonContext context, char *buffer, int size);
+const char *echttp_json_export (ParserContext context, char *buffer, int size);
 

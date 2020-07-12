@@ -80,9 +80,9 @@ static void print_string (const char *key, const char *value) {
     free(buffer);
 }
 
-static void print_json (JsonToken *token, int i, int deep);
+static void print_json (ParserToken *token, int i, int deep);
 
-static void enumerate (JsonToken *parent) {
+static void enumerate (ParserToken *parent) {
 
     int i;
     int index[JSON_PRINT_MAX];
@@ -93,7 +93,7 @@ static void enumerate (JsonToken *parent) {
     }
 
     for (i = 0; i < parent->length; ++i) {
-        if (parent->type == JSON_OBJECT)
+        if (parent->type == PARSER_OBJECT)
             printf ("    %s: ", parent[index[i]].key);
         else
             printf ("    [%2d] ", i);
@@ -101,24 +101,24 @@ static void enumerate (JsonToken *parent) {
     }
 }
 
-static void print_json (JsonToken *token, int i, int deep) {
+static void print_json (ParserToken *token, int i, int deep) {
 
     switch (token[i].type) {
-        case JSON_NULL:
+        case PARSER_NULL:
             printf ("null\n"); break;
-        case JSON_BOOL:
+        case PARSER_BOOL:
             printf ("%s\n", token[i].value.bool?"true":"false"); break;
-        case JSON_INTEGER:
+        case PARSER_INTEGER:
             printf ("%d\n", token[i].value.integer); break;
-        case JSON_REAL:
+        case PARSER_REAL:
             printf ("%e\n", token[i].value.real); break;
-        case JSON_STRING:
+        case PARSER_STRING:
             print_string (token[i].key, token[i].value.string); break;
-        case JSON_ARRAY:
+        case PARSER_ARRAY:
             printf ("array, length %d\n", token[i].length);
             if (deep) enumerate (token+i);
             break;
-        case JSON_OBJECT:
+        case PARSER_OBJECT:
             printf ("object, %d elements\n", token[i].length);
             if (deep) enumerate (token+i);
             break;
@@ -128,7 +128,7 @@ static void print_json (JsonToken *token, int i, int deep) {
     }
 }
 
-static void print_tokens (JsonToken *token, int count) {
+static void print_tokens (ParserToken *token, int count) {
     int i;
     for (i = 0; i < count; ++i) {
         printf ("Token type %d at index %d, length %d, key %s\n",
@@ -145,7 +145,7 @@ int main (int argc, const char **argv) {
     int show_tokens = 0;
     const char *error;
     struct stat filestat;
-    JsonToken token[JSON_PRINT_MAX];
+    ParserToken token[JSON_PRINT_MAX];
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {

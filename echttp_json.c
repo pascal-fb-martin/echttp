@@ -26,17 +26,17 @@
  * but is a totally independent implementation, using recursive descent
  * instead of a state machine.
  *
- * const char *echttp_json_parse (char *json, JsonToken *token, int *count);
+ * const char *echttp_json_parse (char *json, ParserToken *token, int *count);
  *
  *    Decode a JSON string and return a list of tokens. The decoding breaks
  *    the input string.
  *
- * int echttp_json_search (const JsonToken *token, int max, const char *path);
+ * int echttp_json_search (const ParserToken *token, int max, const char *path);
  *
  *    Retrieve a JSON item (after decoding) and return its index. return -1
  *    if the item was not found.
  *
- * const char *echttp_json_enumerate (const JsonToken *parent, int *index);
+ * const char *echttp_json_enumerate (const ParserToken *parent, int *index);
  *
  *    Populate the list of children items to an array or object's parent.
  *    The index array must be large enough for the expected number of
@@ -44,34 +44,34 @@
  *    relative to the parent's token.
  *    Return null on success, an error text on failure.
  *
- * JsonContext echttp_json_start
- *                 (JsonToken *token, int max, char *pool, int size);
+ * ParserContext echttp_json_start
+ *                 (ParserToken *token, int max, char *pool, int size);
  * void echttp_json_add_null
- *          (JsonContext context, int parent, const char *key);
+ *          (ParserContext context, int parent, const char *key);
  * void echttp_json_add_bool
- *          (JsonContext context, int parent, const char *key, int value);
+ *          (ParserContext context, int parent, const char *key, int value);
  * void echttp_json_add_integer
- *          (JsonContext context, int parent, const char *key, long value);
+ *          (ParserContext context, int parent, const char *key, long value);
  * void echttp_json_add_real
- *          (JsonContext context, int parent, const char *key, double value);
+ *          (ParserContext context, int parent, const char *key, double value);
  * void echttp_json_add_string
- *          (JsonContext context, int parent, const char *key, const char *value);
+ *          (ParserContext context, int parent, const char *key, const char *value);
  * int echttp_json_add_object
- *          (JsonContext context, int parent, const char *key);
+ *          (ParserContext context, int parent, const char *key);
  * int echttp_json_add_array
- *          (JsonContext context, int parent, const char *key);
- * int echttp_json_end (JsonContext context);
+ *          (ParserContext context, int parent, const char *key);
+ * int echttp_json_end (ParserContext context);
  *
  *    The functions above can be used to generate a JSON token list without
  *    parsing JSON text. This is typically used when building a JSON response.
  *
- * const char *echttp_json_format (JsonToken *token, int count,
+ * const char *echttp_json_format (ParserToken *token, int count,
  *                                 char *json, int size, int options);
  *
  *    Format a JSON string given an array of tokens. Use the option
- *    JSON_OPTION_PRETTY to make the output readable.
+ *    PRINT_OPTION_PRETTY to make the output readable.
  *
- * const char *echttp_json_export (JsonContext context, char *buffer, int size);
+ * const char *echttp_json_export (ParserContext context, char *buffer, int size);
  *
  *    This function combines echttp_json_end() and echttp_json_format()
  *    without pretty formatting, which is what most web servers will tend
@@ -95,9 +95,9 @@
 
 /* This data structure holds the current state of the parser. It is meant
  * to make it easy to pass the current content from one level to the next.
- * (See echttp_json.h for the JsonContext opaque type.)
+ * (See echttp_json.h for the ParserContext opaque type.)
  */
-struct JsonContext_s {
+struct ParserContext_s {
     int cursor;
     int count;
 
@@ -105,8 +105,8 @@ struct JsonContext_s {
     int line_start;
     char *error;
 
-    char *json;
-    JsonToken *token;
+    char *source;
+    ParserToken *token;
     int max;
 
     int size;
@@ -119,14 +119,14 @@ struct JsonContext_s {
 static int  echttp_json_debug = 0;
 static char echttp_json_error_text[160];
 
-static const char *echttp_json_object (JsonContext context);
-static const char *echttp_json_array (JsonContext context);
+static const char *echttp_json_object (ParserContext context);
+static const char *echttp_json_array (ParserContext context);
 
-#define JSONTRACE(x) if (echttp_json_debug) printf ("%s at line %d column %d: %s\n", x, context->line_count, context->cursor - context->line_start + 1, context->json + context->cursor);
+#define JSONTRACE(x) if (echttp_json_debug) printf ("%s at line %d column %d: %s\n", x, context->line_count, context->cursor - context->line_start + 1, context->source + context->cursor);
 
-static char skip_spaces (JsonContext context) {
+static char skip_spaces (ParserContext context) {
 
-    char *json = context->json + context->cursor;
+    char *json = context->source + context->cursor;
 
     for (;;) {
         while (isspace(*json)) {
@@ -140,54 +140,54 @@ static char skip_spaces (JsonContext context) {
         if (json[0] != '/' || json[1] != '/') break;
 
         json = strchrnul (json+2, '\n'); // Next line.
-        context->cursor = (int)(json - context->json);
+        context->cursor = (int)(json - context->source);
     }
 
     JSONTRACE ("next word");
     return *json;
 }
 
-static char next_word (JsonContext context) {
+static char next_word (ParserContext context) {
     context->cursor += 1;
     return skip_spaces (context);
 }
 
-static const char *add_token (JsonContext context) {
+static const char *add_token (ParserContext context) {
     context->count += 1;
     if (context->count > context->max) return "JSON structure is too long";
     return 0;
 }
 
-static const char *echttp_json_literal (JsonContext context) {
+static const char *echttp_json_literal (ParserContext context) {
 
-   char *json = context->json + context->cursor;
-   JsonToken *token = context->token;
+   char *json = context->source + context->cursor;
+   ParserToken *token = context->token;
 
    JSONTRACE ("literal");
    if (strncmp (json, "true", 4) == 0) {
-       token[context->count].type = JSON_BOOL;
+       token[context->count].type = PARSER_BOOL;
        token[context->count].value.bool = 1;
        context->cursor += 3;
    } else if (strncmp (json, "false", 5) == 0) {
-       token[context->count].type = JSON_BOOL;
+       token[context->count].type = PARSER_BOOL;
        token[context->count].value.bool = 0;
        context->cursor += 4;
    } else if (strncmp (json, "null", 4) == 0 && (! isalnum(json[4]))) {
-       token[context->count].type = JSON_NULL;
+       token[context->count].type = PARSER_NULL;
        context->cursor += 3;
    } else {
        return "invalid literal";
    }
-   if (isalnum(context->json[context->cursor+1])) return "invalid literal";
+   if (isalnum(context->source[context->cursor+1])) return "invalid literal";
    token[context->count].length = 0;
    return 0;
 }
 
-static const char *echttp_json_number (JsonContext context) {
+static const char *echttp_json_number (ParserContext context) {
 
     static char isvalidnumber[128] = {0};
 
-    char *json = context->json + context->cursor;
+    char *json = context->source + context->cursor;
 
     if (!isvalidnumber['0']) {
         int i;
@@ -200,16 +200,16 @@ static const char *echttp_json_number (JsonContext context) {
     JSONTRACE ("number");
     while (*json > 0 && isvalidnumber[*json] == 1) json += 1;
     if (*json > 0 && isvalidnumber[*json] == 2) {
-        context->token[context->count].type = JSON_REAL;
+        context->token[context->count].type = PARSER_REAL;
         context->token[context->count].value.real =
-            strtof(context->json + context->cursor, &json);
+            strtof(context->source + context->cursor, &json);
     } else {
-        context->token[context->count].type = JSON_INTEGER;
+        context->token[context->count].type = PARSER_INTEGER;
         context->token[context->count].value.integer =
-            strtol(context->json + context->cursor, &json, 0);
+            strtol(context->source + context->cursor, &json, 0);
     }
     context->token[context->count].length = 0;
-    context->cursor = (int) (json - context->json) - 1;
+    context->cursor = (int) (json - context->source) - 1;
     return 0;
 }
 
@@ -220,12 +220,12 @@ static char hex2bin(char x) {
     return -1;
 }
 
-static const char *echttp_json_string (JsonContext context) {
-    char *from = context->json + context->cursor + 1;
+static const char *echttp_json_string (ParserContext context) {
+    char *from = context->source + context->cursor + 1;
     char *to = from;
     int l, h, ucode;
 
-    context->token[context->count].type = JSON_STRING;
+    context->token[context->count].type = PARSER_STRING;
     context->token[context->count].length = 0;
     context->token[context->count].value.string = to;
 
@@ -234,7 +234,7 @@ static const char *echttp_json_string (JsonContext context) {
         switch (*from) {
             case '\"':
                 *to = 0;
-                context->cursor = (int)(from - context->json);
+                context->cursor = (int)(from - context->source);
                 return 0;
             case '\\':
                 switch (*++from) {
@@ -314,7 +314,7 @@ static const char *echttp_json_string (JsonContext context) {
     return "unterminated string";
 }
 
-static const char *echttp_json_value (JsonContext context) {
+static const char *echttp_json_value (ParserContext context) {
 
     const char *error = 0;
     char c = next_word(context);
@@ -345,14 +345,14 @@ static const char *echttp_json_value (JsonContext context) {
     return error;
 }
 
-static const char *echttp_json_array (JsonContext context) {
+static const char *echttp_json_array (ParserContext context) {
 
     const char *error = 0;
     int i = context->count;
-    JsonToken *token = context->token;
-    char *json = context->json;
+    ParserToken *token = context->token;
+    char *json = context->source;
 
-    token[i].type = JSON_ARRAY;
+    token[i].type = PARSER_ARRAY;
     token[i].length = 0;
 
     JSONTRACE ("array");
@@ -382,14 +382,14 @@ static const char *echttp_json_array (JsonContext context) {
     return "array processing error";
 }
 
-static const char *echttp_json_object (JsonContext context) {
+static const char *echttp_json_object (ParserContext context) {
 
     const char *error = 0;
     int i = context->count;
-    JsonToken *token = context->token;
-    char *json = context->json;
+    ParserToken *token = context->token;
+    char *json = context->source;
 
-    token[i].type = JSON_OBJECT;
+    token[i].type = PARSER_OBJECT;
     token[i].length = 0;
 
     JSONTRACE ("object");
@@ -427,10 +427,10 @@ void echttp_json_enable_debug (void) {
     echttp_json_debug = 1;
 }
 
-const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
+const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
 
    const char *error;
-   struct JsonContext_s context;
+   struct ParserContext_s context;
 
    if (!count || !*count) return "invalid count parameter";
 
@@ -438,7 +438,7 @@ const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
    context.line_start = 0;
    context.cursor = context.count = 0;
 
-   context.json = json;
+   context.source = json;
    context.token = token;
    context.max = *count;
 
@@ -468,19 +468,19 @@ const char *echttp_json_parse (char *json, JsonToken *token, int *count) {
 }
 
 
-static void echttp_json_gen_append (JsonContext context, const char *text) {
+static void echttp_json_gen_append (ParserContext context, const char *text) {
 
     if (context->cursor < context->size) {
-        strncpy (context->json+context->cursor,
+        strncpy (context->source+context->cursor,
                  text, context->size-context->cursor);
-        context->json[context->size-1] = 0;
-        context->cursor += strlen(context->json+context->cursor);
+        context->source[context->size-1] = 0;
+        context->cursor += strlen(context->source+context->cursor);
     }
 }
 
-static void echttp_json_gen_indent (JsonContext context) {
+static void echttp_json_gen_indent (ParserContext context) {
 
-    if (context->options & JSON_OPTION_PRETTY) {
+    if (context->options & PRINT_OPTION_PRETTY) {
         static char indent[81];
         if (indent[0] == 0) memset (indent, ' ',sizeof(indent)-1);
         const char *sp = indent + sizeof(indent) -1 - (4 * context->depth);
@@ -488,18 +488,18 @@ static void echttp_json_gen_indent (JsonContext context) {
     }
 }
 
-static void echttp_json_gen_key (JsonContext context, const char *key) {
+static void echttp_json_gen_key (ParserContext context, const char *key) {
     echttp_json_gen_indent (context);
     if (key) {
-        const char *sep = (context->options & JSON_OPTION_PRETTY)?"\" : ":"\":";
+        const char *sep = (context->options & PRINT_OPTION_PRETTY)?"\" : ":"\":";
         echttp_json_gen_append (context, "\"");
         echttp_json_gen_append (context, key);
         echttp_json_gen_append (context, sep);
     }
 }
 
-static void echttp_json_gen_eol (JsonContext context, int comma) {
-    if (context->options & JSON_OPTION_PRETTY) {
+static void echttp_json_gen_eol (ParserContext context, int comma) {
+    if (context->options & PRINT_OPTION_PRETTY) {
         if (comma)
             echttp_json_gen_append (context, ",\n");
         else
@@ -509,24 +509,24 @@ static void echttp_json_gen_eol (JsonContext context, int comma) {
     }
 }
 
-static void echttp_json_gen_bool (JsonContext context, int i) {
+static void echttp_json_gen_bool (ParserContext context, int i) {
     echttp_json_gen_append (context,
                             context->token[i].value.bool?"true":"false");
 }
 
-static void echttp_json_gen_integer (JsonContext context, int i) {
+static void echttp_json_gen_integer (ParserContext context, int i) {
     char buffer[32];
     snprintf (buffer, sizeof(buffer), "%ld", context->token[i].value.integer);
     echttp_json_gen_append (context, buffer);
 }
 
-static void echttp_json_gen_real (JsonContext context, int i) {
+static void echttp_json_gen_real (ParserContext context, int i) {
     char buffer[64];
     snprintf (buffer, sizeof(buffer), "%e", context->token[i].value.real);
     echttp_json_gen_append (context, buffer);
 }
 
-static char *echttp_json_gen_utf16 (JsonContext context, int value, char *to) {
+static char *echttp_json_gen_utf16 (ParserContext context, int value, char *to) {
 
     static char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
@@ -539,7 +539,7 @@ static char *echttp_json_gen_utf16 (JsonContext context, int value, char *to) {
     return to;
 }
 
-static void echttp_json_gen_string (JsonContext context, int i) {
+static void echttp_json_gen_string (ParserContext context, int i) {
 
     static char escapelist [128];
 
@@ -629,14 +629,14 @@ static void echttp_json_gen_string (JsonContext context, int i) {
     free(buffer);
 }
 
-const char *echttp_json_format (JsonToken *token, int count,
+const char *echttp_json_format (ParserToken *token, int count,
                                 char *json, int size, int options) {
 
-    struct JsonContext_s context;
+    struct ParserContext_s context;
 
     int i;
 
-    context.json = json;
+    context.source = json;
     context.size = size;
     context.token = token;
     context.max = context.count = count;
@@ -653,24 +653,24 @@ const char *echttp_json_format (JsonToken *token, int count,
         echttp_json_gen_key (&context, token[i].key);
 
         switch (token[i].type) {
-            case JSON_NULL:
+            case PARSER_NULL:
                 echttp_json_gen_append (&context, "null"); break;
-            case JSON_BOOL:
+            case PARSER_BOOL:
                 echttp_json_gen_bool (&context, i); break;
-            case JSON_INTEGER:
+            case PARSER_INTEGER:
                 echttp_json_gen_integer (&context, i); break;
-            case JSON_REAL:
+            case PARSER_REAL:
                 echttp_json_gen_real (&context, i); break;
-            case JSON_STRING:
+            case PARSER_STRING:
                 echttp_json_gen_string (&context, i); break;
-            case JSON_ARRAY:
+            case PARSER_ARRAY:
                 echttp_json_gen_append (&context, "[");
                 context.depth += 1;
                 context.ending[context.depth] = ']';
                 context.countdown[context.depth] = token[i].length + 1;
                 comma = 0;
                 break;
-            case JSON_OBJECT:
+            case PARSER_OBJECT:
                 echttp_json_gen_append (&context, "{");
                 context.depth += 1;
                 context.ending[context.depth] = '}';
@@ -710,7 +710,7 @@ static const char *next_separator (const char *p) {
     return p;
 }
 
-static int search_array_element (const JsonToken *token,
+static int search_array_element (const ParserToken *token,
                                  const char *path, int index) {
     int depth = 0;
     int stack[JSON_MAX_DEPTH];
@@ -742,7 +742,7 @@ static int search_array_element (const JsonToken *token,
     return -1;
 }
 
-static int search_object_element (const JsonToken *parent, const char *path) {
+static int search_object_element (const ParserToken *parent, const char *path) {
 
     const char *p = next_separator(path);
     int length = (int) (p - path);
@@ -784,15 +784,15 @@ static int search_object_element (const JsonToken *parent, const char *path) {
     return -1;
 }
 
-int echttp_json_search (const JsonToken *parent, const char *path) {
+int echttp_json_search (const ParserToken *parent, const char *path) {
 
     if (*path == 0) return 0; // End of search: any type is fine.
 
-    if (*path == '.' && parent->type == JSON_OBJECT) {
+    if (*path == '.' && parent->type == PARSER_OBJECT) {
         return search_object_element (parent, path+1);
     }
 
-    if (*path == '[' && parent->type == JSON_ARRAY) {
+    if (*path == '[' && parent->type == PARSER_ARRAY) {
         char *end;
         int d;
         int i = strtol(path+1, &end, 0);
@@ -804,7 +804,7 @@ int echttp_json_search (const JsonToken *parent, const char *path) {
     return -1; // Not the type of token we expected.
 }
 
-const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
+const char *echttp_json_enumerate (const ParserToken *parent, int *index) {
 
     int depth = 0;
     int stack[JSON_MAX_DEPTH];
@@ -813,7 +813,7 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
     int count = parent->length;
 
     if (count == 0) {
-        if (parent->type != JSON_ARRAY && parent->type != JSON_OBJECT)
+        if (parent->type != PARSER_ARRAY && parent->type != PARSER_OBJECT)
             return "invalid type";
         return "no data";
     }
@@ -842,36 +842,36 @@ const char *echttp_json_enumerate (const JsonToken *parent, int *index) {
     return 0;
 }
 
-JsonContext echttp_json_start
-                (JsonToken *token, int max, char *pool, int size) {
-    JsonContext context = (JsonContext) malloc(sizeof(*context));
+ParserContext echttp_json_start
+                (ParserToken *token, int max, char *pool, int size) {
+    ParserContext context = (ParserContext) malloc(sizeof(*context));
 
     context->token = token;
     context->max = max;
     context->count = 0;
 
-    context->json = pool;
+    context->source = pool;
     context->size = size;
     context->cursor = 0;
     return context;
 }
 
-static char *echttp_json_add_pool (JsonContext context, const char *text) {
+static char *echttp_json_add_pool (ParserContext context, const char *text) {
     if (!text) return 0;
     if (context->cursor < context->size) {
-        char *p = context->json + context->cursor;
+        char *p = context->source + context->cursor;
         strncpy (p, text, context->size-context->cursor);
-        context->json[context->size-1] = 0;
-        context->cursor += strlen(context->json+context->cursor) + 1;
+        context->source[context->size-1] = 0;
+        context->cursor += strlen(context->source+context->cursor) + 1;
         return p;
     }
     return 0;
 }
 
-static JsonToken *echttp_json_add_token
-                      (JsonContext context, int parent, const char *key) {
+static ParserToken *echttp_json_add_token
+                      (ParserContext context, int parent, const char *key) {
 
-    JsonToken *token = context->token + context->count;
+    ParserToken *token = context->token + context->count;
 
     if (context->count >= context->max) return 0;
     token->length = 0;
@@ -880,9 +880,9 @@ static JsonToken *echttp_json_add_token
         context->count = 1; // Root element.
         return token;
     } else if (parent >= 0 && parent < context->count) {
-        if (context->token[parent].type == JSON_OBJECT)
+        if (context->token[parent].type == PARSER_OBJECT)
             token->key = echttp_json_add_pool (context, key);
-        else if (context->token[parent].type == JSON_ARRAY)
+        else if (context->token[parent].type == PARSER_ARRAY)
             token->key = 0;
         else
             return 0;
@@ -894,74 +894,74 @@ static JsonToken *echttp_json_add_token
 }
 
 void echttp_json_add_null
-         (JsonContext context, int parent, const char *key) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_NULL;
+        token->type = PARSER_NULL;
     }
 }
 
 void echttp_json_add_bool
-         (JsonContext context, int parent, const char *key, int value) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key, int value) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_BOOL;
+        token->type = PARSER_BOOL;
         token->value.bool = (value != 0);
     }
 }
 
 void echttp_json_add_integer
-         (JsonContext context, int parent, const char *key, long value) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key, long value) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_INTEGER;
+        token->type = PARSER_INTEGER;
         token->value.integer = value;
     }
 }
 
 void echttp_json_add_real
-         (JsonContext context, int parent, const char *key, double value) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key, double value) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_REAL;
+        token->type = PARSER_REAL;
         token->value.real = value;
     }
 }
 
 void echttp_json_add_string
-         (JsonContext context, int parent, const char *key, const char *value) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key, const char *value) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_STRING;
+        token->type = PARSER_STRING;
         token->value.string = echttp_json_add_pool (context, value);
     }
 }
 
 int echttp_json_add_object
-         (JsonContext context, int parent, const char *key) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_OBJECT;
+        token->type = PARSER_OBJECT;
     }
     return (int)(token - context->token);
 }
 
 int echttp_json_add_array
-         (JsonContext context, int parent, const char *key) {
-    JsonToken *token = echttp_json_add_token (context, parent, key);
+         (ParserContext context, int parent, const char *key) {
+    ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
-        token->type = JSON_ARRAY;
+        token->type = PARSER_ARRAY;
     }
     return (int)(token - context->token);
 }
 
-int echttp_json_end (JsonContext context) {
+int echttp_json_end (ParserContext context) {
     int count = context->count;
     free (context);
     return count;
 }
 
-const char *echttp_json_export (JsonContext context, char *buffer, int size) {
+const char *echttp_json_export (ParserContext context, char *buffer, int size) {
     const char *error =
         echttp_json_format (context->token, context->count, buffer, size, 0);
     if (!error && context->count >= context->max) error = "token array is full";

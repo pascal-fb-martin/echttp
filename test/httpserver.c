@@ -77,9 +77,9 @@ static const char *http_json (const char *method, const char *uri,
     static long count = 0;
     static char buffer[1024];
     char pool[1024];
-    JsonToken token[12];
+    ParserToken token[12];
 
-    JsonContext context = echttp_json_start (token, 12, pool, 1024);
+    ParserContext context = echttp_json_start (token, 12, pool, 1024);
     int root = echttp_json_add_object (context, 0, 0);
     echttp_json_add_integer (context, root, "time", (long)time(0));
     int web = echttp_json_add_object (context, root, "web");
