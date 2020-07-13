@@ -6,6 +6,9 @@
  * echttp_json.h - An additional module to decode JSON text,
  */
 
+#ifndef INCLUDED__ECHTTP_PARSER__H
+#define INCLUDED__ECHTTP_PARSER__H
+
 typedef struct {
     const char *key;
     int type;
@@ -33,4 +36,6 @@ typedef struct {
 
 struct ParserContext_s;
 typedef struct ParserContext_s *ParserContext;
+
+#endif // INCLUDED__ECHTTP_PARSER__H
 

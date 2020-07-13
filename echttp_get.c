@@ -40,11 +40,12 @@
 
 #include "echttp.h"
 #include "echttp_json.h"
+#include "echttp_xml.h"
 
 static char *buffer = 0;
 static int buffer_size = 0;
 
-#define JSON_PRINT_MAX 1024
+#define PRINT_MAX 20480
 
 static void print_string (const char *key, const char *value) {
     static char escapelist [128];
@@ -85,7 +86,7 @@ static void print_json (ParserToken *token, int i, int deep);
 static void enumerate (ParserToken *parent) {
 
     int i;
-    int index[JSON_PRINT_MAX];
+    int index[PRINT_MAX];
     const char *error = echttp_json_enumerate (parent, index);
     if (error) {
         printf ("error: %s\n", error);
@@ -143,9 +144,10 @@ int main (int argc, const char **argv) {
     int count = 0;
     int index = 0;
     int show_tokens = 0;
+    int xml_input = 0;
     const char *error;
     struct stat filestat;
-    ParserToken token[JSON_PRINT_MAX];
+    ParserToken token[PRINT_MAX];
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {
@@ -156,14 +158,22 @@ int main (int argc, const char **argv) {
             show_tokens = 1;
             continue;
         }
-        if (!count) {
+        if (strcmp (argv[i], "-x") == 0) {
+            xml_input = 1;
+            continue;
+        }
+
+        if (!count) { // The first non-option is the file name.
+
+            if (strstr(argv[i], ".xml")) xml_input = 1;
+
             if (stat (argv[i], &filestat)) {
                 fprintf (stderr, "Cannot access %s\n", argv[i]);
-                return -1;
+                continue;
             }
             if (filestat.st_size <= 0) {
                 fprintf (stderr, "%s contains no data\n", argv[i]);
-                return -1;
+                continue;
             }
             if (filestat.st_size > buffer_size) {
                 buffer_size = filestat.st_size + 1;
@@ -181,8 +191,11 @@ int main (int argc, const char **argv) {
             close(fd);
             buffer[filestat.st_size] = 0;
 
-            count = JSON_PRINT_MAX;
-            error = echttp_json_parse (buffer, token, &count);
+            count = PRINT_MAX;
+            if (xml_input)
+                error = echttp_xml_parse (buffer, token, &count);
+            else
+                error = echttp_json_parse (buffer, token, &count);
             if (error) {
                 fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
                 return -1;
@@ -190,6 +203,7 @@ int main (int argc, const char **argv) {
             if (show_tokens) print_tokens (token, count);
             continue;
         }
+
         index = echttp_json_search (token, argv[i]);
         printf ("%s (%d): ", argv[i], index);
         if (index >= 0) print_json (token, index, 1);

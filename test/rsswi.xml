@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+<channel>
+
+<title>Metropolitan Water District of Southern California Watering Index</title>
+<dateupdated>7/09/2020</dateupdated>
+<description>See the up to date watering index for Southern California</description>
+<link>http://www.mwdh2o.com</link>
+
+<item>
+<title>Daily Watering Index</title>
+<description>100</description>
+<link>http://www.mwdh2o.com</link>
+</item>
+
+<item>
+<title>Weekly Watering Index</title>
+<description>98</description>
+<link>http://www.mwdh2o.com</link>
+</item>
+
+<item>
+<title>Monthly Watering Index</title>
+<description>93</description>
+<link>http://www.mwdh2o.com</link>
+</item>
+
+</channel>
+</rss>

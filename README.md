@@ -261,15 +261,20 @@ static void response (void *origin, int status, char *data, int length) {
     ... application specific code ...
 }
 ```
-## JSON Parser and Generator
+## JSON and XML Support
 
-The echttp library provides functions to handle JSON data: a small JSON parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This JSON support is a separate extension and requires to include echttp_json.h.
+The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include echttp_json.h or echttp_xml.h (depending on the format used).
 
-Any JSON data can be decoded using three functions:
+These parsers support UTF-8 only.
+
 ```
 const char *echttp_json_parse (char *json, ParserToken *token, int *count);
 ```
 Parses the provided JSON string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser. The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
+```
+const char *echttp_xml_parse (char *xml, ParserToken *token, int *count);
+```
+Parses the provided XML string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser. The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
 
 The ParserToken type is defined as follows:
 ```
@@ -297,6 +302,15 @@ The possible types are:
 Arrays and objects have no value, but the length items indicates how many element are contained in the subsequent entries. (Only the elements immediately inside the array or object are counted: elements contained in a sub-array or sub-objects are not counted in length.) The length for all other types is always 0.
 
 The key pointer is null for anynymous items.
+
+This token structure closely matches the JSON syntax. When decoding XML, the following rules apply:
+* The only token types generated are PARSER_OBJECT and PARSER_STRING.
+* An anonymous top level object is always created.
+* Every XML tag is type PARSER_OBJECT.
+* If XML attributes are present in a tag, the tag object contains an element named "attributes" of type PARSER_OBJECT; this sub-object contains all the attributes as PARSER_STRING elements.
+* If a content is present and is not made of XML tags, the content is stored in a PARSER_STRING element named "content".
+* If a content is present and is made of XML tags, the content is stored as a PARSER_OBJECT element named "content"; This sub-object contains all the inner XML tags.
+
 ```
 int echttp_json_search (const ParserToken *parent, const char *path);
 ```
@@ -310,6 +324,8 @@ Examples of valid paths (matching the content of test/test.json):
     .formattedobject.array[1][0]
 ```
 Its is valid to provide a path that ends on an object or array: this allows chaining the searches (search an inner object first, then later search starting from that inner object).
+
+When the list of token was generated from XML, it is possible to index the name of an object's element. This is used to access the Nth element (i.e. XML tag) with that name. This is done so because repeating the same tag name more than once is valid in XML.
 ```
 const char *echttp_json_enumerate (const ParserToken *parent, int *index);
 ```

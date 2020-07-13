@@ -470,11 +470,13 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
 
 static void echttp_json_gen_append (ParserContext context, const char *text) {
 
-    if (context->cursor < context->size) {
+    int length = strlen(text);
+
+    if (context->cursor + length < context->size) {
         strncpy (context->source+context->cursor,
                  text, context->size-context->cursor);
         context->source[context->size-1] = 0;
-        context->cursor += strlen(context->source+context->cursor);
+        context->cursor += length;
     }
 }
 
@@ -696,6 +698,7 @@ const char *echttp_json_format (ParserToken *token, int count,
             echttp_json_gen_eol (&context, context.countdown[context.depth]>1);
         }
     }
+    if (context.depth > 0) return "unfinished structure";
     if (context.cursor >= context.size) return "not enough space";
     return 0;
 }
@@ -750,6 +753,7 @@ static int search_object_element (const ParserToken *parent, const char *path) {
     int stack[JSON_MAX_DEPTH];
     int i;
     int count = parent->length;
+    int instance = -1;
 
     if (*path == 0) return 0;
 
@@ -770,9 +774,21 @@ static int search_object_element (const ParserToken *parent, const char *path) {
                 match = 1;
             }
             if (match) {
-                int d = echttp_json_search (parent+i, p);
-                if (d < 0) return -1;
-                return i + d;
+                if (instance < 0 &&
+                        *p == '[' && parent[i].type == PARSER_OBJECT) {
+                    // This can happen in XML (tag name repeated).
+                    char *end;
+                    instance = strtol(p+1, &end, 0);
+                    if (*end != ']' || instance < 0) return -1;
+                    p = end + 1;
+                }
+                if (instance > 0) {
+                    instance -= 1;
+                } else {
+                    int d = echttp_json_search (parent+i, p);
+                    if (d < 0) return -1;
+                    return i + d;
+                }
             }
         }
         if (parent[i].length > 0) {
