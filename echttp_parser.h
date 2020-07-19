@@ -3,7 +3,7 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
- * echttp_json.h - An additional module to decode JSON text,
+ * echttp_parser.h - The language-independent part of the JSON & XML parsers.
  */
 
 #ifndef INCLUDED__ECHTTP_PARSER__H
@@ -36,6 +36,9 @@ typedef struct {
 
 struct ParserContext_s;
 typedef struct ParserContext_s *ParserContext;
+
+char *echttp_parser_load (const char *file);
+void echttp_parser_free (char *buffer);
 
 #endif // INCLUDED__ECHTTP_PARSER__H
 

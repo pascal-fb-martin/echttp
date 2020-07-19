@@ -42,9 +42,6 @@
 #include "echttp_json.h"
 #include "echttp_xml.h"
 
-static char *buffer = 0;
-static int buffer_size = 0;
-
 #define PRINT_MAX 20480
 
 static void print_string (const char *key, const char *value) {
@@ -139,14 +136,13 @@ static void print_tokens (ParserToken *token, int count) {
 
 int main (int argc, const char **argv) {
 
-    int i, j;
-    int fd;
+    int i;
     int count = 0;
     int index = 0;
     int show_tokens = 0;
     int xml_input = 0;
+    char *buffer;
     const char *error;
-    struct stat filestat;
     ParserToken token[PRINT_MAX];
 
     for (i = 1; i < argc; ++i) {
@@ -167,29 +163,7 @@ int main (int argc, const char **argv) {
 
             if (strstr(argv[i], ".xml")) xml_input = 1;
 
-            if (stat (argv[i], &filestat)) {
-                fprintf (stderr, "Cannot access %s\n", argv[i]);
-                continue;
-            }
-            if (filestat.st_size <= 0) {
-                fprintf (stderr, "%s contains no data\n", argv[i]);
-                continue;
-            }
-            if (filestat.st_size > buffer_size) {
-                buffer_size = filestat.st_size + 1;
-                buffer = (char *) realloc (buffer, buffer_size);
-            }
-            fd = open (argv[i], O_RDONLY);
-            if (fd < 0) {
-                fprintf (stderr, "Cannot open %s\n", argv[i]);
-                return -1;
-            }
-            if (read (fd, buffer, filestat.st_size) != filestat.st_size) {
-                fprintf (stderr, "Cannot read %s\n", argv[i]);
-                return -1;
-            }
-            close(fd);
-            buffer[filestat.st_size] = 0;
+            buffer = echttp_parser_load (argv[i]);
 
             count = PRINT_MAX;
             if (xml_input)
@@ -209,5 +183,6 @@ int main (int argc, const char **argv) {
         if (index >= 0) print_json (token, index, 1);
         else printf ("invalid path\n");
     }
+    echttp_parser_free (buffer);
 }
 

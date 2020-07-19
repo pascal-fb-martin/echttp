@@ -30,13 +30,8 @@
  */
 
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 #include "echttp.h"
 #include "echttp_json.h"
@@ -44,7 +39,6 @@
 
 static char *inbuffer = 0;
 static char *outbuffer = 0;
-static int inbuffer_size = 0;
 static int outbuffer_size = 0;
 
 #define PRINT_MAX 20480
@@ -93,13 +87,13 @@ int main (int argc, const char **argv) {
 
     int i, j;
     int fd;
+    int size;
     int count;
     int show_tokens = 0;
     int xml_input = 0;
     int consume_xml = 0;
     int pretty = PRINT_OPTION_PRETTY;
     const char *error;
-    struct stat filestat;
     ParserToken token[PRINT_MAX];
 
     for (i = 1; i < argc; ++i) {
@@ -123,48 +117,37 @@ int main (int argc, const char **argv) {
         xml_input = consume_xml;
         if (strstr(argv[i], ".xml")) xml_input = 1;
 
-        if (stat (argv[i], &filestat)) {
+        inbuffer = echttp_parser_load (argv[i]);
+        if (!inbuffer) {
             fprintf (stderr, "Cannot access %s\n", argv[i]);
             continue;
         }
-        if (filestat.st_size > 0) {
-            if (filestat.st_size > inbuffer_size) {
-                inbuffer_size = filestat.st_size + 1;
-                outbuffer_size = 30 * inbuffer_size;
-
-                inbuffer = (char *) realloc (inbuffer, inbuffer_size);
-                outbuffer = (char *) realloc (outbuffer, outbuffer_size);
-            }
-            fd = open (argv[i], O_RDONLY);
-            if (fd < 0) {
-                fprintf (stderr, "Cannot open %s\n", argv[i]);
-                continue;
-            }
-            if (read (fd, inbuffer, filestat.st_size) != filestat.st_size) {
-                fprintf (stderr, "Cannot read %s\n", argv[i]);
-                continue;
-            }
-            close(fd);
-            inbuffer[filestat.st_size] = 0; // Terminate the JSON string.
-
-            count = PRINT_MAX;
-            if (consume_xml)
-                error = echttp_xml_parse (inbuffer, token, &count);
-            else
-                error = echttp_json_parse (inbuffer, token, &count);
-            if (error) {
-                fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
-                continue;
-            }
-            if (show_tokens) print_tokens (token, count);
-            printf ("// File %s\n", argv[i]);
-            error = echttp_json_format (token, count, outbuffer, outbuffer_size, pretty);
-            if (error) {
-                fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
-                continue;
-            }
-            printf ("%s", outbuffer);
+        size = strlen(inbuffer);
+        if (outbuffer_size < 30 * size) {
+            outbuffer_size = 30 * size;
+            outbuffer = (char *) realloc (outbuffer, outbuffer_size);
         }
+
+        count = PRINT_MAX;
+        if (consume_xml)
+            error = echttp_xml_parse (inbuffer, token, &count);
+        else
+            error = echttp_json_parse (inbuffer, token, &count);
+        if (error) {
+            fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
+            continue;
+        }
+        if (show_tokens) print_tokens (token, count);
+        printf ("// File %s (%d characters, %d tokens)\n",
+                argv[i], size, count);
+
+        error = echttp_json_format (token, count, outbuffer, outbuffer_size, pretty);
+        if (error) {
+            fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
+            continue;
+        }
+        printf ("%s", outbuffer);
+        echttp_parser_free (inbuffer);
     }
 }
 
