@@ -315,7 +315,7 @@ This token structure closely matches the JSON syntax. When decoding XML, the fol
 char *echttp_parser_load (const char *file);
 void echttp_parser_free (char *buffer);
 ```
-These functions are used to load the entire content of a JSON or XML file in a buffer, before parsing the data. The buffer is dynamically allocated, and must be released.
+These functions are used to load the entire content of a JSON or XML file in a buffer, before parsing the data. The buffer is dynamically allocated, and must be released once the data is no longer used. Because the parsed tokens rely on the buffer's content, the buffer should be released only after the tokens have been discarded.
 
 ```
 int echttp_json_search (const ParserToken *parent, const char *path);
