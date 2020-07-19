@@ -270,7 +270,6 @@ static void echttp_execute (int route, int client,
 
     int i;
     char buffer[256];
-    int datalength;
     echttp_request *context = &(echttp_context[client]);
 
     // Do not rely on echttp_current internally: the application is allowed
@@ -299,8 +298,7 @@ static void echttp_execute (int route, int client,
     }
     echttp_current = 0;
 
-    datalength = data?strlen(data):0;
-    length = datalength + context->transfer.size;
+    length = data?strlen(data):0;
 
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
              context->status, context->reason);
