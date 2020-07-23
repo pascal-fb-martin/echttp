@@ -56,18 +56,30 @@ const char *echttp_option_match (const char *reference,
                                  const char *input, const char **value) {
 
     size_t length = strlen(reference);
-    const char *result = input + length;
+
+    // Accept both the -name=value and --name=value variants
+    // if the expected option is -name=value.
+    //
+    if ((input[0] == '-' && input[1] == '-') &&
+        (reference[0] == '-' && reference[1] != '-')) input += 1;
 
     if (strncmp (reference, input, length)) return 0;
 
     if (input[length] != 0) {
         if (input[length-1] != '=') return 0;
-        if (value) *value = result;
+        if (value) *value = input + length;
     }
-    return result;
+    return input + length;
 }
 
 int echttp_option_present (const char *reference, const char *input) {
+
+    // Accept both the -name and --name variants
+    // if the expected option is -name.
+    //
+    if ((input[0] == '-' && input[1] == '-') &&
+        (reference[0] == '-' && reference[1] != '-')) input += 1;
+
     return strcmp (reference, input) == 0;
 }
 
