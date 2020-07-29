@@ -17,7 +17,7 @@ install:
 	chmod 644 /usr/local/lib/libechttp.a
 	mkdir -p /usr/local/include
 	cp echttp.h echttp_static.h /usr/local/include
-	cp echttp_json.h echttp_parser.h /usr/local/include
+	cp echttp_json.h echttp_xml.h echttp_parser.h /usr/local/include
 	chown root:root /usr/local/include/echttp*.h
 	chmod 644 /usr/local/include/echttp*.h
 	cp echttp_print echttp_get /usr/local/bin
@@ -34,6 +34,7 @@ uninstall:
 	rm -f /usr/local/lib/libechttp.a
 	rm -f /usr/local/include/echttp.h /usr/local/include/echttp_static.h
 	rm -f /usr/local/include/echttp_parser.h /usr/local/include/echttp_json.h
+	rm -f /usr/local/include/echttp_xml.h
 	rm -f /usr/local/bin/echttp_print /usr/local/bin/echttp_get
 	rm -f /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
 
