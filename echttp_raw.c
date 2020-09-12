@@ -646,13 +646,16 @@ int echttp_raw_connect (const char *host, const char *service) {
                 if (echttp_raw_debug)
                     printf ("connection failed: %s\n", strerror(errno));
                 close(s);
+                freeaddrinfo(resolved);
                 return -1;
             }
         }
         echttp_raw_client[i].socket = s;
         echttp_raw_client[i].peer = (struct sockaddr_in){0};
+        freeaddrinfo(resolved);
         return i;
     }
+    freeaddrinfo(resolved);
     return -1;
 }
 
