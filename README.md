@@ -372,3 +372,65 @@ There are also two JSON utilities provided with echttp:
 
 Both tools have minimal features. They were intended to test the JSON and XML functions, but can be useful to analyze the content of a JSON file, especially when the JSON data was not formatted for readability.
 
+## Catalog (a minimalist associative array module)
+
+The echttp library uses its own associative array mechanism for managing HTTP attributes or routes. This module is made public because it is somewhat useful for the echttp applications as well, for example when maintaining a catalog of known web services.
+
+The basis for the mechanism is the echttp_catalog type:
+```
+typedef struct {
+    const char *name;
+    const char *value;
+    unsigned int signature;
+    time_t       timestamp;
+    int next;
+} echttp_symbol;
+
+#define ECHTTP_HASH 127
+#define ECHTTP_MAX_SYMBOL 256
+
+typedef struct {
+    int count;
+    int index[ECHTTP_HASH];
+    echttp_symbol item[ECHTTP_MAX_SYMBOL];
+} echttp_catalog;
+```
+A catalog must be initialized. A static catalog is naturally initialized by the compiler, but a local catalog must be initialized explicitely:
+```
+void echttp_catalog_reset (echttp_catalog *d);
+```
+
+There are two ways to add (or update) entries in a catalog:
+* The simplest method works if the value was not allocated, or is referenced in another place:
+```
+void echttp_catalog_set (echttp_catalog *d,
+                         const char *name, const char *value);
+```
+* The more generic method returns the old (and discarded) value, if any, which allows it do be deallocated cleanly if necessary:
+```
+const char *echttp_catalog_refresh
+               (echttp_catalog *d, const char *name, const char *value, time_t timestamp);
+```
+In both case the value of an existing entry is replaced with the new value, or a new entry is added if non match the name. The timestamp parameter indicates the age of the entry, which can be useful when using the catalog for discovery, i.e. when expired entries should be ignored.
+
+A catalog entry can be retrieved in two ways:
+* Find the entry, for example when both the value and timestamp must be accessed:
+```
+int echttp_catalog_find (echttp_catalog *d, const char *name);
+```
+* Get the value:
+```
+const char *echttp_catalog_get (echttp_catalog *d, const char *name);
+```
+
+A few more functions are used in more rare cases:
+```
+void echttp_catalog_join (echttp_catalog *d,
+                          const char *sep, char *text, int size);
+```
+This function dumps all its content in the HTTP parameter format.
+```
+unsigned int echttp_catalog_signature (const char *name);
+```
+This function computes a signature from the provided name. A signature is the hash value before applying the hash array modulo. This function can be reused when implementing a hash table module with different properties. This function is derived from the well known hash function by Daniel J. Bernstein.
+

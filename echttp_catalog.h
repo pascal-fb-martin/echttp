@@ -6,10 +6,14 @@
  * This module implements the mechanism used to map names to values. This is
  * used for query parameters, HTTP attributes, etc.
  */
+
+#include "time.h"
+
 typedef struct {
     const char *name;
     const char *value;
     unsigned int signature;
+    time_t       timestamp;
     int next;
 } echttp_symbol;
 
@@ -30,6 +34,9 @@ void echttp_catalog_reset (echttp_catalog *d);
 
 void echttp_catalog_set (echttp_catalog *d,
                          const char *name, const char *value);
+
+const char *echttp_catalog_refresh
+               (echttp_catalog *d, const char *name, const char *value, time_t timestamp);
 
 const char *echttp_catalog_get (echttp_catalog *d, const char *name);
 
