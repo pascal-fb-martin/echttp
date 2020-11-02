@@ -192,12 +192,12 @@ static int echttp_raw_new_client (void) {
    return -1;
 }
 
-static void echttp_raw_accept (echttp_raw_acceptor *acceptor) {
+static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    int i;
    struct sockaddr_in peer;
    socklen_t peerlength = sizeof(peer);
 
-   int s = accept(echttp_raw_server, (struct sockaddr *)(&peer), &peerlength);
+   int s = accept(server, (struct sockaddr *)(&peer), &peerlength);
    if (s < 0) {
        fprintf (stderr, "cannot accept new client: %s\n", strerror(errno));
        exit(1);
@@ -226,10 +226,14 @@ int echttp_raw_open (const char *service, int debug) {
 
    int i;
 
-   struct sockaddr_in netaddress;
+   struct sockaddr_in6 netaddress6;
    int port = -1;
 
    echttp_raw_debug = debug;
+
+   for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
+       echttp_raw_client[i].socket = -1;
+   }
 
    if (strcmp ("dynamic", service) == 0) {
        port = 0;
@@ -252,32 +256,32 @@ int echttp_raw_open (const char *service, int debug) {
 
    if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
 
-   echttp_raw_server = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+   echttp_raw_server = socket(PF_INET6, SOCK_STREAM, 0);
    if (echttp_raw_server < 0) {
        fprintf (stderr, "cannot open socket for service %s: %s\n",
                 service, strerror(errno));
        return 0;
    }
 
-   memset(&netaddress, 0, sizeof(netaddress));
-   netaddress.sin_family = AF_INET;
-   netaddress.sin_addr.s_addr = INADDR_ANY;
-   netaddress.sin_port = htons(port);
+   memset(&netaddress6, 0, sizeof(netaddress6));
+   netaddress6.sin6_family = AF_INET6;
+   netaddress6.sin6_addr = in6addr_any;
+   netaddress6.sin6_port = htons(port);
 
    if (bind(echttp_raw_server,
-            (struct sockaddr *)&netaddress, sizeof(netaddress)) < 0) {
+            (struct sockaddr *)&netaddress6, sizeof(netaddress6)) < 0) {
        fprintf (stderr, "cannot bind to service %s: %s\n",
                 service, strerror(errno));
-       return 0;
+       exit(0);
    }
 
    if (port == 0) {
-       int addrlen = sizeof(netaddress);
+       int addrlen = sizeof(netaddress6);
        getsockname (echttp_raw_server,
-                    (struct sockaddr *)&netaddress, &addrlen);
-       echttp_raw_serverport = ntohs(netaddress.sin_port);
+                    (struct sockaddr *)&netaddress6, &addrlen);
+       port = echttp_raw_serverport = ntohs(netaddress6.sin6_port);
        if (echttp_raw_debug)
-           printf ("Dynamic port allocated: %d\n", echttp_raw_serverport);
+           printf ("Dynamic port allocated: %d\n", port);
    }
 
    if (listen (echttp_raw_server, 4) < 0) {
@@ -286,9 +290,6 @@ int echttp_raw_open (const char *service, int debug) {
        return 0;
    }
 
-   for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {
-       echttp_raw_client[i].socket = -1;
-   }
    return 1;
 }
 
@@ -451,8 +452,9 @@ int  echttp_raw_is_local (int client) {
 
 int  echttp_raw_server_port (int ip) {
     switch (ip) {
-        case 4: return echttp_raw_serverport;
-        case 6: return 0; // No IPv6 support for now.
+        case 4:
+        case 6:
+            return echttp_raw_serverport;
     }
     return 0; // Not a known IP version.
 }
@@ -539,7 +541,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           }
 
           if (FD_ISSET(echttp_raw_server, &readset)) {
-              echttp_raw_accept(accept);
+              echttp_raw_accept(accept, echttp_raw_server);
           }
 
           for (i = 0; i < ECHTTP_CLIENT_MAX; ++i) {

@@ -145,7 +145,7 @@ Return 1 if the HTTP client is on a local network, 0 otherwise. This is a crude 
 ```
 int echttp_port (int ip);
 ```
-Return the web server's port number for IPv4 (ip=4) or IPv6 (ip=6). If the port number returned is 0, the web server is not listening on the specified address space. (IPv6 is not currently supported by echttp, and the port number returned for IPv6 is always 0 at this time.)
+Return the web server's port number for IPv4 (ip=4) or IPv6 (ip=6). If the port number returned is 0, the web server is not listening on the specified address space. (At this time echttp always uses the same port number for IPv4 and IPv6.)
 ```
 int echttp_dynamic_port (void);
 ```
