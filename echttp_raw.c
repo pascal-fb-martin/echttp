@@ -92,7 +92,7 @@ typedef struct {
 #define ECHTTP_CLIENT_MAX 32
 static struct {
     int socket;
-    struct sockaddr_in peer;
+    struct sockaddr_in6 peer;
     time_t deadline;
     echttp_buffer in;
     echttp_buffer out;
@@ -155,6 +155,8 @@ static void echttp_raw_enumerate (void) {
             if ((cursor->ifa_addr == 0) || (cursor->ifa_netmask == 0)) continue;
             if (cursor->ifa_addr->sa_family != AF_INET)  continue;
 
+            // TBD: switch to IPv6.
+
             if (echttp_raw_debug) {
                 struct sockaddr_in *ia;
                 ia = (struct sockaddr_in *) (cursor->ifa_addr);
@@ -194,7 +196,7 @@ static int echttp_raw_new_client (void) {
 
 static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    int i;
-   struct sockaddr_in peer;
+   struct sockaddr_in6 peer;
    socklen_t peerlength = sizeof(peer);
 
    int s = accept(server, (struct sockaddr *)(&peer), &peerlength);
@@ -213,10 +215,16 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
        close (s);
        return;
    }
-   if (echttp_raw_debug)
-       printf ("Accepting client %d from %s:%d\n", i,
-               echttp_printip(ntohl((long)(peer.sin_addr.s_addr))),
-              peer.sin_port);
+   if (echttp_raw_debug) {
+       if (peer.sin6_family == AF_INET6) {
+           printf ("Accepting IPv6 client %d for port %d\n", i,
+                   peer.sin6_port);
+       } else if (peer.sin6_family == AF_INET) {
+           printf ("Accepting IPv4 client %d\n", i); // Not expected.
+       } else {
+           printf ("Accepting client %d from unknown protocol\n", i);
+       }
+   }
 
    echttp_raw_client[i].socket = s;
    echttp_raw_client[i].peer = peer;
@@ -430,24 +438,11 @@ static int echttp_raw_invalid (int client) {
 
 int  echttp_raw_is_local (int client) {
 
-    int i;
-    uint32_t ipaddr = echttp_raw_client[client].peer.sin_addr.s_addr;
+    if (echttp_raw_client[client].peer.sin6_family != AF_INET6) return 1;
 
-    echttp_raw_enumerate();
+    return 1; // TBD: adjust this check to IPv6 addresses.
 
-    if (echttp_raw_debug) {
-        printf ("Comparing %s to:\n", echttp_printip (ntohl((long)ipaddr)));
-    }
-    for (i = 0; i < echttp_raw_ifcount; ++i) {
-        uint32_t ifmask = echttp_raw_if[i].ifmask;
-        if (echttp_raw_debug) {
-            printf ("   %s\n",
-                    echttp_printip (ntohl((long)echttp_raw_if[i].ifaddr)));
-        }
-        if ((echttp_raw_if[i].ifaddr & ifmask) == (ipaddr & ifmask))
-            return 1;
-    }
-    return 0;
+    // echttp_raw_enumerate();
 }
 
 int  echttp_raw_server_port (int ip) {
@@ -648,12 +643,11 @@ int echttp_raw_connect (const char *host, const char *service) {
                 if (echttp_raw_debug)
                     printf ("connection failed: %s\n", strerror(errno));
                 close(s);
-                freeaddrinfo(resolved);
-                return -1;
+                continue;
             }
         }
         echttp_raw_client[i].socket = s;
-        echttp_raw_client[i].peer = (struct sockaddr_in){0};
+        echttp_raw_client[i].peer = (struct sockaddr_in6){0};
         freeaddrinfo(resolved);
         return i;
     }
