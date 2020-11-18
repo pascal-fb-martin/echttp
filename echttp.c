@@ -27,6 +27,8 @@
  *    the echttp's own hardcoded defaults and force its own.
  *    This should be called before echttp_open().
  *
+ *    In this case, argv[0] is an option, not the program's name.
+ *
  * int echttp_open (int argc, const char **argv);
  *
  *    Initialize the HTTP server. The HTTP-specific arguments are removed
@@ -596,7 +598,7 @@ const char *echttp_help (int level) {
 void echttp_defaults (int argc, const char **argv) {
 
    int i;
-   for (i = 1; i < argc; ++i) {
+   for (i = 0; i < argc; ++i) {
        if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
            continue;
        if (echttp_option_present ("-http-debug", argv[i])) {
