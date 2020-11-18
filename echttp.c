@@ -21,7 +21,13 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
- * echttp_open (int argc, const char **argv);
+ * void echttp_defaults (int argc, const char **argv);
+ *
+ *    Initialize default values. This allows an application to override
+ *    the echttp's own hardcoded defaults and force its own.
+ *    This should be called before echttp_open().
+ *
+ * int echttp_open (int argc, const char **argv);
  *
  *    Initialize the HTTP server. The HTTP-specific arguments are removed
  *    from the argument list and the count of remaining arguments is returned.
@@ -150,7 +156,8 @@
 #include "echttp_raw.h"
 #include "echttp_catalog.h"
 
-static int echttp_debug = 0;
+static const char *echttp_service = "http";
+static int         echttp_debug = 0;
 
 
 #define ECHTTP_STATE_IDLE    0
@@ -586,18 +593,31 @@ const char *echttp_help (int level) {
     return httpHelp[level];
 }
 
+void echttp_defaults (int argc, const char **argv) {
+
+   int i;
+   for (i = 1; i < argc; ++i) {
+       if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
+           continue;
+       if (echttp_option_present ("-http-debug", argv[i])) {
+           echttp_debug = 1;
+           continue;
+       }
+   }
+}
+
 int echttp_open (int argc, const char **argv) {
 
    int i;
    int shift;
    const char *value;
-   const char *service = "http";
 
    int port = -1;
 
    for (i = 1, shift = 1; i < argc; ++i) {
        if (shift != i) argv[shift] = argv[i];
-       if (echttp_option_match ("-http-service=", argv[i], &service)) continue;
+       if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
+           continue;
        if (echttp_option_present ("-http-debug", argv[i])) {
            echttp_debug = 1;
            continue;
@@ -605,11 +625,11 @@ int echttp_open (int argc, const char **argv) {
        shift += 1;
    }
    echttp_routing.count = 0;
-   if (! echttp_raw_open (service, echttp_debug)) return -1;
+   if (! echttp_raw_open (echttp_service, echttp_debug)) return -1;
    echttp_context_count = echttp_raw_capacity();
    echttp_context = calloc (echttp_context_count, sizeof(echttp_request));
    for (i = 0; i < echttp_context_count; ++i) echttp_context[i].client = i;
-   echttp_dynamic_flag = (strcmp(service, "dynamic") == 0);
+   echttp_dynamic_flag = (strcmp(echttp_service, "dynamic") == 0);
    return shift;
 }
 

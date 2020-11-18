@@ -62,6 +62,11 @@ const char *echttp_help (int level);
 Return a help text to print. If level is 0, it returns the short list of options in a single line, otherwise it returns the detailed description for option N. To print the detailed descriptions for all options, the caller should loop starting at 1 and stop when the return is 0 (null).
 
 ```
+void echttp_defaults (int argc, const char **argv);
+```
+Override the HTTP server hard-coded defaults. This function must be called before echttp_open() and allow an application to define its own defaults. For example an application might want to use "dynamic" as its default TCP service name, while still allowing the user to force some specific port number instead. All the arguments must be statically allocated.
+
+```
 int echttp_open (int argc, const char **argv);
 ```
 Initialize the HTTP server. The HTTP-specific arguments are removed from the argument list and the count of remaining arguments is returned.
