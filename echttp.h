@@ -23,7 +23,7 @@ const char *echttp_option_match (const char *reference,
 
 int echttp_option_present (const char *reference, const char *input);
 
-void echttp_defaults (int argc, const char **argv);
+void echttp_default (const char *arg);
 int  echttp_open (int argc, const char **argv);
 int  echttp_port (int ip);
 int  echttp_dynamic_port (void);

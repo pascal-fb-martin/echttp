@@ -21,13 +21,15 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
- * void echttp_defaults (int argc, const char **argv);
+ * void echttp_default (const char *arg);
  *
- *    Initialize default values. This allows an application to override
- *    the echttp's own hardcoded defaults and force its own.
- *    This should be called before echttp_open().
+ *    Set a default value for a command line option. The parameters must
+ *    follow the exact same syntax as for command line options, i.e. it
+ *    must be in the form "-option=value" or "-option". This function
+ *    allows an application to override the echttp's own hardcoded
+ *    option defaults and force its own.
  *
- *    In this case, argv[0] is an option, not the program's name.
+ *    This can be called multiple times, and it must be before echttp_open().
  *
  * int echttp_open (int argc, const char **argv);
  *
@@ -595,16 +597,13 @@ const char *echttp_help (int level) {
     return httpHelp[level];
 }
 
-void echttp_defaults (int argc, const char **argv) {
+void echttp_default (const char *arg) {
 
-   int i;
-   for (i = 0; i < argc; ++i) {
-       if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
-           continue;
-       if (echttp_option_present ("-http-debug", argv[i])) {
-           echttp_debug = 1;
-           continue;
-       }
+   if (echttp_option_match ("-http-service=", arg, &echttp_service)) return;
+
+   if (echttp_option_present ("-http-debug", arg)) {
+      echttp_debug = 1;
+      return;
    }
 }
 
