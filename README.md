@@ -103,7 +103,7 @@ The global protect (route 0) is called first, then the protect for the specific 
 * If the status is 204, the route callback is not called and no data is returned with the response.
 * If the status is any other 2xx, the route callback is called.
 
-This mechanism is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
+This mechanism is meant to facilitates the implementation of access control extensions, this is not an access control method on its own.
 ```
 const char *echttp_attribute_get (const char *name); 
 ```
@@ -208,6 +208,24 @@ For example if one defines a static route from /static to /home/doe/public, the 
 As soon as a static route has been declared, the extension takes over the root URI "/". If the root URI is requested, the extension seaches for file index.html in every path provided and returns the content of the first one found.
 
 This function returns the route descriptor or -1 on failure. This route descriptor can be used to protect the whole path.
+
+## Cross-Origin Resource Sharing (CORS) Extension
+
+The CORS extension facilitate the support for the CORS HTTP mechanism. See web public documentation for more details about this mechanism.
+
+This extension provides a minimal implementation of CORS:
+
+```
+void echttp_cors_allow_method (const char *method);
+```
+This function defines which method or methods are allowed in a CORS request. It can be called multiple times if more than one method is allowed. The method string must be static.
+
+```
+int echttp_cors_protect (const char *method, const char *uri);
+```
+This function must be called from a protect callback. It returns 0 if the request processing may continue or 1 if the protect callback should return immediately.
+
+In the later case, this function has setup the HTTP status and headers necessary: there is nothing more that the caller can or should do.
 
 ## Command Line Options
 
