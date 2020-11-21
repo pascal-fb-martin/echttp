@@ -94,7 +94,9 @@ int echttp_protect (int route, echttp_protect_callback *call);
 ```
 Declare a protect callback for the specified route. The route descriptor is the value returned by echttp_route_uri() or echttp_route_match(). A protect callback is called before the route's callback and may change the HTTP status to not OK (by calling echttp_error()--see later) and set the response's attributes; in that case the route's callback function is not called.
 
-Note that the protect callback is associated with the route, i.e. the URI string, not with the callback function: one may define two routes to the same callback function, and protect one route but not the other. This is intentional, as this allows protecting specific file paths without protecting all file paths (see the static page extention later).
+If the route is 0 the protect callback applies to all routes, in addition of each route protect callback. Thus the application may define two level of protect callback: one for all requests, and one for each route.
+
+Note that the protect callback is associated with a route, i.e. the URI string, not with a callback function: one may define two routes to the same callback function, and protect one route but not the other. This is intentional, as this allows protecting specific file paths without protecting all file paths (see the static page extention later).
 
 This mechanism is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
 ```

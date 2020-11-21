@@ -216,6 +216,7 @@ static struct {
     int count;
     int index[ECHTTP_HASH];
     echttp_route item[ECHTTP_MAX_ROUTES];
+    echttp_protect_callback *protect;
 } echttp_routing;
 
 
@@ -298,8 +299,13 @@ static void echttp_execute (int route, int client,
     context->transfer.size = 0;
 
     echttp_current = context;
-    if (echttp_routing.item[route].protect) {
-        echttp_routing.item[route].protect (action, uri);
+    if (echttp_routing.protect) {
+        echttp_routing.protect (action, uri);
+    }
+    if (context->status == 200) {
+        if (echttp_routing.item[route].protect) {
+            echttp_routing.item[route].protect (action, uri);
+        }
     }
     if (context->status != 200) {
         keep = 0;
@@ -626,6 +632,7 @@ int echttp_open (int argc, const char **argv) {
        shift += 1;
    }
    echttp_routing.count = 0;
+   echttp_routing.protect = 0;
    if (! echttp_raw_open (echttp_service, echttp_debug)) return -1;
    echttp_context_count = echttp_raw_capacity();
    echttp_context = calloc (echttp_context_count, sizeof(echttp_request));
@@ -653,7 +660,10 @@ int echttp_route_match (const char *root, echttp_callback *call) {
 
 int echttp_protect (int route, echttp_protect_callback *call) {
     if (route < 0 || route > echttp_routing.count) return -1;
-    echttp_routing.item[route].protect = call;
+    if (route == 0)
+        echttp_routing.protect = call;
+    else
+        echttp_routing.item[route].protect = call;
     return route;
 }
 
