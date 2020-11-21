@@ -302,12 +302,12 @@ static void echttp_execute (int route, int client,
     if (echttp_routing.protect) {
         echttp_routing.protect (action, uri);
     }
-    if (context->status == 200) {
+    if (context->status / 100 == 2) {
         if (echttp_routing.item[route].protect) {
             echttp_routing.item[route].protect (action, uri);
         }
     }
-    if (context->status != 200) {
+    if ((context->status / 100) != 2) {
         keep = 0;
         data = 0;
     } else {
