@@ -59,9 +59,22 @@ static const char *echttp_allowed[MAX_METHOD];
 static int         echttp_allowed_count = 0;
 static char        echttp_all_allowed[1024] = {0};
 
+static const char *echttp_local = 0;
+
 void echttp_cors_allow_method (const char *method) {
 
     if (echttp_allowed_count >= MAX_METHOD) return;
+
+    if (!echttp_local) {
+        char hostname[256];
+        char buffer[256];
+        gethostname (hostname, sizeof(hostname));
+        snprintf (buffer, sizeof(buffer),
+                  "http://%s:%d", hostname, echttp_port(4));
+        echttp_local = strdup(buffer);
+        if (echttp_isdebug()) printf ("Local server is %s\n", echttp_local);
+    }
+    if (echttp_isdebug()) printf ("Allowing method %s\n", method);
 
     echttp_allowed[echttp_allowed_count++] = method;
     if (echttp_all_allowed[0]) {
@@ -87,6 +100,8 @@ int echttp_cors_protect (const char *method, const char *uri) {
 
     const char *origin = echttp_attribute_get ("Origin");
     if (!origin) return 0; // Not a cross-domain request.
+
+    if (!strcmp (origin, echttp_local)) return 0; // Same origin..
 
     if (!strcmp (method, "OPTIONS")) { // Preflight request.
 
