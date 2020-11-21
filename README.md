@@ -98,6 +98,11 @@ If the route is 0 the protect callback applies to all routes, in addition of eac
 
 Note that the protect callback is associated with a route, i.e. the URI string, not with a callback function: one may define two routes to the same callback function, and protect one route but not the other. This is intentional, as this allows protecting specific file paths without protecting all file paths (see the static page extention later).
 
+The global protect (route 0) is called first, then the protect for the specific route. However the later is not called if the global protect changed the HTTP status to something different than 200. How the HTTP request is then processed depends on the HTTP status after both protect calls:
+* If the status is not a 2xx, the route callback is not called and the connection is closed after the response has been sent.
+* If the status is 204, the route callback is not called and no data is returned with the response.
+* If the status is any other 2xx, the route callback is called.
+
 This mechanism is meant to facilitate the implementation of access control extensions, this is not an access control method on its own.
 ```
 const char *echttp_attribute_get (const char *name); 
