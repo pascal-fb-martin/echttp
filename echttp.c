@@ -79,7 +79,7 @@
  * 
  * void echttp_redirect (const char *url);
  * 
- * Send a redirect response instead of OK.
+ * Send a temporary redirect response instead of OK.
  * 
  *
  * int echttp_islocal (void);
@@ -715,7 +715,7 @@ void echttp_error (int code, const char *message) {
 }
 
 void echttp_redirect (const char *url) {
-    echttp_error (302, "Redirected");
+    echttp_error (307, "Temporary Redirect");
     echttp_attribute_set ("Location", url);
 }
 
