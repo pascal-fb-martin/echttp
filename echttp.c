@@ -828,7 +828,7 @@ int echttp_redirected (const char *method) {
         echttp_catalog_get (&(echttp_current->in), "Location");
     if (redirect) {
         const char *error = echttp_client (method, redirect);
-        if (!error) return 1;
+        if (!error) return 0;
     }
     return 500;
 }
