@@ -71,5 +71,7 @@ const char *echttp_client (const char *method, const char *url);
 
 void echttp_submit (const char *data, int length,
                     echttp_response *response, void *origin);
+
+int echttp_redirected (const char *method);
 #endif
 

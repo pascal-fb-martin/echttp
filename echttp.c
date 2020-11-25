@@ -149,6 +149,20 @@
  *    the web client context. When a response will be received from the
  *    server, the response function will be called, with the provided
  *    origin pointer as its first parameter.
+ *
+ * int echttp_redirected (const char *method);
+ *
+ *    This helper function handles the common cases of redirections.
+ *    If used, this must be called from the application's response callback,
+ *    and it must be the first thing that the response callback do. How the
+ *    response callback then behaves depends on the return code:
+ *       >0: the response was not handled and the response must be processed
+ *           as normal. The value returned is an updated HTTP status.
+ *       0:  the response was handled and the response callback must now
+ *           (re)build the request data, call echttp_submit and return.
+ *    The method parameter is the method used for the original request.
+ *    Depending on the redirect code, either this method will be used or
+ *    else a GET method will be forced.
  */
 
 #include <stdlib.h>
@@ -419,7 +433,7 @@ static void echttp_respond (int client, char *data, int length) {
    // to submit another request in reaction to the response, so the current
    // context might be eradicated.
    //
-   echttp_request *context = echttp_current = &(echttp_context[client]);
+   echttp_request *context = &(echttp_context[client]);
 
    echttp_current = context;
    context->response (context->origin, context->status, data, length);
@@ -795,5 +809,27 @@ void echttp_submit (const char *data, int length,
 
     echttp_send (echttp_current->client, data, length);
     echttp_current = 0;
+}
+
+int echttp_redirected (const char *method) {
+
+    switch (echttp_current->status) {
+        case 301:
+        case 307:
+        case 308: break; // Use requested method.
+
+        case 302:
+        case 303: method = "GET"; break;
+
+        default: return echttp_current->status;
+    }
+
+    const char *redirect =
+        echttp_catalog_get (&(echttp_current->in), "Location");
+    if (redirect) {
+        const char *error = echttp_client (method, redirect);
+        if (!error) return 1;
+    }
+    return 500;
 }
 
