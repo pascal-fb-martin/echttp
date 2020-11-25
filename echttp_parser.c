@@ -32,6 +32,11 @@
  *    check the value of errno. If errno indicates no error, the file was
  *    empty.
  *
+ * char *echttp_parser_string (const char *text);
+ *
+ *    This function allocates a copy of the provided string in a way
+ *    that is compatible with echttp_parser_free().
+ *
  * void echttp_parser_free (char *buffer);
  *
  *    Free the provided buffer (must have been allocated in this module).
@@ -71,6 +76,15 @@ char *echttp_parser_load (const char *file) {
     buffer[filestat.st_size] = 0;
     close (fd);
 
+    if (!BoundLow || buffer < BoundLow) BoundLow = buffer;
+    if (!BoundHigh || buffer > BoundHigh) BoundHigh = buffer;
+
+    return buffer;
+}
+
+char *echttp_parser_string (const char *text) {
+
+    char *buffer = strdup(text);
     if (!BoundLow || buffer < BoundLow) BoundLow = buffer;
     if (!BoundHigh || buffer > BoundHigh) BoundHigh = buffer;
 

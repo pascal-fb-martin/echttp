@@ -38,7 +38,8 @@ struct ParserContext_s;
 typedef struct ParserContext_s *ParserContext;
 
 char *echttp_parser_load (const char *file);
-void echttp_parser_free (char *buffer);
+char *echttp_parser_string (const char *text);
+void  echttp_parser_free (char *buffer);
 
 #endif // INCLUDED__ECHTTP_PARSER__H
 
