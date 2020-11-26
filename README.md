@@ -278,19 +278,30 @@ Send the HTTP request, including the specified content. If a file transfer was s
 
 Once a complete response has been received from the server, the response function is called with the provided origin value, the HTTP status from the server and the data content from the response, if any. The attributes from the response header can be accessed using the standard echttp API.
 
-The echttp client functions do not automatically follow redirection (HTTP status 302): the application must do this itself if this is the intent. For example:
+The echttp client functions do not automatically follow redirection (HTTP status 301, 302, 303, 307 or 308): the application must do this itself if this is the intent. The echttp API provide a helper function to make it easier:
+```
+int echttp_redirected (const char *method);
+```
+This function handles the common cases of redirections. If used, this must be called from the application's response callback, and it must be the first thing that the response callback do. How the response callback then behaves depends on the return code:
+ * Non-zero: the response was not handled and the response must be processed as normal. The value returned is an updated HTTP status.
+ * 0: the response was fully handled and the response callback must now (re)build the request data, call echttp_submit and then return without processing the response further.
+
+The method parameter is the method used for the original request. Depending on the redirect code, either this method will be used or else the GET method will be forced.
+
+It is always possible for the application to handle redirections on its own, if the case is too complex for this helper. Do not forget, however, to handle all the redirection codes (301, 302, 303, 207 and 308).
+
+For example:
 ```
 static void response (void *origin, int status, char *data, int length) {
-    if (status == 302) {
-        const char *error =
-            echttp_client ("GET", echttp_attribute_get("Location"));
-        if (!error)
-            echttp_submit (0, 0, response, 0);
+    status = echttp_redirected ("GET");
+    if (!status) {
+        echttp_submit (0, 0, response, origin);
         return;
     }
     ... application specific code ...
 }
 ```
+
 ## JSON and XML Support
 
 The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include echttp_json.h or echttp_xml.h (depending on the format used).
@@ -343,7 +354,8 @@ This token structure closely matches the JSON syntax. When decoding XML, the fol
 
 ```
 char *echttp_parser_load (const char *file);
-void echttp_parser_free (char *buffer);
+char *echttp_parser_string (const char *text);
+void  echttp_parser_free (char *buffer);
 ```
 These functions are used to load the entire content of a JSON or XML file in a buffer, before parsing the data. The buffer is dynamically allocated, and must be released once the data is no longer used. Because the parsed tokens rely on the buffer's content, the buffer should be released only after the tokens have been discarded.
 
