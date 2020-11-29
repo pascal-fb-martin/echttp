@@ -46,6 +46,7 @@ void        echttp_parameter_join (char *text, int size);
 void echttp_attribute_set (const char *name, const char *value);
 void echttp_error         (int code, const char *message);
 void echttp_redirect      (const char *url);
+void echttp_permanent_redirect (const char *url);
 
 void echttp_content_type_set  (const char *value);
 void echttp_content_type_html (void);

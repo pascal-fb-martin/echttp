@@ -348,7 +348,7 @@ static void echttp_raw_transmit (int i) {
           if (echttp_raw_client[i].transfer.size <= 0) {
               echttp_raw_client[i].deadline = time(NULL) + 10;
           } else if (echttp_raw_debug) {
-              printf ("Initiating fiel transfer (%d bytes)\n",
+              printf ("Initiating field transfer (%d bytes)\n",
                       echttp_raw_client[i].transfer.size);
           }
       }
