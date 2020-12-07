@@ -57,6 +57,7 @@ void echttp_transfer (int fd, int size);
 
 typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
+void echttp_forget (int fd);
 void echttp_background (echttp_listener *listener);
  
 int echttp_isdebug (void);

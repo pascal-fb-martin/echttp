@@ -758,6 +758,10 @@ void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {
     echttp_raw_register (fd, mode, listener, premium);
 }
  
+void echttp_forget (int fd) {
+    echttp_raw_forget (fd);
+}
+ 
 void echttp_background (echttp_listener *listener) {
     echttp_raw_background (listener);
 }

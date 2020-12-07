@@ -169,12 +169,16 @@ Dynamic port mode is activated using the command line option -http-service=dynam
 ```
 typedef void *echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
+void echttp_forget (int fd);
 ```
-Listen to the specified file descriptor (mode=0: don't listen, mode=1: read only, mode=2: write only, mode=3: read & write).
+Listen to the specified file descriptor (mode=0: don't listen, mode=1: read only, mode=2: write only, mode=3: read & write). This may be called multiple times to listen to a list of I/O, or on the same I/O to change the mode, the listener and the premium option. Setting mode to 0 can be used to temporarily suspend listening to the I/O without removing it from the list.
 
 When the specified file descriptor is ready, the listener is called with the mode corresponding to the event.
 
 The premium option, if used, causes this file descriptor to be processed before any HTTP client and other listener. The premium option is meant for a high priority I/O.
+
+The echttp_forget() function is used to remove the I/O from the list. It has no effect if the I/O was not in the list. This does not close the file descriptor.
+
 ```
 void echttp_background (echttp_listener *listener);
 ```

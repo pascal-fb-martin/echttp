@@ -38,6 +38,10 @@
  *
  * void echttp_raw_close_client (int i, const char *reason);
  *
+ * void echttp_raw_register (int fd, int mode,
+ *                           echttp_listener *listener, int premium);
+ * void echttp_raw_forget (int fd);
+ *
  * void echttp_raw_close (void);
  */
 
@@ -576,20 +580,24 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
 void echttp_raw_register (int fd, int mode,
                           echttp_listener *listener, int premium) {
     int i;
-    if (listener == 0) mode = 0; // Ignore when no listener.
+    if (listener == 0) mode = 0; // Disabled when no listener.
+
+    // Is this an existing I/O to update?
+    //
     for (i = 0; i < echttp_raw_other_count; ++i) {
-        if (echttp_raw_other[i].fd == fd) {
+        if (echttp_raw_other[i].fd == fd) { // Update existing entry.
             echttp_raw_other[i].mode = mode;
             if (mode) {
+                echttp_raw_other[i].premium = premium;
                 echttp_raw_other[i].listener = listener;
-            } else {
-                if (i == echttp_raw_other_count-1) echttp_raw_other_count -= 1;
             }
             return;
         }
     }
-    if (mode == 0) return;
+    if (mode == 0) return; // Disabling a non-existent entry is no-op.
 
+    // This is a new I/O to listen to.
+    //
     if (echttp_raw_other_count >= ECHTTP_RAW_MAXREGISTERED) {
         fprintf (stderr, __FILE__ ": too many listeners\n");
         return;
@@ -599,6 +607,18 @@ void echttp_raw_register (int fd, int mode,
     echttp_raw_other[echttp_raw_other_count].listener = listener;
     echttp_raw_other[echttp_raw_other_count].fd = fd;
     echttp_raw_other_count += 1;
+}
+
+void echttp_raw_forget (int fd) {
+    int i;
+    for (i = 0; i < echttp_raw_other_count; ++i) {
+        if (echttp_raw_other[i].fd == fd) {
+            if (i < --echttp_raw_other_count) {
+                echttp_raw_other[i] = echttp_raw_other[echttp_raw_other_count];
+            }
+            return;
+        }
+    }
 }
 
 void echttp_raw_background (echttp_listener *listener) {

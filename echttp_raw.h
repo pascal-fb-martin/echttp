@@ -17,6 +17,7 @@ void echttp_raw_transfer (int client, int fd, int length);
 
 void echttp_raw_register (int fd, int mode,
                           echttp_listener *listener, int premium);
+void echttp_raw_forget (int fd);
 
 void echttp_raw_background (echttp_listener *listener);
 
