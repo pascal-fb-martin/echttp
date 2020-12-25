@@ -256,6 +256,10 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
 
 
 static void echttp_send (int client, const char *data, int length) {
+    echttp_raw_send (client, data, length);
+}
+
+static void echttp_send_data (int client, const char *data, int length) {
 
     echttp_request *context = &(echttp_context[client]);
     static const char eol[] = "\r\n";
@@ -264,18 +268,18 @@ static void echttp_send (int client, const char *data, int length) {
 
     snprintf (buffer, sizeof(buffer)-1, "Content-Length: %d\r\n",
               length + context->transfer.size);
-    echttp_raw_send (client, buffer, strlen(buffer));
+    echttp_send (client, buffer, strlen(buffer));
 
     for (i = 1; i <= context->out.count; ++i) {
         if (context->out.item[i].name == 0) continue;
         snprintf (buffer, sizeof(buffer)-1, "%s: %s\r\n",
                   context->out.item[i].name,
                   context->out.item[i].value);
-        echttp_raw_send (client, buffer, strlen(buffer));
+        echttp_send (client, buffer, strlen(buffer));
     }
-    echttp_raw_send (client, eol, sizeof(eol)-1);
+    echttp_send (client, eol, sizeof(eol)-1);
     if (length > 0) {
-       echttp_raw_send (client, data, length);
+       echttp_send (client, data, length);
     }
     if (context->transfer.size > 0) {
         // This transfer must be submitted to the raw layer only after
@@ -335,14 +339,14 @@ static void echttp_execute (int route, int client,
 
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
              context->status, context->reason);
-    echttp_raw_send (client, buffer, strlen(buffer));
+    echttp_send (client, buffer, strlen(buffer));
 
     if (keep) {
         static const char text[] = "Connection: keep-alive\r\n";
-        echttp_raw_send (client, text, sizeof(text)-1);
+        echttp_send (client, text, sizeof(text)-1);
     }
 
-    echttp_send (client, data, length);
+    echttp_send_data (client, data, length);
 }
 
 static void echttp_unknown (int client) {
@@ -350,7 +354,7 @@ static void echttp_unknown (int client) {
         "HTTP/1.1 404 Not found\r\n"
         "Content-Length: 0\r\n"
         "Connection: Closed\r\n\r\n";
-    echttp_raw_send (client, unknown, sizeof(unknown)-1);
+    echttp_send (client, unknown, sizeof(unknown)-1);
 }
 
 static void echttp_invalid (int client) {
@@ -358,7 +362,7 @@ static void echttp_invalid (int client) {
         "HTTP/1.1 406 Not Acceptable\r\n"
         "Content-Length: 0\r\n"
         "Connection: Closed\r\n\r\n";
-    echttp_raw_send (client, invalid, sizeof(invalid)-1);
+    echttp_send (client, invalid, sizeof(invalid)-1);
 }
 
 static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
@@ -510,12 +514,12 @@ static int echttp_received (int client, char *data, int length) {
        if (context->response) {
            // Expect a status line.
            if (echttp_debug) printf("HTTP status: %s\n", line[0]);
-           if (strncmp (line[0], "HTTP/1.1 ", 9)) {
+           if (strncmp (line[0], "HTTP/1.", 7)) {
                context->status = 505;
                echttp_respond (client, 0, 0);
                return 0; // Connection was closed, nothing more to do.
            }
-           context->status = atoi(line[0]+9);
+           context->status = atoi(strchr(line[0], ' '));
        } else {
            // Expect a request line.
            if (echttp_debug) printf("HTTP request: %s\n", line[0]);
@@ -773,13 +777,17 @@ const char *echttp_client (const char *method, const char *url) {
     char host[64];
     char service[16];
     char buffer[256];
+    int start;
+    int end;
 
-    if (strncmp (url, "http://", 7)) return "unsupported";
+    if (!strncmp (url, "http://", 7)) start = 7;
+    else return "unsupported";
 
-    for (i = 7; i < 70 && url[i] && url[i] != ':' && url[i] != '/'; ++i) {
-        host[i-7] = url[i];
+    end = start + sizeof(host) - 1;
+    for (i = start; i < end && url[i] && url[i] != ':' && url[i] != '/'; ++i) {
+        host[i-start] = url[i];
     }
-    host[i-7] = 0;
+    host[i-start] = 0;
     service[0] = ':';
     if (url[i] == ':') {
         for (j = 1, ++i; j < 15 && url[i] && url[i] != '/'; ++i, ++j) {
@@ -791,16 +799,16 @@ const char *echttp_client (const char *method, const char *url) {
         j = 0; // Mark that we use the default port.
     }
     if (echttp_debug) printf ("Connecting to %s%s\n", host, service);
-    client = echttp_raw_connect (host, service+1); // Skip the ':'
+    client = echttp_raw_connect_client (host, service+1); // Skip the ':'
     if (client < 0) return "connection failed";
     echttp_newlink (client);
     echttp_current = &(echttp_context[client]);
 
     snprintf (buffer, sizeof(buffer), "%s %s HTTP/1.1\r\n", method, url+i);
-    echttp_raw_send (client, buffer, strlen(buffer));
+    echttp_send (client, buffer, strlen(buffer));
 
     snprintf (buffer, sizeof(buffer), "Host: %s%s\r\n", host, j?service:"");
-    echttp_raw_send (client, buffer, strlen(buffer));
+    echttp_send (client, buffer, strlen(buffer));
 
     return 0;
 }
@@ -811,7 +819,7 @@ void echttp_submit (const char *data, int length,
     echttp_current->response = response;
     echttp_current->origin = origin;
 
-    echttp_send (echttp_current->client, data, length);
+    echttp_send_data (echttp_current->client, data, length);
     echttp_current = 0;
 }
 

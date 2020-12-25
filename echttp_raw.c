@@ -35,6 +35,8 @@
  *                       echttp_raw_receiver *received);
  *
  * int echttp_raw_connect (const char *host, const char *service);
+ * int echttp_raw_attach_client (int socket);
+ * int echttp_raw_connect_client (const char *host, const char *service);
  *
  * void echttp_raw_close_client (int i, const char *reason);
  *
@@ -628,14 +630,11 @@ void echttp_raw_background (echttp_listener *listener) {
 int echttp_raw_connect (const char *host, const char *service) {
 
     int value;
-    int s;
+    int s = -1;
 
     static struct addrinfo hints;
     struct addrinfo *resolved;
     struct addrinfo *cursor;
-
-    int i = echttp_raw_new_client ();
-    if (i < 0) return i;
 
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
@@ -653,6 +652,7 @@ int echttp_raw_connect (const char *host, const char *service) {
         int flags = fcntl(s, F_GETFL);
         if (flags == -1) {
             close(s);
+            s = -1;
             continue;
         }
         flags |= O_NONBLOCK;
@@ -663,16 +663,33 @@ int echttp_raw_connect (const char *host, const char *service) {
                 if (echttp_raw_debug)
                     printf ("connection failed: %s\n", strerror(errno));
                 close(s);
+                s = -1;
                 continue;
             }
         }
-        echttp_raw_client[i].socket = s;
-        echttp_raw_client[i].peer = (struct sockaddr_in6){0};
-        freeaddrinfo(resolved);
-        return i;
+        break; // Since we got a proper socket, no need to continue.
     }
     freeaddrinfo(resolved);
-    return -1;
+    return s;
+}
+
+int echttp_raw_attach_client (int socket) {
+
+    if (socket < 0) return -1;
+
+    int i = echttp_raw_new_client ();
+    if (i < 0) {
+        close(socket);
+        return -1;
+    }
+    echttp_raw_client[i].socket = socket;
+    echttp_raw_client[i].peer = (struct sockaddr_in6){0};
+    return i;
+}
+
+int echttp_raw_connect_client (const char *host, const char *service) {
+
+    return echttp_raw_attach_client (echttp_raw_connect (host, service));
 }
 
 void echttp_raw_close (void) {

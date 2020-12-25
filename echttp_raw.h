@@ -27,6 +27,8 @@ void echttp_raw_loop (echttp_raw_acceptor * acceptor,
 int  echttp_raw_is_local (int client);
 
 int echttp_raw_connect (const char *host, const char *service);
+int echttp_raw_attach_client (int socket);
+int echttp_raw_connect_client (const char *host, const char *service);
 
 void echttp_raw_close_client (int i, const char *reason);
 void echttp_raw_close (void);
