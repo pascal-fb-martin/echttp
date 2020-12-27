@@ -28,11 +28,10 @@ void echttp_tls_initialize (int size);
 int  echttp_tls_attach (int client, int s, const char *host);
 
 int  echttp_tls_send (int client, const char *data, int length);
-int  echttp_tls_receive (int client, char *buffer, int size);
-
 int  echttp_tls_transfer (int client, int fd, int offset);
 
-int  echttp_tls_ready (int client, int mode);
+typedef int echttp_tls_receiver (int client, char *data, int length);
+int  echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver);
 
 void echttp_tls_detach_client (int client, const char *reason);
 

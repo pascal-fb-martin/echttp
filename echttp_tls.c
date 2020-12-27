@@ -27,15 +27,12 @@
  * int  echttp_tls_attach (int client, int s, const char *host);
  *
  * int  echttp_tls_send (int client, const char *data, int length);
- * int  echttp_tls_receive (int client, char *buffer, int size);
- *
  * int  echttp_tls_transfer (int client, int fd, int offset);
  *
- * int echttp_tls_ready (int client, int mode);
+ * typedef int  echttp_tls_receiver (int client, char *data, int length);
+ * int echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver);
  *
  * void echttp_tls_detach_client (int client, const char *reason);
- *
- * TBD: proper write data buffering to handle async I/O.
  */
 
 #include <errno.h>
@@ -71,10 +68,10 @@ typedef struct {
 typedef struct {
     SSL *ssl;
     int pending;
-    int socket;
     int transfer_fd;
     int transfer_length;
     echttp_buffer out;
+    echttp_buffer in;
 } echttp_tls_registration;
 
 static echttp_tls_registration **echttp_tls_clients = 0;
@@ -89,10 +86,11 @@ static void echttp_tls_cleanup (int i) {
     if (registered->ssl) SSL_free (registered->ssl);
     registered->ssl = 0;
     registered->pending = ECHTTP_TLS_IDLE;
-    registered->socket = -1;
     if (registered->transfer_fd >= 0) close (registered->transfer_fd);
     registered->transfer_fd = -1;
     registered->transfer_length = 0;
+    registered->in.start = registered->in.end = 0;
+    registered->out.start = registered->out.end = 0;
 }
 
 void echttp_tls_initialize (int size) {
@@ -196,14 +194,15 @@ int echttp_tls_attach (int client, int s, const char *host) {
         return -1;
     }
 
-    if (!echttp_tls_clients[client]) {
-        echttp_tls_clients[client] = malloc(sizeof(**echttp_tls_clients));
-        echttp_tls_clients[client]->ssl = 0;
-        echttp_tls_clients[client]->transfer_fd = -1;
+    echttp_tls_registration *registered = echttp_tls_clients[client];
+
+    if (!registered) {
+        registered = malloc(sizeof(**echttp_tls_clients));
+        registered->ssl = 0;
+        registered->transfer_fd = -1;
+        echttp_tls_clients[client] = registered;
     }
     echttp_tls_cleanup (client);
-
-    echttp_tls_registration *registered = echttp_tls_clients[client];
 
     registered->ssl = SSL_new(echttp_tls_context);
     if (!registered->ssl) {
@@ -223,10 +222,16 @@ int echttp_tls_attach (int client, int s, const char *host) {
         }
         return -1;
     }
-    registered->socket = s;
-    registered->pending = ECHTTP_TLS_IDLE;
-
     return echttp_tls_connect (client);
+}
+
+static int echttp_tls_consume (echttp_buffer *buffer, int length) {
+    buffer->start += length;
+    if (buffer->start >= buffer->end) {
+        buffer->start = buffer->end = 0;
+        if (echttp_isdebug()) printf ("Buffer empty\n");
+    }
+    return (buffer->end == 0);
 }
 
 static int echttp_tls_flush (int client) {
@@ -241,6 +246,7 @@ static int echttp_tls_flush (int client) {
         registered->out.start = registered->out.end = 0;
         return 0;
     }
+    if (echttp_isdebug()) printf ("Client %d flushing\n", client);
     ERR_clear_error();
     int ret = SSL_write (registered->ssl,
                          registered->out.data + registered->out.start, length);
@@ -248,11 +254,7 @@ static int echttp_tls_flush (int client) {
     switch (SSL_get_error(registered->ssl, ret)) {
         case SSL_ERROR_NONE:
             if (echttp_isdebug()) printf ("SSL_write completed\n");
-            registered->out.start += ret;
-            if (registered->out.start >= registered->out.end) {
-                registered->out.start = registered->out.end = 0;
-                return 0;
-            }
+            if (echttp_tls_consume (&(registered->out), ret)) return 0;
             return 2;
         case SSL_ERROR_ZERO_RETURN:
             if (echttp_isdebug())
@@ -260,6 +262,9 @@ static int echttp_tls_flush (int client) {
                         ERR_error_string(ERR_get_error(), 0));
             echttp_tls_cleanup (client);
             return -1;
+        case SSL_ERROR_WANT_READ:
+            if (echttp_isdebug()) printf ("SSL_write: read blocked\n");
+            return 1;
         case SSL_ERROR_WANT_WRITE:
             if (echttp_isdebug()) printf ("SSL_write: write blocked\n");
             return 2;
@@ -281,8 +286,9 @@ static int echttp_tls_store (int client, const char *data, int length) {
     if (length > 0) {
         memcpy (registered->out.data + registered->out.end, data, length);
         registered->out.end += length;
-    } else
+    } else {
         if (echttp_isdebug()) printf ("Client %d: buffer full\n", client);
+    }
     return length;
 }
 
@@ -295,20 +301,38 @@ int echttp_tls_send (int client, const char *data, int length) {
     return length;
 }
 
-int echttp_tls_receive (int client, char *buffer, int size) {
+static int echttp_tls_receive (int client, echttp_tls_receiver *receiver) {
 
     echttp_tls_registration *registered = echttp_tls_clients[client];
 
     if (registered->pending == ECHTTP_TLS_CONNECT) return 0;
 
+    char *cursor = registered->in.data + registered->in.start;
+    int   available = sizeof(registered->in.data) - registered->in.end - 1;
+
+    if (available <= 0) {
+        if (echttp_isdebug())
+            printf ("TLS client %d: in buffer full\n", client);
+        return -1;
+    }
+
+    if (echttp_isdebug()) printf ("Client %d reading\n", client);
     ERR_clear_error();
-    int ret = SSL_read (echttp_tls_clients[client]->ssl, buffer, size);
+    int ret = SSL_read (registered->ssl, cursor, available);
 
     switch (SSL_get_error(registered->ssl, ret)) {
         case SSL_ERROR_NONE:
+            registered->in.end += ret;
+            registered->in.data[registered->in.end] = 0; // Terminate string.
             if (echttp_isdebug())
-                printf ("Client %d TLS data: %s\n", client, buffer);
-            return ret;
+                printf ("Client %d TLS data: %s\n", client, cursor);
+            if (receiver) {
+                cursor = registered->in.data + registered->in.start;
+                available = registered->in.end - registered->in.start;
+                ret = receiver (client, cursor, available);
+                echttp_tls_consume (&(registered->in), ret);
+            }
+            return 1;
         case SSL_ERROR_ZERO_RETURN:
             if (echttp_isdebug())
                 printf ("SSL_connect: zero return, error %s\n",
@@ -317,15 +341,16 @@ int echttp_tls_receive (int client, char *buffer, int size) {
             return -1;
         case SSL_ERROR_WANT_READ:
             if (echttp_isdebug()) printf ("SSL_read: read blocked\n");
-            return 0;
+            return 1;
         case SSL_ERROR_WANT_WRITE:
             if (echttp_isdebug()) printf ("SSL_read: write blocked\n");
-            return -2;
+            return 2;
         default:
             if (echttp_isdebug()) printf ("SSL_read: unknown error code\n");
             echttp_tls_cleanup (client);
             return -1;
     }
+    return 0; // We should never get there.
 }
 
 int echttp_tls_transfer (int client, int fd, int length) {
@@ -384,7 +409,7 @@ static int echttp_tls_transmit (int client) {
     return 2; // We have more data to send, even if the buffer is empty.
 }
 
-int echttp_tls_ready (int client, int mode) {
+int echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver) {
 
     echttp_tls_registration *registered = echttp_tls_clients[client];
 
@@ -401,7 +426,15 @@ int echttp_tls_ready (int client, int mode) {
         case ECHTTP_TLS_IDLE:
             if (echttp_isdebug())
                 printf ("Client %d: flush\n", client);
-            return (mode & 1) | echttp_tls_flush(client);
+            switch (mode) {
+                case 1:
+                    return echttp_tls_receive (client, receiver);
+                case 2:
+                    return echttp_tls_flush(client);
+                case 3:
+                    return echttp_tls_flush(client)
+                         | echttp_tls_receive (client, receiver);
+            }
     }
     return 0;
 }

@@ -802,20 +802,10 @@ void echttp_background (echttp_listener *listener) {
 
 static void echttp_listener_tls (int client, int mode) {
 
-    mode = echttp_tls_ready (client, mode);
+    mode = echttp_tls_ready (client, mode, echttp_received);
     if (mode < 0) {
         echttp_raw_close_client(client, "TLS failure");
         return;
-    }
-
-    if (mode & 1) {
-        char buffer[3000];
-        int length;
-        length = echttp_tls_receive (client, buffer, sizeof(buffer));
-        if (length > 0) {
-            echttp_received (client, buffer, length);
-        }
-        if (length == -2) mode |= 2;
     }
     echttp_raw_update (client, mode | 1);
 }
