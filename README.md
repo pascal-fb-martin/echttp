@@ -16,9 +16,9 @@ This web server can be configured to use dynamic port allocation for its server 
 * make
 * sudo make install (this installs files in the /usr/local tree)
 
-Use the -lechttp option when building your application. For example:
+Use the OpenSSL and -lechttp options when building your application. For example:
 ```
-cc -o httpserver httpserver.c -lechttp
+cc -o httpserver httpserver.c -lechttp -lssl -lcrypto
 ```
 # Example
 Below is an example of a small, but fully functional web server written using echttp. This server returns pages from the current directory as well as an embedded welcome message.
@@ -252,9 +252,9 @@ Return true if the HTTP debug option was selected. Only used for debug or troubl
 
 ## HTTP Client
 
-The echttp library includes support for the HTTP client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
+The echttp library includes support for the HTTP and HTTPS client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
 
-The intent is to allow an application using echttp to access other web server to collect information, or to access web services. For example a sprinkler controller may need to access public web sites to get weather information, or control relays through local web services.
+The intent is to allow an application using echttp to access other web servers to collect information, or to access web services. For example a sprinkler controller may need to access public web sites to get weather information, or control relays through local web services.
 
 A web client request is processed in three steps:
 * Initialize the query context (providing the method and URL).
@@ -271,7 +271,7 @@ A client request can be initiated from within an HTTP request callback (i.e. whi
 ````
 const char *echttp_client (const char *method, const char *url);
 ````
-Initiate a client context. This function returns 0 (null pointer) on success, or an error text on failure. There is no specific assumption made regarding the method string: any name compatible with the HTTP syntax would do, as long as the server supports it.
+Initiate a client context. This function returns 0 (null pointer) on success, or an error text on failure. There is no specific assumption made regarding the method string: any name compatible with the HTTP syntax would do, as long as the server supports it. The function will automatically use a TLS connection is the URL starts with "https:".
 ```
 typedef void echttp_response (void *origin, int status, char *data, int length);
 

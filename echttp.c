@@ -172,6 +172,7 @@
 
 #include "echttp.h"
 #include "echttp_raw.h"
+#include "echttp_tls.h"
 #include "echttp_catalog.h"
 
 static const char *echttp_service = "http";
@@ -181,7 +182,10 @@ static int         echttp_debug = 0;
 #define ECHTTP_STATE_IDLE    0
 #define ECHTTP_STATE_CONTENT 1
 
+enum echttp_transport {ECHTTP_RAW = 0, ECHTTP_TLS = 1};
+
 typedef struct {
+    enum echttp_transport mode;
     int state;
     int route;
     int client;
@@ -206,8 +210,8 @@ typedef struct {
 
 } echttp_request;
 
-static echttp_request *echttp_context = 0;
-static int             echttp_context_count = 0;
+static echttp_request **echttp_context = 0;
+static int              echttp_context_count = 0;
 static echttp_request *echttp_current = 0;
 
 static int echttp_dynamic_flag = 0;
@@ -256,12 +260,19 @@ static int echttp_split (char *data, const char *sep, char **items, int max) {
 
 
 static void echttp_send (int client, const char *data, int length) {
-    echttp_raw_send (client, data, length);
+    switch (echttp_context[client]->mode) {
+        case ECHTTP_RAW:
+            echttp_raw_send (client, data, length);
+            break;
+        case ECHTTP_TLS:
+            echttp_tls_send (client, data, length);
+            break;
+    }
 }
 
 static void echttp_send_data (int client, const char *data, int length) {
 
-    echttp_request *context = &(echttp_context[client]);
+    echttp_request *context = echttp_context[client];
     static const char eol[] = "\r\n";
     int i;
     char buffer[256];
@@ -300,7 +311,7 @@ static void echttp_execute (int route, int client,
 
     int i;
     char buffer[256];
-    echttp_request *context = &(echttp_context[client]);
+    echttp_request *context = echttp_context[client];
 
     // Do not rely on echttp_current internally: the application is allowed
     // to submit a client request in reaction to the received request,
@@ -433,11 +444,10 @@ static char *echttp_unescape (char *data) {
 
 static void echttp_respond (int client, char *data, int length) {
 
-   // Do not rely on echttp_current internally: the application is allowed
-   // to submit another request in reaction to the response, so the current
-   // context might be eradicated.
+   // Do not rely on echttp_current internally: this is processing a response
+   // and there is no current request processing.
    //
-   echttp_request *context = &(echttp_context[client]);
+   echttp_request *context = echttp_context[client];
 
    echttp_current = context;
    context->response (context->origin, context->status, data, length);
@@ -449,7 +459,7 @@ static void echttp_respond (int client, char *data, int length) {
    echttp_raw_close_client(context->client, "end of response");
 }
 
-static int echttp_newlink (int client) {
+static int echttp_newclient (int client) {
 
    int i;
 
@@ -457,10 +467,15 @@ static int echttp_newlink (int client) {
        fprintf (stderr, "Invalid client context\n");
        return -1;
    }
-   if (echttp_debug) printf ("New client %d\n", client);
+   if (echttp_debug) printf ("New client %d is reported\n", client);
 
-   echttp_request *context = &(echttp_context[client]);
+   echttp_request *context = echttp_context[client];
+   if (!context) {
+       context = echttp_context[client] = malloc (sizeof(echttp_request));
+       context->client = client;
+   }
    context->state = ECHTTP_STATE_IDLE;
+   context->mode = ECHTTP_RAW;
    context->transfer.fd = -1;
    context->transfer.size = 0;
    context->response = 0;
@@ -476,11 +491,11 @@ static int echttp_received (int client, char *data, int length) {
    char *endreq;
    char *enddata = data + length;
    int consumed = 0;
-   echttp_request *context = &(echttp_context[client]);
+   echttp_request *context = echttp_context[client];
 
    if (echttp_debug)
        printf ("Received HTTP %s (%d bytes)\n",
-               echttp_context[client].response?"response":"request", length);
+               echttp_context[client]->response?"response":"request", length);
    data[length] = 0;
 
    // If there was content left to receive, and we just received it all,
@@ -612,6 +627,17 @@ static int echttp_received (int client, char *data, int length) {
    return consumed;
 }
 
+static void echttp_terminate (int client, const char *reason) {
+    if (!echttp_context[client]) return;
+    switch (echttp_context[client]->mode) {
+        case ECHTTP_RAW:
+            break;
+        case ECHTTP_TLS:
+            echttp_tls_detach_client (client, reason);
+            break;
+    }
+}
+
 const char *echttp_help (int level) {
     static const char *httpHelp[] = {
         " [-http-service=NAME] [-http-debug]",
@@ -637,14 +663,18 @@ int echttp_open (int argc, const char **argv) {
 
    int i;
    int shift;
+   int ttl = 0;
    const char *value;
-
-   int port = -1;
+   const char *ttl_ascii;
 
    for (i = 1, shift = 1; i < argc; ++i) {
        if (shift != i) argv[shift] = argv[i];
        if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
            continue;
+       if (echttp_option_match ("-http-ttl=", argv[i], &ttl_ascii)) {
+           ttl = atoi(ttl_ascii);
+           continue;
+       }
        if (echttp_option_present ("-http-debug", argv[i])) {
            echttp_debug = 1;
            continue;
@@ -653,16 +683,16 @@ int echttp_open (int argc, const char **argv) {
    }
    echttp_routing.count = 0;
    echttp_routing.protect = 0;
-   if (! echttp_raw_open (echttp_service, echttp_debug)) return -1;
+   if (! echttp_raw_open (echttp_service, echttp_debug, ttl)) return -1;
    echttp_context_count = echttp_raw_capacity();
-   echttp_context = calloc (echttp_context_count, sizeof(echttp_request));
-   for (i = 0; i < echttp_context_count; ++i) echttp_context[i].client = i;
+   echttp_context = calloc (echttp_context_count, sizeof(echttp_request *));
    echttp_dynamic_flag = (strcmp(echttp_service, "dynamic") == 0);
+   echttp_tls_initialize (echttp_context_count);
    return shift;
 }
 
 void echttp_loop (void) {
-   echttp_raw_loop (echttp_newlink, echttp_received);
+   echttp_raw_loop (echttp_newclient, echttp_received, echttp_terminate);
    echttp_raw_close ();
 }
 
@@ -770,18 +800,47 @@ void echttp_background (echttp_listener *listener) {
     echttp_raw_background (listener);
 }
 
+static void echttp_listener_tls (int client, int mode) {
+
+    mode = echttp_tls_ready (client, mode);
+    if (mode < 0) {
+        echttp_raw_close_client(client, "TLS failure");
+        return;
+    }
+
+    if (mode & 1) {
+        char buffer[3000];
+        int length;
+        length = echttp_tls_receive (client, buffer, sizeof(buffer));
+        if (length > 0) {
+            echttp_received (client, buffer, length);
+        }
+        if (length == -2) mode |= 2;
+    }
+    echttp_raw_update (client, mode | 1);
+}
+
+static echttp_request *echttp_stacked = 0;
+
 const char *echttp_client (const char *method, const char *url) {
 
     int i, j;
+    int socket;
     int client;
     char host[64];
     char service[16];
     char buffer[256];
     int start;
     int end;
+    enum echttp_transport mode;
 
-    if (!strncmp (url, "http://", 7)) start = 7;
-    else return "unsupported";
+    if (!strncmp (url, "https://", 8)) {
+        mode = ECHTTP_TLS;
+        start = 8;
+    } else if (!strncmp (url, "http://", 7)) {
+        mode = ECHTTP_RAW;
+        start = 7;
+    } else return "unsupported";
 
     end = start + sizeof(host) - 1;
     for (i = start; i < end && url[i] && url[i] != ':' && url[i] != '/'; ++i) {
@@ -794,15 +853,46 @@ const char *echttp_client (const char *method, const char *url) {
             service[j] = url[i];
         }
         service[j] = 0;
+    } else if (mode == ECHTTP_TLS) {
+        service[1] = '4'; service[2] = '4'; service[3] = '3'; // Port 443.
+        service[4] = 0;
+        j = 0; // Mark that we use the default port.
     } else {
-        service[1] = '8'; service[2] = '0'; service[3] = 0; // Port 80.
+        service[1] = '8'; service[2] = '0'; // Port 80.
+        service[3] = 0;
         j = 0; // Mark that we use the default port.
     }
     if (echttp_debug) printf ("Connecting to %s%s\n", host, service);
-    client = echttp_raw_connect_client (host, service+1); // Skip the ':'
-    if (client < 0) return "connection failed";
-    echttp_newlink (client);
-    echttp_current = &(echttp_context[client]);
+    socket = echttp_raw_connect(host, service+1); // Skip the ':'
+    if (socket < 0) return "connection failed";
+
+    switch (mode) {
+        case ECHTTP_RAW:
+             client = echttp_raw_manage (socket);
+             break;
+        case ECHTTP_TLS:
+             client = echttp_raw_attach (socket, 3, echttp_listener_tls);
+             switch (echttp_tls_attach (client, socket, host)) {
+                 case -1:
+                     echttp_raw_close_client (client, "TLS failed");
+                     return "TLS failed";
+                 case 0:
+                 case 1:
+                     echttp_raw_update (socket, 1); // Read only.
+                     break;
+                 case 2:
+                     break;
+             }
+             break;
+        default:
+             return "invalid transport mode";
+    }
+    if (client < 0) return "no more client context";;
+
+    echttp_newclient (client);
+    echttp_stacked = echttp_current;
+    echttp_current = echttp_context[client];
+    echttp_current->mode = mode;
 
     snprintf (buffer, sizeof(buffer), "%s %s HTTP/1.1\r\n", method, url+i);
     echttp_send (client, buffer, strlen(buffer));
@@ -811,16 +901,6 @@ const char *echttp_client (const char *method, const char *url) {
     echttp_send (client, buffer, strlen(buffer));
 
     return 0;
-}
-
-void echttp_submit (const char *data, int length,
-                    echttp_response *response, void *origin) {
-
-    echttp_current->response = response;
-    echttp_current->origin = origin;
-
-    echttp_send_data (echttp_current->client, data, length);
-    echttp_current = 0;
 }
 
 int echttp_redirected (const char *method) {
@@ -843,5 +923,16 @@ int echttp_redirected (const char *method) {
         if (!error) return 0;
     }
     return 500;
+}
+
+void echttp_submit (const char *data, int length,
+                    echttp_response *response, void *origin) {
+
+    echttp_current->response = response;
+    echttp_current->origin = origin;
+
+    echttp_send_data (echttp_current->client, data, length);
+    echttp_current = echttp_stacked;
+    echttp_stacked = 0;
 }
 

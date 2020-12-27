@@ -2,6 +2,7 @@
 OBJS= echttp.o \
       echttp_static.o \
       echttp_cors.o \
+      echttp_tls.o \
       echttp_raw.o \
       echttp_catalog.o \
       echttp_option.o \
