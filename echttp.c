@@ -687,8 +687,8 @@ int echttp_open (int argc, const char **argv) {
    echttp_context_count = echttp_raw_capacity();
    echttp_context = calloc (echttp_context_count, sizeof(echttp_request *));
    echttp_dynamic_flag = (strcmp(echttp_service, "dynamic") == 0);
-   echttp_tls_initialize (echttp_context_count);
-   return shift;
+
+   return echttp_tls_initialize (echttp_context_count, shift, argv);
 }
 
 void echttp_loop (void) {

@@ -24,7 +24,7 @@
  * echttp_tls.h -- a TLS connection management layer.
  */
 
-void echttp_tls_initialize (int size);
+int  echttp_tls_initialize (int size, int argc, const char **argv);
 int  echttp_tls_attach (int client, int s, const char *host);
 
 int  echttp_tls_send (int client, const char *data, int length);
