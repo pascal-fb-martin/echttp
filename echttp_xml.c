@@ -26,6 +26,8 @@
  * but is a totally independent implementation, using recursive descent
  * instead of a state machine.
  *
+ * int echttp_xml_estimate (const char *xml);
+ *
  * const char *echttp_xml_parse (char *xml, ParserToken *token, int *count);
  *
  *    Decode a XML string and return a list of tokens. The decoding breaks
@@ -209,6 +211,10 @@ static const char *echttp_xml_tagname (ParserContext context, int index) {
     return 0;
 }
 
+static int echttp_xml_valid_attribute (char c) {
+    return isalnum(c) || c == '_' || c == ':' || c == '-';
+}
+
 static const char *echttp_xml_attributes (ParserContext context, int parent) {
     char *xml = context->xml;
     ParserToken *token = context->token;
@@ -234,7 +240,7 @@ static const char *echttp_xml_attributes (ParserContext context, int parent) {
         token[this_attribute].key = xml + context->cursor;
         do {
             context->cursor += 1;
-        } while (isalnum(xml[context->cursor]));
+        } while (echttp_xml_valid_attribute(xml[context->cursor]));
         if (xml[context->cursor] != '=') return "invalid attributes syntax";
         xml[context->cursor] = 0;
         context->cursor += 1;
@@ -311,6 +317,27 @@ static const char *echttp_xml_element (ParserContext context, int parent) {
     return echttp_xml_content (context, index);
 }
 
+int echttp_xml_estimate (const char *xml) {
+    int count = 1; // Implicit outer object.
+    // This method of counting does not escape the literal strings content,
+    // always assumes a token for attributes and accounts for 4 items per
+    // start/end tag pair instead of the max 3.
+    // This is not a problem because the goal is to estimate a sufficient
+    // space, not the smallest possible space.
+    for (;;) {
+        switch (*(xml++)) {
+            case '=': // Tell-all sign of an attribute.
+                count += 1;
+                break;
+            case '>':
+                count += 2; // total of 4 when content is present (start + end)
+                break;
+            case 0:
+                return count;
+        }
+    }
+}
+
 const char *echttp_xml_parse (char *xml, ParserToken *token, int *count) {
 
    const char *error;
@@ -327,6 +354,7 @@ const char *echttp_xml_parse (char *xml, ParserToken *token, int *count) {
    context.max = *count;
 
    echttp_xml_error_text[0] = 0;
+   *count = 0;
 
    token[0].key = 0;
 
@@ -364,6 +392,7 @@ const char *echttp_xml_parse (char *xml, ParserToken *token, int *count) {
           break;
        default:  return "probably not XML data";
    }
+   *count = context.count;
 
    if (! error) {
        if (next_word(&context) != 0) error = "data left at the end of input";
@@ -375,7 +404,6 @@ const char *echttp_xml_parse (char *xml, ParserToken *token, int *count) {
                  error, context.line_count, context.cursor-context.line_start);
        return echttp_xml_error_text;
    }
-   *count = context.count;
    return 0;
 }
 

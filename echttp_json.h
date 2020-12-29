@@ -10,6 +10,7 @@
 
 void echttp_json_enable_debug (void);
 
+int echttp_json_estimate (const char *json);
 const char *echttp_json_parse (char *json, ParserToken *token, int *count);
 
 int echttp_json_search (const ParserToken *parent, const char *path);

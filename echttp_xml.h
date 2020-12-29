@@ -10,5 +10,6 @@
 
 void echttp_xml_enable_debug (void);
 
+int echttp_xml_estimate (const char *xml);
 const char *echttp_xml_parse (char *xml, ParserToken *token, int *count);
 

@@ -26,6 +26,8 @@
  * but is a totally independent implementation, using recursive descent
  * instead of a state machine.
  *
+ * int echttp_json_estimate (const char *json);
+ *
  * const char *echttp_json_parse (char *json, ParserToken *token, int *count);
  *
  *    Decode a JSON string and return a list of tokens. The decoding breaks
@@ -423,6 +425,27 @@ static const char *echttp_json_object (ParserContext context) {
     return "object processing error";
 }
 
+int echttp_json_estimate (const char *json) {
+    // This method of counting does not escape the literal strings content
+    // and does not account for a ',' after an object or array: it might
+    // overestimates the number of tokens needed. This is OK because
+    // we are looking for enough space, not for the smallest space.
+    int count = 0;
+    for (;;) {
+        switch (*(json++)) {
+            case ']':
+            case '}':
+                count += 2; // the item before, plus the object/array.
+                break;
+            case ',':
+                count += 1;
+                break;
+            case 0:
+                return count;
+        }
+    }
+}
+
 void echttp_json_enable_debug (void) {
     echttp_json_debug = 1;
 }
@@ -443,6 +466,7 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
    context.max = *count;
 
    echttp_json_error_text[0] = 0;
+   *count = 0;
 
    token[0].key = 0;
 

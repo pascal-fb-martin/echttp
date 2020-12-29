@@ -41,8 +41,6 @@ static char *inbuffer = 0;
 static char *outbuffer = 0;
 static int outbuffer_size = 0;
 
-#define PRINT_MAX 20480
-
 
 static void print_tokens (ParserToken *token, int count) {
     int i;
@@ -90,11 +88,14 @@ int main (int argc, const char **argv) {
     int size;
     int count;
     int show_tokens = 0;
-    int xml_input = 0;
-    int consume_xml = 0;
+    int force_xml = 0; // default is JSON.
+    int xml_input;
     int pretty = PRINT_OPTION_PRETTY;
+    int silent = 0;
     const char *error;
-    ParserToken token[PRINT_MAX];
+    ParserToken *token = 0;
+    int max = 0;
+    int estimated;
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {
@@ -107,14 +108,18 @@ int main (int argc, const char **argv) {
             continue;
         }
         if (strcmp (argv[i], "-x") == 0) {
-            consume_xml = 1;
+            force_xml = 1; // Force XML no matter what.
             continue;
         }
         if (strcmp (argv[i], "-r") == 0) {
             pretty = 0;
             continue;
         }
-        xml_input = consume_xml;
+        if (strcmp (argv[i], "-s") == 0) {
+            silent = 1;
+            continue;
+        }
+        xml_input = force_xml;
         if (strstr(argv[i], ".xml")) xml_input = 1;
 
         inbuffer = echttp_parser_load (argv[i]);
@@ -128,26 +133,44 @@ int main (int argc, const char **argv) {
             outbuffer = (char *) realloc (outbuffer, outbuffer_size);
         }
 
-        count = PRINT_MAX;
-        if (consume_xml)
+        if (xml_input) {
+            int estimated = echttp_xml_estimate (inbuffer);
+            printf ("// File %s: estimated %d XML tokens\n", argv[i], estimated);
+            if (estimated > max) {
+                token = realloc (token, estimated * sizeof(*token));
+                max = estimated;
+            }
+            count = max;
             error = echttp_xml_parse (inbuffer, token, &count);
-        else
+        } else {
+            int estimated = echttp_json_estimate (inbuffer);
+            printf ("// File %s: estimated %d JSON tokens\n", argv[i], estimated);
+            if (estimated > max) {
+                token = realloc (token, estimated * sizeof(*token));
+                max = estimated;
+            }
+            count = max;
             error = echttp_json_parse (inbuffer, token, &count);
+        }
         if (error) {
-            fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
+            fprintf (stderr,
+                     "%s: error after %d tokens, %s\n", argv[i], count, error);
             continue;
         }
         if (show_tokens) print_tokens (token, count);
         printf ("// File %s (%d characters, %d tokens)\n",
                 argv[i], size, count);
 
-        error = echttp_json_format (token, count, outbuffer, outbuffer_size, pretty);
-        if (error) {
-            fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
-            continue;
+        if (!silent) {
+            error = echttp_json_format
+                        (token, count, outbuffer, outbuffer_size, pretty);
+            if (error) {
+                fprintf (stderr, "Cannot format: %s: %s\n", argv[i], error);
+                continue;
+            }
+            printf ("%s", outbuffer);
+            echttp_parser_free (inbuffer);
         }
-        printf ("%s", outbuffer);
-        echttp_parser_free (inbuffer);
     }
 }
 

@@ -313,13 +313,19 @@ The echttp library provides functions to handle JSON and XML data: a small JSON 
 These parsers support UTF-8 only.
 
 ```
+int echttp_json_estimate (const char *json);
 const char *echttp_json_parse (char *json, ParserToken *token, int *count);
 ```
-Parses the provided JSON string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser. The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
+Parses the provided JSON string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser (even on error). The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
+
+The token array must be large enough to hold all the tokens found, or else an error is returned. The `echttp_json_estimate()` function calculates an estimated size for the token array that should be sufficient. if the same token array is used multiple times, it is recommended to allocate an initial size large enough for most common cases and rely on the estimate only to protect against larger data sets. This avoids trashing the heap with frequent re-allocations.
 ```
+int echttp_xml_estimate ((const char *xml);
 const char *echttp_xml_parse (char *xml, ParserToken *token, int *count);
 ```
-Parses the provided XML string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser. The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
+Parses the provided XML string and populate the array of token. The content of the string is modified during the parsing. The variable pointed by count must contain the size of the token array before the call, and is set to the actual number of JSON items found by the parser (even on error). The parser return a null pointer on success, or an error message on failure. The error message container is a static buffer and it thus overwritten on the next call.
+
+The `echttp_xml_estimate()` function is the XML equivalent of the `echttp_json_estimate()` function.
 
 The ParserToken type is defined as follows:
 ```
