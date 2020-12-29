@@ -452,6 +452,7 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
        case '[': error = echttp_json_array(&context); break;
        default:  error = echttp_json_value (&context);
    }
+   *count = context.count + 1;
 
    if (! error) {
        if (next_word(&context) != 0) error = "data left at the end of input";
@@ -463,7 +464,6 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
                  error, context.line_count, context.cursor-context.line_start);
        return echttp_json_error_text;
    }
-   *count = context.count + 1;
    return 0;
 }
 
