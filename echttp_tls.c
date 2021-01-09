@@ -79,7 +79,7 @@ static int echttp_tls_clients_size = 0;
 
 static SSL_CTX *echttp_tls_context = 0;
 
-static const char *echttp_tls_certificates = "/etc/ssl/certs";
+static const char *echttp_tls_certificates = 0;
 static int echttp_tls_debug = 0;
 
 static void echttp_tls_start (void) {
@@ -95,10 +95,20 @@ static void echttp_tls_start (void) {
         return;
     }
     SSL_CTX_set_verify(echttp_tls_context, SSL_VERIFY_PEER, 0);
-    if (!SSL_CTX_load_verify_locations
-            (echttp_tls_context, 0, echttp_tls_certificates)) {
-        if (echttp_tls_debug) printf ("Failed to load certificates\n");
-        return;
+    if (echttp_tls_certificates) {
+        if (!SSL_CTX_load_verify_locations
+                (echttp_tls_context, 0, echttp_tls_certificates)) {
+            if (echttp_tls_debug)
+                printf ("Failed to load certificates from %s\n",
+                        echttp_tls_certificates);
+            return;
+        }
+    } else {
+        if (!SSL_CTX_set_default_verify_dir (echttp_tls_context)) {
+            if (echttp_tls_debug)
+                printf ("Failed to load certificates from default location\n");
+            return;
+        }
     }
     if (echttp_tls_debug) printf ("TLS module started\n");
 }
