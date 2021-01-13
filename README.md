@@ -147,6 +147,10 @@ void echttp_redirect (const char *url);
 ```
 The HTTP response will return a redirect to the specified URL.
 ```
+const char *echttp_reason (void);
+```
+This function returns the error message stored last for the current request (see echttp_error()). This is mostly intended to help the application log HTTP errors.
+```
 void echttp_transfer (int fd, int size);
 ```
 Declare a file descriptor to transfer after the returned response. This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred from the file to the client. This transfer only happens after the HTTP preamble and the response string returned by the callback have been sent.

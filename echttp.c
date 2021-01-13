@@ -77,6 +77,12 @@
  * Send an error response instead of OK.
  * 
  * 
+ * const char *echttp_reason (void);
+ *
+ * Return the current reason message for the current request. This function
+ * simply repeats the last message string that was set through echttp_error().
+ *
+ *
  * void echttp_redirect (const char *url);
  * 
  * Send a temporary redirect response instead of OK.
@@ -331,7 +337,7 @@ static void echttp_execute (int route, int client,
     if (echttp_routing.protect) {
         echttp_routing.protect (action, uri);
     }
-    if (context->status != 200) {
+    if (context->status == 200) {
         if (echttp_routing.item[route].protect) {
             echttp_routing.item[route].protect (action, uri);
         }
@@ -760,6 +766,10 @@ void echttp_transfer (int fd, int size) {
 void echttp_error (int code, const char *message) {
     echttp_current->status = code;
     echttp_current->reason = message;
+}
+
+const char *echttp_reason (void) {
+    return echttp_current->reason;
 }
 
 void echttp_redirect (const char *url) {

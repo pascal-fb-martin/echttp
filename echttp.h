@@ -48,6 +48,8 @@ void echttp_error         (int code, const char *message);
 void echttp_redirect      (const char *url);
 void echttp_permanent_redirect (const char *url);
 
+const char *echttp_reason (void);
+
 void echttp_content_type_set  (const char *value);
 void echttp_content_type_html (void);
 void echttp_content_type_json (void);
