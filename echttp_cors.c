@@ -30,7 +30,17 @@
  *
  *    Define which method or methods are allowed in a CORS case.
  *    This function should be called multiple times if more than
- *    one method is allowed. The method string must be static.
+ *    one method is allowed.
+ *
+ * void echttp_cors_trust_origin (const char *name);
+ *
+ *    Defines one origin URL that is always trusted in a CORS case.
+ *    This function should be called multiple times if more than
+ *    one URL is allowed.
+ *
+ *    There can be two main reasons for trusting an URL:
+ *    - The host name in this URL is trusted server, or
+ *    - The host name is an alias of this same host.
  *
  * int echttp_cors_protect (const char *method, const char *uri);
  *
@@ -54,73 +64,106 @@
 #include "echttp.h"
 #include "echttp_cors.h"
 
-#define MAX_METHOD 64
-static const char *echttp_allowed[MAX_METHOD];
-static int         echttp_allowed_count = 0;
-static char        echttp_all_allowed[1024] = {0};
+#define MAX_ALLOWED 64
+typedef struct {
+    int         count;
+    const char *items[MAX_ALLOWED];
+} echttp_allowed;
 
-static const char *echttp_local = 0;
+static echttp_allowed echttp_allowed_methods = {0};
+static echttp_allowed echttp_allowed_url = {0};
 
-void echttp_cors_allow_method (const char *method) {
+static char  echttp_all_allowed_methods[1024] = {0};
 
-    if (echttp_allowed_count >= MAX_METHOD) return;
 
-    if (!echttp_local) {
+static void echttp_cors_initialize (void) {
+
+    if (echttp_allowed_url.count == 0) {
+        // Always allow this local host..
         char hostname[256];
         char buffer[256];
         gethostname (hostname, sizeof(hostname));
         snprintf (buffer, sizeof(buffer),
                   "http://%s:%d", hostname, echttp_port(4));
-        echttp_local = strdup(buffer);
-        if (echttp_isdebug()) printf ("Local server is %s\n", echttp_local);
-    }
-    if (echttp_isdebug()) printf ("Allowing method %s\n", method);
-
-    echttp_allowed[echttp_allowed_count++] = method;
-    if (echttp_all_allowed[0]) {
-        int length = strlen(echttp_all_allowed);
-        snprintf (echttp_all_allowed+length, sizeof(echttp_all_allowed)-length,
-                  ", %s", method);
-    } else {
-        snprintf (echttp_all_allowed, sizeof(echttp_all_allowed), "%s", method);
+        if (echttp_isdebug()) printf ("Local server is %s\n", buffer);
+        echttp_allowed_url.items[0] = strdup(buffer);
+        snprintf (buffer, sizeof(buffer), "http://%s", hostname);
+        echttp_allowed_url.items[1] = strdup(buffer);
+        echttp_allowed_url.count = 2;
     }
 }
 
-static int echttp_cors_reject (const char *method) {
+static void echttp_cors_allow (const char *item,
+                               echttp_allowed *allowed, const char *label) {
+
+    echttp_cors_initialize ();
+
+    if (allowed->count >= MAX_ALLOWED) return;
+
+    if (echttp_isdebug()) printf ("Allowing %s %s\n", label, item);
+    allowed->items[allowed->count++] = strdup(item);
+}
+
+void echttp_cors_allow_method (const char *method) {
+
+    int length = strlen(echttp_all_allowed_methods);
+    const char *format = (length > 0) ? ", %s" : "%s";
+
+    echttp_cors_allow (method, &echttp_allowed_methods, "method");
+
+    snprintf (echttp_all_allowed_methods+length,
+              sizeof(echttp_all_allowed_methods)-length,
+              format, method);
+}
+
+void echttp_cors_trust_origin (const char *url) {
+
+    echttp_cors_allow (url, &echttp_allowed_url, "URL");
+}
+
+static int echttp_cors_allowed (const char *item,
+                                const echttp_allowed *allowed) {
     int i;
 
-    if (!method) return 1;
-    for (i = 0; i < echttp_allowed_count; ++i) {
-        if (!strcmp(method, echttp_allowed[i])) return 0;
+    if (!item) return 0;
+    for (i = 0; i < allowed->count; ++i) {
+        if (!strcmp(item, allowed->items[i])) return 1;
     }
-    return 1;
+    return 0;
 }
 
 int echttp_cors_protect (const char *method, const char *uri) {
 
+    echttp_cors_initialize();
+
     const char *origin = echttp_attribute_get ("Origin");
     if (!origin) return 0; // Not a cross-domain request.
 
-    if (!strcmp (origin, echttp_local)) return 0; // Same origin..
+    if (! echttp_cors_allowed (origin, &echttp_allowed_url)) {
 
-    if (!strcmp (method, "OPTIONS")) { // Preflight request.
+        // If this is not one of these trusted origins, let check
+        // if the method is one allowed to others.
+        //
+        if (!strcmp (method, "OPTIONS")) { // Preflight request.
 
-        method = echttp_attribute_get ("Access-Control-Request-Method");
-        if (echttp_cors_reject (method)) {
+            method = echttp_attribute_get ("Access-Control-Request-Method");
+            if (!echttp_cors_allowed (method, &echttp_allowed_methods)) {
+                echttp_error (403, "Forbidden Cross-Domain");
+                return 1;
+            }
+            echttp_attribute_set ("Access-Control-Allow-Origin", "*");
+            echttp_attribute_set ("Access-Control-Allow-Methods",
+                                  echttp_all_allowed_methods);
+            echttp_error (204, "No Content"); // Not an error but stop here.
+            return 1;
+        }
+
+        if (!echttp_cors_allowed (method, &echttp_allowed_methods)) {
             echttp_error (403, "Forbidden Cross-Domain");
             return 1;
         }
-        echttp_attribute_set ("Access-Control-Allow-Origin", "*");
-        echttp_attribute_set ("Access-Control-Allow-Methods",
-                              echttp_all_allowed);
-        echttp_error (204, "No Content"); // Not an error but stop here.
-        return 1;
     }
 
-    if (echttp_cors_reject (method)) {
-        echttp_error (403, "Forbidden Cross-Domain");
-        return 1;
-    }
     echttp_attribute_set ("Access-Control-Allow-Origin", "*");
     return 0; // Keep going.
 }

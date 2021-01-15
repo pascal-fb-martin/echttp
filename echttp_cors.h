@@ -22,6 +22,7 @@
  * A minimal implementation of the CORS mechanism
  */
 void echttp_cors_allow_method (const char *method);
+void echttp_cors_trust_origin (const char *name);
 
 int  echttp_cors_protect (const char *method, const char *uri);
 

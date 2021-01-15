@@ -226,7 +226,12 @@ This extension provides a minimal implementation of CORS:
 ```
 void echttp_cors_allow_method (const char *method);
 ```
-This function defines which method or methods are allowed in a CORS request. It can be called multiple times if more than one method is allowed. The method string must be static.
+This function defines which method or methods are allowed in a CORS request. A method is allowed for any origin URL. This function can be called multiple times if more than one method is allowed.
+
+```
+void echttp_cors_trust_origin (const char *url);
+```
+This function defines an URL that is trusted, i.e. any cross access is allowed, regardless of the method. This does not create any restriction on origins for the allowed methods. This function can be called multiple times if more than one origin is trusted. The local host is implicitely trusted.
 
 ```
 int echttp_cors_protect (const char *method, const char *uri);
