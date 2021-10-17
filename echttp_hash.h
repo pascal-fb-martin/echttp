@@ -26,7 +26,7 @@ typedef struct {
     echttp_symbol item[ECHTTP_MAX_SYMBOL];
 } echttp_hash;
 
-typedef void echttp_hash_action (int i, const char *name);
+typedef int echttp_hash_action (int i, const char *name);
 
 unsigned int echttp_hash_signature (const char *name);
 
@@ -38,8 +38,8 @@ int echttp_hash_add (echttp_hash *d, const char *name);
 
 int echttp_hash_insert (echttp_hash *d, const char *name);
 
-void echttp_hash_iterate (echttp_hash *d,
-                          const char *name, echttp_hash_action *action);
+int echttp_hash_iterate (echttp_hash *d,
+                         const char *name, echttp_hash_action *action);
 
 // Compatibility API, to be phased out.
 //

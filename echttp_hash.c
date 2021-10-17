@@ -70,12 +70,15 @@
  *    Return 0 if the hash table is full, the new item's index otherwise.
  *    (This is used for non-unique indexes only.)
  *
- * void echttp_hash_iterate (echttp_hash *d,
- *                           const char *name, echttp_hash_action *action);
+ * int echttp_hash_iterate (echttp_hash *d,
+ *                          const char *name, echttp_hash_action *action);
  *
  *    Scan the items in the hash index and call action for each matching
  *    items. If name is null, action is called for all items in the hash
  *    index. The action must not be null (what would be the point?).
+ *    If the action returns 0, the iteration continue until no more item
+ *    is found; otherwise the iteration stops and returns the last
+ *    processed index.
  *
  * void echttp_hash_insert (echttp_hash *d, const char *name);
  *
@@ -195,19 +198,20 @@ int echttp_hash_add (echttp_hash *d, const char *name) {
     return index;
 }
 
-void echttp_hash_iterate (echttp_hash *d,
-                          const char *name, echttp_hash_action *action) {
+int echttp_hash_iterate (echttp_hash *d,
+                         const char *name, echttp_hash_action *action) {
     int i;
     if (!name) {
         for (i = 1; i < d->count; ++i) {
-            action (i, d->item[i].name);
+            if (action (i, d->item[i].name)) return i;
         }
     } else {
         for (i = echttp_hash_find (d, name);
              i > 0; i = echttp_hash_next(d, i, name)) {
-            action (i, name);
+            if (action (i, name)) return i;
         }
     }
+    return 0;
 }
 
 int echttp_hash_insert (echttp_hash *d, const char *name) {
