@@ -8,27 +8,11 @@
  */
 
 #include "time.h"
+#include "echttp_hash.h"
 
-typedef struct {
-    const char *name;
-    const char *value;
-    unsigned int signature;
-    time_t       timestamp;
-    int next;
-} echttp_symbol;
-
-#define ECHTTP_HASH 127
-#define ECHTTP_MAX_SYMBOL 256
-
-typedef struct {
-    int count;
-    int index[ECHTTP_HASH];
-    echttp_symbol item[ECHTTP_MAX_SYMBOL];
-} echttp_catalog;
+typedef echttp_hash echttp_catalog;
 
 unsigned int echttp_catalog_signature (const char *name);
-
-int echttp_catalog_find (echttp_catalog *d, const char *name);
 
 void echttp_catalog_reset (echttp_catalog *d);
 

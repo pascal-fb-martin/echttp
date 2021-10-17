@@ -170,6 +170,13 @@ int main (int argc, const char **argv) {
 
     echttp_listen (0, 1, http_console, 1);
 
+    printf ("Now that the test HTTP server is ready, you can try these\n"
+            "HTTP requests:\n"
+            "   /welcome\n"
+            "   /forbidden\n"
+            "   /echo/...\n"
+            "   /json/...\n"
+            "   /static/...\n");
     echttp_loop();
 }
 

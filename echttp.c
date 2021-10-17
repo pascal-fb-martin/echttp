@@ -385,7 +385,7 @@ static void echttp_invalid (int client) {
 static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
 
     int i = echttp_routing.count + 1;
-    unsigned int signature = echttp_catalog_signature (uri);
+    unsigned int signature = echttp_hash_signature (uri);
     int index = signature % ECHTTP_HASH;
 
     if (i >= ECHTTP_MAX_ROUTES) {
@@ -405,7 +405,7 @@ static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
 
 static int echttp_route_search (const char *uri, int mode) {
    int i;
-   unsigned int signature = echttp_catalog_signature (uri);
+   unsigned int signature = echttp_hash_signature (uri);
    int index = signature % ECHTTP_HASH;
 
    static char *toascii[] = {"(invalid)", "exact", "parent", "any"};
