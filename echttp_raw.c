@@ -56,6 +56,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -330,6 +331,8 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
    }
 
    if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
+
+   signal(SIGPIPE, SIG_IGN);
 
    echttp_raw_server = socket(PF_INET6, SOCK_STREAM, 0);
    if (echttp_raw_server < 0) {
