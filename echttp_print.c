@@ -68,7 +68,7 @@ static void print_tokens (ParserToken *token, int count) {
             case PARSER_NULL: value = "null"; break;
             case PARSER_BOOL: value = (token[i].value.bool)?"true":"false"; break;
             case PARSER_INTEGER:
-                snprintf (valueascii, sizeof(valueascii), "%d", token[i].value.integer);
+                snprintf (valueascii, sizeof(valueascii), "%ld", token[i].value.integer);
                 break;
             case PARSER_REAL:
                 snprintf (valueascii, sizeof(valueascii), "%e", token[i].value.real);

@@ -194,7 +194,7 @@ static int echttp_raw_io_new (char use, int fd) {
 static const char *echttp_printip (long ip) {
     static char ascii[16];
 
-    snprintf (ascii, sizeof(ascii), "%d.%d.%d.%d",
+    snprintf (ascii, sizeof(ascii), "%ld.%ld.%ld.%ld",
               (ip>>24) & 0xff, (ip>>16) & 0xff, (ip>>8) & 0xff, ip & 0xff);
     return ascii;
 }
@@ -422,7 +422,7 @@ static void echttp_raw_transmit (int i) {
       }
       if (echttp_raw_debug) {
           printf ("Transmit data at offset %d: %*.*s\n",
-                  buffer->start, 0-length, length, buffer->data + buffer->start);
+                  buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
       }
       if (echttp_raw_consume (buffer, length)) {
           if (echttp_raw_io[i].data->tcp.transfer.size <= 0) {

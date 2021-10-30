@@ -291,7 +291,7 @@ static void echttp_send_data (int client, const char *data, int length) {
         if (context->out.item[i].name == 0) continue;
         snprintf (buffer, sizeof(buffer)-1, "%s: %s\r\n",
                   context->out.item[i].name,
-                  context->out.item[i].value);
+                  (char *)(context->out.item[i].value));
         echttp_send (client, buffer, strlen(buffer));
     }
     echttp_send (client, eol, sizeof(eol)-1);

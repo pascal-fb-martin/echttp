@@ -92,7 +92,7 @@ void echttp_catalog_join (echttp_catalog *d,
 
     for (i = 1; i <= d->count; ++i) {
         snprintf (text+length, size-length, "%s%s=%s",
-                  length?sep:"", d->item[i].name, d->item[i].value);
+                  length?sep:"", d->item[i].name, (char *)(d->item[i].value));
         length += strlen(text+length);
     }
 }
