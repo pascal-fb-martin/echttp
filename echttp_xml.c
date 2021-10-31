@@ -196,6 +196,7 @@ static const char *echttp_xml_content (ParserContext context, int parent) {
     if (context->xml[context->cursor+keylen] != '>')
         return "invalid tag end syntax";
     context->cursor += keylen + 1;
+    return 0;
 }
 
 static const char *echttp_xml_tagname (ParserContext context, int index) {

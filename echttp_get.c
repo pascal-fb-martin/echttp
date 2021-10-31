@@ -141,7 +141,6 @@ int main (int argc, const char **argv) {
     int index = 0;
     int show_tokens = 0;
     int xml_input = 0;
-    char *buffer;
     const char *error;
     ParserToken token[PRINT_MAX];
 
@@ -163,7 +162,7 @@ int main (int argc, const char **argv) {
 
             if (strstr(argv[i], ".xml")) xml_input = 1;
 
-            buffer = echttp_parser_load (argv[i]);
+            char *buffer = echttp_parser_load (argv[i]);
 
             count = PRINT_MAX;
             if (xml_input)
@@ -172,9 +171,11 @@ int main (int argc, const char **argv) {
                 error = echttp_json_parse (buffer, token, &count);
             if (error) {
                 fprintf (stderr, "Cannot decode %s: %s\n", argv[i], error);
+                echttp_parser_free (buffer);
                 return -1;
             }
             if (show_tokens) print_tokens (token, count);
+            echttp_parser_free (buffer);
             continue;
         }
 
@@ -183,6 +184,5 @@ int main (int argc, const char **argv) {
         if (index >= 0) print_json (token, index, 1);
         else printf ("invalid path\n");
     }
-    echttp_parser_free (buffer);
 }
 
