@@ -296,8 +296,8 @@ The echttp client functions do not automatically follow redirection (HTTP status
 int echttp_redirected (const char *method);
 ```
 This function handles the common cases of redirections. If used, this must be called from the application's response callback, and it must be the first thing that the response callback do. How the response callback then behaves depends on the return code:
- * Non-zero: the response was not handled and the response must be processed as normal. The value returned is an updated HTTP status.
- * 0: the response was fully handled and the response callback must now (re)build the request data, call echttp_submit and then return without processing the response further.
+* Non-zero: the response was not handled and the response must be processed as normal. The value returned is an updated HTTP status.
+* 0: the response was fully handled and the response callback must now (re)build the request data, call echttp_submit and then return without processing the response further.
 
 The method parameter is the method used for the original request. Depending on the redirect code, either this method will be used or else the GET method will be forced.
 
