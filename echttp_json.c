@@ -280,8 +280,6 @@ static const char *echttp_json_string (ParserContext context) {
                                return "missing 2nd half of surrogate pair";
                            // UTF-32 coded as a surrogate pair.
                            int pair1 = ucode - 0xd800;
-                           if (pair1 < 0 || pair1 > 0x3ff)
-                               return "invalid UTF-16 surrogate pair";
                            h = hex2bin(from[7]);
                            l = hex2bin(from[8]);
                            if (h < 0 || l < 0) return "invalid unicode";
@@ -349,7 +347,6 @@ static const char *echttp_json_value (ParserContext context) {
 
 static const char *echttp_json_array (ParserContext context) {
 
-    const char *error = 0;
     int i = context->count;
     ParserToken *token = context->token;
     char *json = context->source;
@@ -359,7 +356,7 @@ static const char *echttp_json_array (ParserContext context) {
 
     JSONTRACE ("array");
     for (;;) {
-        error = add_token(context);
+        const char *error = add_token(context);
         if (error) return error;
 
         token[context->count].key = 0;
@@ -386,7 +383,6 @@ static const char *echttp_json_array (ParserContext context) {
 
 static const char *echttp_json_object (ParserContext context) {
 
-    const char *error = 0;
     int i = context->count;
     ParserToken *token = context->token;
     char *json = context->source;
@@ -407,7 +403,7 @@ static const char *echttp_json_object (ParserContext context) {
         default: return "invalid character, expected a string (key)";
         }
 
-        error = add_token(context);
+        const char *error = add_token(context);
         if (error) return error;
 
         error = echttp_json_string (context);

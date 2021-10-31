@@ -37,10 +37,6 @@
 #include "echttp_json.h"
 #include "echttp_xml.h"
 
-static char *inbuffer = 0;
-static char *outbuffer = 0;
-static int outbuffer_size = 0;
-
 
 static void print_tokens (ParserToken *token, int count) {
     int i;
@@ -81,10 +77,9 @@ static void print_tokens (ParserToken *token, int count) {
     }
 }
 
-int main (int argc, const char **argv) {
+void main (int argc, const char **argv) {
 
-    int i, j;
-    int fd;
+    int i;
     int size;
     int count;
     int show_tokens = 0;
@@ -96,6 +91,10 @@ int main (int argc, const char **argv) {
     ParserToken *token = 0;
     int max = 0;
     int estimated;
+
+    char *inbuffer = 0;
+    char *outbuffer = 0;
+    int outbuffer_size = 0;
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {
@@ -131,22 +130,25 @@ int main (int argc, const char **argv) {
         if (outbuffer_size < 30 * size) {
             outbuffer_size = 30 * size;
             outbuffer = (char *) realloc (outbuffer, outbuffer_size);
+            if (!outbuffer) goto outbuffer_allocation_error;
         }
 
         if (xml_input) {
-            int estimated = echttp_xml_estimate (inbuffer);
+            estimated = echttp_xml_estimate (inbuffer);
             printf ("// File %s: estimated %d XML tokens\n", argv[i], estimated);
             if (estimated > max) {
                 token = realloc (token, estimated * sizeof(*token));
+                if (!token) goto token_allocation_error;
                 max = estimated;
             }
             count = max;
             error = echttp_xml_parse (inbuffer, token, &count);
         } else {
-            int estimated = echttp_json_estimate (inbuffer);
+            estimated = echttp_json_estimate (inbuffer);
             printf ("// File %s: estimated %d JSON tokens\n", argv[i], estimated);
             if (estimated > max) {
                 token = realloc (token, estimated * sizeof(*token));
+                if (!token) goto token_allocation_error;
                 max = estimated;
             }
             count = max;
@@ -169,8 +171,20 @@ int main (int argc, const char **argv) {
                 continue;
             }
             printf ("%s", outbuffer);
-            echttp_parser_free (inbuffer);
         }
+        echttp_parser_free (inbuffer);
     }
+    // These are useless (we exit anyway), make static analysis happy.
+    if (token) free(token);
+    if (outbuffer) free(outbuffer);
+    exit(0);
+
+token_allocation_error:
+    fprintf (stderr, "Not enough memory for %d token\n", estimated);
+    exit(1);
+
+outbuffer_allocation_error:
+    fprintf (stderr, "Not enough memory for a %d bytes output buffer\n", outbuffer_size);
+    exit(2);
 }
 

@@ -144,7 +144,6 @@ static void http_console (int fd, int mode) {
 }
 
 int main (int argc, const char **argv) {
-    int i;
     argc = echttp_open (argc, argv);
     if (argc <= 0) exit(1);
 
@@ -153,6 +152,7 @@ int main (int argc, const char **argv) {
            printf("No remaining argument\n");
         else {
            printf("Remaining arguments:\n");
+           int i;
            for (i = 1; i < argc; ++i) {
                printf ("  %d: %s\n", i, argv[i]);
            }

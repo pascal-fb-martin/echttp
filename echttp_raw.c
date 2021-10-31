@@ -323,8 +323,8 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
            port = ntohs(entry->s_port);
        }
 
-       if (port <= 0) {
-           fprintf (stderr, "invalid service name %s\n", service);
+       if (port <= 0 || port >= 0x10000) {
+           fprintf (stderr, "invalid service name  or number %s\n", service);
            return 0;
        }
        echttp_raw_serverport = port;
@@ -455,25 +455,6 @@ static void echttp_raw_transmit (int i) {
    }
 }
 
-static int echttp_split (char *data, const char *sep, char **items, int max) {
-    int count = 0;
-    int length = strlen(sep);
-    char *start = data;
-
-    while (*data) {
-       if (strncmp(sep, data, length) == 0) {
-           *data = 0;
-           items[count++] = start;
-           data += length;
-           start = data;
-       } else {
-           data += 1;
-       }
-    }
-    if (data > start) items[count++] = start;
-    return count;
-}
-
 static void echttp_raw_receive (int i, echttp_raw_receiver received) {
 
    echttp_buffer *buffer = &(echttp_raw_io[i].data->tcp.in);
@@ -568,15 +549,14 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
    fd_set writeset;
    int i;
    int count;
-   int maxfd;
 
    echttp_raw_terminate = terminate;
 
    while (echttp_raw_server >= 0) {
+      int maxfd = echttp_raw_server;
       FD_ZERO(&readset);
       FD_ZERO(&writeset);
       FD_SET(echttp_raw_server, &readset);
-      maxfd = echttp_raw_server;
 
       for (i = 0; i <= echttp_raw_io_last; ++i) {
           int mode;
@@ -757,7 +737,6 @@ void echttp_raw_background (echttp_listener *listener) {
 
 int echttp_raw_connect (const char *host, const char *service) {
 
-    int value;
     int s = -1;
 
     static struct addrinfo hints;

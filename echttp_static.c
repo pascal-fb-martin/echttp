@@ -78,7 +78,7 @@ static const char *echttp_static_file (int page, const char *filename) {
     }
     struct stat fileinfo;
     if (fstat(page, &fileinfo) < 0) goto unsupported;
-    if (fileinfo.st_mode & S_IFMT != S_IFREG) goto unsupported;
+    if ((fileinfo.st_mode & S_IFMT) != S_IFREG) goto unsupported;
     if (fileinfo.st_size < 0) goto unsupported;
 
     if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
@@ -104,7 +104,6 @@ static const char *echttp_static_page (const char *action,
     const char *path;
     char rooturi[1024];
     char filename[1024];
-    char *sep;
 
     if (strstr(uri, "../")) {
         if (echttp_isdebug()) printf ("Security violation: %s\n", uri);
@@ -119,7 +118,7 @@ static const char *echttp_static_page (const char *action,
         if (echttp_isdebug()) printf ("Searching static map for %s\n", rooturi);
         path = echttp_catalog_get (&echttp_static_roots, rooturi);
         if (path) break;
-        sep = strrchr (rooturi+1, '/');
+        char *sep = strrchr (rooturi+1, '/');
         if (sep == 0) break;
         *sep = 0;
     }
@@ -151,7 +150,6 @@ static const char *echttp_static_root (const char *method, const char *uri,
         const char *path = echttp_static_roots.item[i].value;
         if (path == 0) continue;
         snprintf (filename, sizeof(filename), "%s/index.html", path);
-        filename[sizeof(filename)-1] = 0;
         if (echttp_isdebug())
             printf ("Trying static file %s\n", filename);
         page = open (filename, O_RDONLY);

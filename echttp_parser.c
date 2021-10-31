@@ -62,7 +62,6 @@ char *echttp_parser_load (const char *file) {
 
     struct stat filestat;
     int fd;
-    int i;
     char *buffer;
 
     fd = open (file, O_RDONLY);

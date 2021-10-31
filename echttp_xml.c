@@ -103,7 +103,6 @@ static const char *echttp_xml_string (ParserContext context, int parent) {
 
     char *from = context->xml + context->cursor;
     char *to = from;
-    int l, h;
     int quoted = (*from == '"');
     int string = context->count;
 
@@ -219,7 +218,6 @@ static const char *echttp_xml_attributes (ParserContext context, int parent) {
     char *xml = context->xml;
     ParserToken *token = context->token;
     int attributes = context->count;
-    char *name;
 
     XMLTRACE ("attributes");
     const char *error = add_token (context, PARSER_OBJECT);

@@ -315,7 +315,6 @@ static void echttp_execute (int route, int client,
                            const char *action, const char *uri,
                            const char *data, int length) {
 
-    int i;
     char buffer[256];
     echttp_request *context = echttp_context[client];
 
@@ -467,8 +466,6 @@ static void echttp_respond (int client, char *data, int length) {
 
 static int echttp_newclient (int client) {
 
-   int i;
-
    if (client >= echttp_context_count) {
        fprintf (stderr, "Invalid client context\n");
        return -1;
@@ -541,6 +538,7 @@ static int echttp_received (int client, char *data, int length) {
                return 0; // Connection was closed, nothing more to do.
            }
            context->status = atoi(strchr(line[0], ' '));
+           if (context->status < 100 || context->status >= 600) context->status = 500;
        } else {
            // Expect a request line.
            if (echttp_debug) printf("HTTP request: %s\n", line[0]);
@@ -612,6 +610,7 @@ static int echttp_received (int client, char *data, int length) {
        context->content = endreq;
        if (field) {
           context->contentlength = atoi(field);
+          if (context->contentlength < 0) context->contentlength = 0;
           if (context->contentlength > (int)(enddata - endreq)) {
               if (echttp_debug) printf("HTTP: waiting for end of content.\n");
               context->state = ECHTTP_STATE_CONTENT;
@@ -670,7 +669,6 @@ int echttp_open (int argc, const char **argv) {
    int i;
    int shift;
    int ttl = 0;
-   const char *value;
    const char *ttl_ascii;
 
    for (i = 1, shift = 1; i < argc; ++i) {
@@ -679,6 +677,7 @@ int echttp_open (int argc, const char **argv) {
            continue;
        if (echttp_option_match ("-http-ttl=", argv[i], &ttl_ascii)) {
            ttl = atoi(ttl_ascii);
+           if (ttl < 0) ttl = 0;
            continue;
        }
        if (echttp_option_present ("-http-debug", argv[i])) {
