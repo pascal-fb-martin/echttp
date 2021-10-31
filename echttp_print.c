@@ -130,7 +130,10 @@ void main (int argc, const char **argv) {
         if (outbuffer_size < 30 * size) {
             outbuffer_size = 30 * size;
             outbuffer = (char *) realloc (outbuffer, outbuffer_size);
-            if (!outbuffer) goto outbuffer_allocation_error;
+            if (!outbuffer) {
+                fprintf (stderr, "Not enough memory for a %d bytes output buffer\n", outbuffer_size);
+                exit(2);
+            }
         }
 
         if (xml_input) {
@@ -138,7 +141,10 @@ void main (int argc, const char **argv) {
             printf ("// File %s: estimated %d XML tokens\n", argv[i], estimated);
             if (estimated > max) {
                 token = realloc (token, estimated * sizeof(*token));
-                if (!token) goto token_allocation_error;
+                if (!token) {
+                    fprintf (stderr, "Not enough memory for %d token\n", estimated);
+                    exit(1);
+                }
                 max = estimated;
             }
             count = max;
@@ -148,7 +154,10 @@ void main (int argc, const char **argv) {
             printf ("// File %s: estimated %d JSON tokens\n", argv[i], estimated);
             if (estimated > max) {
                 token = realloc (token, estimated * sizeof(*token));
-                if (!token) goto token_allocation_error;
+                if (!token) {
+                    fprintf (stderr, "Not enough memory for %d token\n", estimated);
+                    exit(1);
+                }
                 max = estimated;
             }
             count = max;
@@ -179,12 +188,5 @@ void main (int argc, const char **argv) {
     if (outbuffer) free(outbuffer);
     exit(0);
 
-token_allocation_error:
-    fprintf (stderr, "Not enough memory for %d token\n", estimated);
-    exit(1);
-
-outbuffer_allocation_error:
-    fprintf (stderr, "Not enough memory for a %d bytes output buffer\n", outbuffer_size);
-    exit(2);
 }
 
