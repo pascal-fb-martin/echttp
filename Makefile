@@ -22,7 +22,7 @@ PUBLIC_INCLUDE=echttp.h \
 
 all: libechttp.a echttp_print echttp_get
 
-install:
+dev:
 	mkdir -p /usr/local/lib
 	cp libechttp.a /usr/local/lib
 	chown root:root /usr/local/lib/libechttp.a
@@ -34,6 +34,8 @@ install:
 	cp echttp_print echttp_get /usr/local/bin
 	chown root:root /usr/local/bin/echttp_*
 	chmod 755 /usr/local/bin/echttp_*
+
+install: dev
 
 clean:
 	rm -f *.o *.a echttp_print echttp_get
