@@ -614,6 +614,7 @@ static int echttp_received (int client, char *data, int length) {
           if (context->contentlength > (int)(enddata - endreq)) {
               if (echttp_debug) printf("HTTP: waiting for end of content.\n");
               context->state = ECHTTP_STATE_CONTENT;
+              consumed += ((int) (endreq - data));
               return consumed; // Wait for more.
           }
        }
