@@ -315,6 +315,11 @@ static void response (void *origin, int status, char *data, int length) {
 }
 ```
 
+```
+void echttp_escape (const char *s, char *d, int size);
+```
+This support function encodes the s string according to the HTTP character encoding rules and stores the result to the d location. The result is no larger than size characters, including the null terminator.
+
 ## JSON and XML Support
 
 The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include echttp_json.h or echttp_xml.h (depending on the format used).

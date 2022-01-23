@@ -69,6 +69,8 @@ void echttp_loop (void);
 
 // Web client functions:
 
+void echttp_escape (const char *s, char *d, int size);
+
 typedef void echttp_response (void *origin, int status, char *data, int length);
 
 const char *echttp_client (const char *method, const char *url);

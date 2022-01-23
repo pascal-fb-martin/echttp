@@ -429,6 +429,12 @@ static int echttp_hextoi (char a) {
     return tolower(a) - 'a' + 10;
 }
 
+static char echttp_itohex (unsigned int a) {
+    if (a > 15) return 'F';
+    if (a < 10) return '0' + a;
+    return 'A' + a;
+}
+
 static char *echttp_unescape (char *data) {
     char *f = data;
     char *t = data;
@@ -446,6 +452,48 @@ static char *echttp_unescape (char *data) {
     *t = 0; // Force a terminator.
     return data;
 }
+
+static char echttp_escape_table[128]; // Encoding for punctuation.
+
+static void echttp_escape_init (void) {
+    echttp_escape_table['%'] = 1; // Used as the "initialized" flag.
+    echttp_escape_table['+'] = 1;
+    echttp_escape_table[','] = 1;
+    echttp_escape_table['/'] = 1;
+    echttp_escape_table[':'] = 1;
+    echttp_escape_table[';'] = 1;
+    echttp_escape_table['<'] = 1;
+    echttp_escape_table['='] = 1;
+    echttp_escape_table['>'] = 1;
+    echttp_escape_table['?'] = 1;
+    echttp_escape_table['@'] = 1;
+    echttp_escape_table['['] = 1;
+    echttp_escape_table['\\'] = 1;
+    echttp_escape_table[']'] = 1;
+    echttp_escape_table['^'] = 1;
+    echttp_escape_table['`'] = 1;
+}
+
+void echttp_escape (const char *s, char *d, int size) {
+    int i = 0;
+    if (!echttp_escape_table['%']) echttp_escape_init();
+
+    size -= 1; // Reserve space for the null terminator.
+    while (i < size) {
+        int c = *(s++) & 0xff;
+        if (c <= 41 || c >= 123 || echttp_escape_table[c]) {
+            if (c <= 0) break;
+            if (i >= size - 3) break;
+            d[i++] = '%';
+            d[i++] = echttp_itohex (c >> 4);
+            d[i++] = echttp_itohex (c & 0x0f);
+        } else {                           // Compatible character.
+            d[i++] = (char)c;
+        }
+    }
+    d[i] = 0;
+}
+
 
 static void echttp_respond (int client, char *data, int length) {
 
