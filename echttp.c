@@ -180,6 +180,7 @@
 #include "echttp_raw.h"
 #include "echttp_tls.h"
 #include "echttp_catalog.h"
+#include "echttp_encoding.h"
 
 static const char *echttp_service = "http";
 static int         echttp_debug = 0;
@@ -424,76 +425,6 @@ static int echttp_route_search (const char *uri, int mode) {
    return -1;
 }
 
-static int echttp_hextoi (char a) {
-    if (isdigit(a)) return a - '0';
-    return tolower(a) - 'a' + 10;
-}
-
-static char echttp_itohex (unsigned int a) {
-    if (a > 15) return 'F';
-    if (a < 10) return '0' + a;
-    return 'A' + a;
-}
-
-static char *echttp_unescape (char *data) {
-    char *f = data;
-    char *t = data;
-    while (*f) {
-        if (*f == '%') {
-            if ((!isxdigit(f[1])) || (!isxdigit(f[2]))) return 0;
-            *t = 16 * echttp_hextoi(f[1]) + echttp_hextoi(f[2]);
-            f += 2;
-        } else if (t != f) {
-            *t = *f;
-        }
-        t += 1;
-        f += 1;
-    }
-    *t = 0; // Force a terminator.
-    return data;
-}
-
-static char echttp_escape_table[128]; // Encoding for punctuation.
-
-static void echttp_escape_init (void) {
-    echttp_escape_table['%'] = 1; // Used as the "initialized" flag.
-    echttp_escape_table['+'] = 1;
-    echttp_escape_table[','] = 1;
-    echttp_escape_table['/'] = 1;
-    echttp_escape_table[':'] = 1;
-    echttp_escape_table[';'] = 1;
-    echttp_escape_table['<'] = 1;
-    echttp_escape_table['='] = 1;
-    echttp_escape_table['>'] = 1;
-    echttp_escape_table['?'] = 1;
-    echttp_escape_table['@'] = 1;
-    echttp_escape_table['['] = 1;
-    echttp_escape_table['\\'] = 1;
-    echttp_escape_table[']'] = 1;
-    echttp_escape_table['^'] = 1;
-    echttp_escape_table['`'] = 1;
-}
-
-void echttp_escape (const char *s, char *d, int size) {
-    int i = 0;
-    if (!echttp_escape_table['%']) echttp_escape_init();
-
-    size -= 1; // Reserve space for the null terminator.
-    while (i < size) {
-        int c = *(s++) & 0xff;
-        if (c <= 41 || c >= 123 || echttp_escape_table[c]) {
-            if (c <= 0) break;
-            if (i >= size - 3) break;
-            d[i++] = '%';
-            d[i++] = echttp_itohex (c >> 4);
-            d[i++] = echttp_itohex (c & 0x0f);
-        } else {                           // Compatible character.
-            d[i++] = (char)c;
-        }
-    }
-    d[i] = 0;
-}
-
 
 static void echttp_respond (int client, char *data, int length) {
 
@@ -599,8 +530,8 @@ static int echttp_received (int client, char *data, int length) {
                return length; // Consume everything, since we are closing.
            }
            wordcount = echttp_split (request[1], "?", uri, 4);
-           context->method = echttp_unescape(request[0]);
-           context->uri = echttp_unescape(uri[0]);
+           context->method = echttp_encoding_unescape(request[0]);
+           context->uri = echttp_encoding_unescape(uri[0]);
 
            if (context->method == 0 || context->uri == 0) {
                echttp_invalid (client);
@@ -614,8 +545,8 @@ static int echttp_received (int client, char *data, int length) {
                for (i = 0; i < wordcount; ++i) {
                    char *param[4];
                    if (echttp_split (arg[i], "=", param, 4) >= 2) {
-                       char *name = echttp_unescape (param[0]);
-                       char *value = echttp_unescape (param[1]);
+                       char *name = echttp_encoding_unescape (param[0]);
+                       char *value = echttp_encoding_unescape (param[1]);
                        if (!name || !value) {
                            echttp_invalid (client);
                            return length; // Consume everything, invalid.

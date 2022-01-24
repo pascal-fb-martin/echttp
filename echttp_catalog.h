@@ -27,3 +27,7 @@ const char *echttp_catalog_get (echttp_catalog *d, const char *name);
 void echttp_catalog_join (echttp_catalog *d,
                           const char *sep, char *text, int size);
 
+typedef int echttp_catalog_action (const char *name, const char *value);
+
+void echttp_catalog_enumerate (echttp_catalog *d,
+                               echttp_catalog_action *action);

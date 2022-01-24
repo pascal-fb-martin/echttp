@@ -496,7 +496,26 @@ void echttp_catalog_join (echttp_catalog *d,
 ```
 This function dumps all its content in the HTTP parameter format.
 ```
+typedef int echttp_catalog_action (const char *name, const char *value);
+void echttp_catalog_enumerate (echttp_catalog *d,
+                               echttp_catalog_action *action);
+```
+Call the specified action for each item present in the catalog.
+
+```
 unsigned int echttp_catalog_signature (const char *name);
 ```
 This function computes a signature from the provided name. A signature is the hash value before applying the hash array modulo. This function can be reused when implementing a hash table module with different properties. This function is derived from the well known hash function by Daniel J. Bernstein.
+
+## HTTP Character encoding
+
+The echttp library comes with a module for encoding and decoding strings per the HTTP encoding rules:
+```
+char *echttp_encoding_escape (const char *s, char *d, int size);
+```
+This function encodes the s string per the HTTP encoding rules and store the result to d. The result is never longer than the specified size. A pointer to the result is returned, so that this function can be used in a parameter list.
+```
+char *echttp_encoding_unescape (char *data);
+```
+This function decodes the escape sequences as per the HTTP encoding rules. The decoding happens in-place and the original (encoded) data is lost. A pointer to the result is returned, so that this function can be used in a parameter list.
 

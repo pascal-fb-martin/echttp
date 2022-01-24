@@ -6,12 +6,14 @@ OBJS= echttp.o \
       echttp_raw.o \
       echttp_hash.o \
       echttp_catalog.o \
+      echttp_encoding.o \
       echttp_option.o \
       echttp_json.o \
       echttp_xml.o \
       echttp_parser.o
 
 PUBLIC_INCLUDE=echttp.h \
+              echttp_encoding.h \
               echttp_catalog.h \
               echttp_hash.h \
               echttp_static.h \
