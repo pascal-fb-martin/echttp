@@ -173,7 +173,7 @@ int echttp_hash_find (echttp_hash *d, const char *name) {
 }
 
 int echttp_hash_next (echttp_hash *d, int from, const char *name) {
-    if (from <= 0) return 0;
+    if (from <= 0 || from >= ECHTTP_MAX_SYMBOL) return 0;
     return echttp_hash_forage (d, d->item[from].next,
                                name, d->item[from].signature);
 }

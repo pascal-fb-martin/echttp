@@ -550,7 +550,7 @@ static void echttp_json_gen_real (ParserContext context, int i) {
 
 static char *echttp_json_gen_utf16 (ParserContext context, int value, char *to) {
 
-    static char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    static const char tohex [16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
     *to++ = '\\';
     *to++ = 'u';
@@ -758,7 +758,7 @@ static int search_array_element (const ParserToken *token,
         }
         if (token[i].length > 0) {
             count += token[i].length;
-            if (depth >= JSON_MAX_DEPTH) return -1;
+            if (depth >= JSON_MAX_DEPTH-1) return -1;
             stack[++depth] = token[i].length + 1;
         }
     }
@@ -813,7 +813,7 @@ static int search_object_element (const ParserToken *parent, const char *path) {
         }
         if (parent[i].length > 0) {
             count += parent[i].length;
-            if (depth >= JSON_MAX_DEPTH) return -1;
+            if (depth >= JSON_MAX_DEPTH-1) return -1;
             stack[++depth] = parent[i].length + 1;
         }
     }
@@ -869,7 +869,7 @@ const char *echttp_json_enumerate (const ParserToken *parent, int *index) {
 
         if (parent[i].length > 0) {
             count += parent[i].length;
-            if (depth >= JSON_MAX_DEPTH) return "data structure too deep";
+            if (depth >= JSON_MAX_DEPTH-1) return "data structure too deep";
             stack[++depth] = parent[i].length + 1;
         }
     }

@@ -523,15 +523,15 @@ static int echttp_received (int client, char *data, int length) {
            if (echttp_debug) printf("HTTP request: %s\n", line[0]);
 
            char *request[4];
-           char *uri[4];
+           char *rawuri[4];
            int wordcount = echttp_split (line[0], " ", request, 4);
            if (wordcount != 3) {
                echttp_invalid (client);
                return length; // Consume everything, since we are closing.
            }
-           wordcount = echttp_split (request[1], "?", uri, 4);
+           wordcount = echttp_split (request[1], "?", rawuri, 4);
            context->method = echttp_encoding_unescape(request[0]);
-           context->uri = echttp_encoding_unescape(uri[0]);
+           context->uri = echttp_encoding_unescape(rawuri[0]);
 
            if (context->method == 0 || context->uri == 0) {
                echttp_invalid (client);
@@ -541,7 +541,7 @@ static int echttp_received (int client, char *data, int length) {
            echttp_catalog_reset(&(context->params));
            if (wordcount == 2) {
                char *arg[32];
-               wordcount = echttp_split (uri[1], "&", arg, 32);
+               wordcount = echttp_split (rawuri[1], "&", arg, 32);
                for (i = 0; i < wordcount; ++i) {
                    char *param[4];
                    if (echttp_split (arg[i], "=", param, 4) >= 2) {
