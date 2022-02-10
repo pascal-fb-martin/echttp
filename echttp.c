@@ -765,7 +765,7 @@ void echttp_redirect (const char *url) {
 }
 
 void echttp_permanent_redirect (const char *url) {
-    echttp_error (301, "Redirected permanently");
+    echttp_error (308, "Redirected permanently");
     echttp_attribute_set ("Location", url);
 }
 
