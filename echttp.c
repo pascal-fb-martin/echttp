@@ -894,10 +894,10 @@ int echttp_redirected (const char *method) {
 
     switch (echttp_current->status) {
         case 301:
+        case 302:
         case 307:
         case 308: break; // Use requested method.
 
-        case 302:
         case 303: method = "GET"; break;
 
         default: return echttp_current->status;
