@@ -71,25 +71,28 @@ typedef struct {
 } echttp_allowed;
 
 static echttp_allowed echttp_allowed_methods = {0};
-static echttp_allowed echttp_allowed_url = {0};
+static echttp_allowed echttp_allowed_origin = {0};
 
 static char  echttp_all_allowed_methods[1024] = {0};
 
 
 static void echttp_cors_initialize (void) {
 
-    if (echttp_allowed_url.count == 0) {
-        // Always allow this local host..
+    if (echttp_allowed_origin.count == 0) {
+        // Always allow this local host, either under its name or 'localhost'..
         char hostname[256];
         char buffer[256];
         gethostname (hostname, sizeof(hostname));
         snprintf (buffer, sizeof(buffer),
                   "http://%s:%d", hostname, echttp_port(4));
         if (echttp_isdebug()) printf ("Local server is %s\n", buffer);
-        echttp_allowed_url.items[0] = strdup(buffer);
+        echttp_allowed_origin.items[0] = strdup(buffer);
         snprintf (buffer, sizeof(buffer), "http://%s", hostname);
-        echttp_allowed_url.items[1] = strdup(buffer);
-        echttp_allowed_url.count = 2;
+        echttp_allowed_origin.items[1] = strdup(buffer);
+        snprintf (buffer, sizeof(buffer),
+                  "http://localhost:%d", echttp_port(4));
+        echttp_allowed_origin.items[2] = strdup(buffer);
+        echttp_allowed_origin.count = 3;
     }
 }
 
@@ -118,7 +121,7 @@ void echttp_cors_allow_method (const char *method) {
 
 void echttp_cors_trust_origin (const char *url) {
 
-    echttp_cors_allow (url, &echttp_allowed_url, "URL");
+    echttp_cors_allow (url, &echttp_allowed_origin, "URL");
 }
 
 static int echttp_cors_allowed (const char *item,
@@ -139,7 +142,7 @@ int echttp_cors_protect (const char *method, const char *uri) {
     const char *origin = echttp_attribute_get ("Origin");
     if (!origin) return 0; // Not a cross-domain request.
 
-    if (! echttp_cors_allowed (origin, &echttp_allowed_url)) {
+    if (! echttp_cors_allowed (origin, &echttp_allowed_origin)) {
 
         // If this is not one of these trusted origins, let check
         // if the method is one allowed to others.
