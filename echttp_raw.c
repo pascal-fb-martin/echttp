@@ -461,6 +461,7 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
 
    ssize_t length = sizeof(buffer->data) - buffer->end - 1;
    if (length <= 0) {
+       if (received) received (i, 0, -1);
        echttp_raw_close_client (i, "data too large");
        return;
    }
@@ -469,6 +470,7 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
    if (length <= 0) {
        if (echttp_raw_debug)
            printf ("Client %d recv() error on socket %d\n", i, echttp_raw_io[i].fd);
+       if (received) received (i, 0, -1);
        echttp_raw_close_client (i, strerror(errno));
        return;
    }

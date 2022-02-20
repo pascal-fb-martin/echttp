@@ -440,7 +440,6 @@ static void echttp_respond (int client, char *data, int length) {
    context->response = 0;
    context->origin = 0;
    echttp_catalog_reset(&(context->in));
-   echttp_raw_close_client(context->client, "end of response");
 }
 
 static int echttp_newclient (int client) {
@@ -475,6 +474,18 @@ static int echttp_received (int client, char *data, int length) {
    int consumed = 0;
    echttp_request *context = echttp_context[client];
 
+   if (length < 0) {
+       // This reports a TCP connection error.
+       if (echttp_debug)
+           printf ("End of connection while waiting for %s\n",
+                   context->response?"response":"request");
+       if (context->response) {
+           context->status = 505;
+           echttp_respond (client, 0, 0);
+       }
+       return 0; // The connection will be closed by echttp_raw.
+   }
+
    if (echttp_debug)
        printf ("Received HTTP %s (%d bytes)\n",
                echttp_context[client]->response?"response":"request", length);
@@ -487,6 +498,7 @@ static int echttp_received (int client, char *data, int length) {
        if (context->contentlength > length) return 0; // Wait for more.
        if (context->response) {
            echttp_respond (client, data, context->contentlength);
+           echttp_raw_close_client(context->client, "end of response");
            return 0; // Connection was closed, nothing more to do.
        }
        echttp_execute (context->route, client,
@@ -514,6 +526,7 @@ static int echttp_received (int client, char *data, int length) {
            if (strncmp (line[0], "HTTP/1.", 7)) {
                context->status = 505;
                echttp_respond (client, 0, 0);
+               echttp_raw_close_client(context->client, "protocol error");
                return 0; // Connection was closed, nothing more to do.
            }
            context->status = atoi(strchr(line[0], ' '));
@@ -611,6 +624,7 @@ static int echttp_received (int client, char *data, int length) {
 
        if (context->response) {
            echttp_respond (client, context->content, context->contentlength);
+           echttp_raw_close_client(context->client, "end of response");
            return 0; // Nothing more to do with this connection.
        }
        echttp_execute (context->route, client,
@@ -801,6 +815,11 @@ static void echttp_listener_tls (int client, int mode) {
 
     mode = echttp_tls_ready (client, mode, echttp_received);
     if (mode < 0) {
+        echttp_request *context = echttp_context[client];
+        if (context->response) {
+            context->status = 505;
+            echttp_respond (client, 0, 0);
+        }
         echttp_raw_close_client(client, "TLS failure");
         return;
     }
@@ -861,6 +880,8 @@ const char *echttp_client (const char *method, const char *url) {
              client = echttp_raw_attach (socket, 3, echttp_listener_tls);
              switch (echttp_tls_attach (client, socket, host)) {
                  case -1:
+                     // No need to call the response callback, because
+                     // the query was not yet submitted.
                      echttp_raw_close_client (client, "TLS failed");
                      return "TLS failed";
                  case 0:

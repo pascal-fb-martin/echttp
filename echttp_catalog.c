@@ -55,7 +55,8 @@
  * void echttp_catalog_enumerate (echttp_catalog *d,
  *                                echttp_catalog_action *action);
  *
- *    Call action for each item of the catalog.
+ *    Call action for each item of the catalog. Stop at the end of the catalog
+ *    Or when the action returns true.
  */
 
 #include <stdlib.h>
@@ -113,7 +114,8 @@ void echttp_catalog_enumerate (echttp_catalog *d,
     int i;
 
     for (i = 1; i <= d->count; ++i) {
-        action (d->item[i].name, (const char *)(d->item[i].value));
+        int done = action (d->item[i].name, (const char *)(d->item[i].value));
+        if (done) return;
     }
 }
 
