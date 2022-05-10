@@ -340,6 +340,9 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
                 service, strerror(errno));
        return 0;
    }
+   int option = 1;
+   setsockopt(echttp_raw_server,
+              SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
    memset(&netaddress6, 0, sizeof(netaddress6));
    netaddress6.sin6_family = AF_INET6;
