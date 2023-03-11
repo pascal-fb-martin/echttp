@@ -158,24 +158,6 @@ static const char *echttp_static_page (const char *action,
     return echttp_static_file (open (filename, O_RDONLY), filename);
 }
 
-static const char *echttp_static_root (const char *method, const char *uri,
-                                  const char *data, int length) {
-    char filename[1024];
-    int page = 0;
-    int i;
-
-    for (i = 1; i <= echttp_static_roots.count; ++i) {
-        const char *path = echttp_static_roots.item[i].value;
-        if (path == 0) continue;
-        snprintf (filename, sizeof(filename), "%s/index.html", path);
-        if (echttp_isdebug())
-            printf ("Trying static file %s\n", filename);
-        page = open (filename, O_RDONLY);
-        if (page >= 0) break;
-    }
-    return echttp_static_file (page, filename);
-}
-
 static void echttp_static_initialize (void) {
 
     static int Initialized = 0;
@@ -187,7 +169,6 @@ static void echttp_static_initialize (void) {
                                 echttp_static_default_types[i].extension,
                                 echttp_static_default_types[i].content);
         }
-        echttp_route_uri ("/", echttp_static_root);
         Initialized = 1;
     }
 }
