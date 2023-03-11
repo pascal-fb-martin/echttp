@@ -374,12 +374,15 @@ static void echttp_unknown (int client) {
     echttp_send (client, unknown, sizeof(unknown)-1);
 }
 
-static void echttp_invalid (int client) {
-    static const char invalid[] =
-        "HTTP/1.1 406 Not Acceptable\r\n"
+static void echttp_invalid (int client, const char *text) {
+    static const char invalidformat[] =
+        "HTTP/1.1 406 Invalid %s\r\n"
         "Content-Length: 0\r\n"
         "Connection: Closed\r\n\r\n";
-    echttp_send (client, invalid, sizeof(invalid)-1);
+    char invalid[1024];
+    int length = snprintf (invalid, sizeof(invalid), invalidformat, text);
+    if (length >= sizeof(invalid)) length = sizeof(invalid) - 1;
+    echttp_send (client, invalid, length);
 }
 
 static int echttp_route_add (const char *uri, echttp_callback *call, int mode) {
@@ -539,15 +542,19 @@ static int echttp_received (int client, char *data, int length) {
            char *rawuri[4];
            int wordcount = echttp_split (line[0], " ", request, 4);
            if (wordcount != 3) {
-               echttp_invalid (client);
+               echttp_invalid (client, "HTTP Request Line");
                return length; // Consume everything, since we are closing.
            }
            wordcount = echttp_split (request[1], "?", rawuri, 4);
            context->method = echttp_encoding_unescape(request[0]);
            context->uri = echttp_encoding_unescape(rawuri[0]);
 
-           if (context->method == 0 || context->uri == 0) {
-               echttp_invalid (client);
+           if (context->method == 0) {
+               echttp_invalid (client, "HTTP Method");
+               return length; // Consume everything, since we are closing.
+           }
+           if (context->uri == 0) {
+               echttp_invalid (client, "HTTP URI");
                return length; // Consume everything, since we are closing.
            }
 
@@ -561,7 +568,7 @@ static int echttp_received (int client, char *data, int length) {
                        char *name = echttp_encoding_unescape (param[0]);
                        char *value = echttp_encoding_unescape (param[1]);
                        if (!name || !value) {
-                           echttp_invalid (client);
+                           echttp_invalid (client, "HTTP Parameter Syntax");
                            return length; // Consume everything, invalid.
                        }
                        echttp_catalog_set (&(context->params), name, value);

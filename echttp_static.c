@@ -94,7 +94,8 @@ static const char *echttp_static_file (int page, const char *filename) {
     return "";
 
     unsupported:
-        echttp_error (406, "Not Acceptable");
+        if (echttp_isdebug()) printf ("File type violation: %s\n", filename);
+        echttp_error (406, "File Not Acceptable");
         return "";
 }
 
@@ -107,7 +108,7 @@ static const char *echttp_static_page (const char *action,
 
     if (strstr(uri, "../")) {
         if (echttp_isdebug()) printf ("Security violation: %s\n", uri);
-        echttp_error (406, "Not Acceptable");
+        echttp_error (406, "Path Not Acceptable");
         return "";
     }
 
