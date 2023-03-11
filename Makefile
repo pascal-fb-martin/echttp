@@ -54,15 +54,15 @@ uninstall:
 purge: uninstall
 
 %.o: %.c
-	gcc -c -g -Os -fPIC -o $@ $<
+	gcc -c -Os -fPIC -o $@ $<
 
 libechttp.a: $(OBJS)
 	ar r $@ $^
 	ranlib $@
 
 echttp_print: echttp_print.o libechttp.a
-	gcc -g -O -fPIC -o $@ echttp_print.o libechttp.a
+	gcc -Os -fPIC -o $@ echttp_print.o libechttp.a
 
 echttp_get: echttp_get.o libechttp.a
-	gcc -g -O -fPIC -o $@ echttp_get.o libechttp.a
+	gcc -Os -fPIC -o $@ echttp_get.o libechttp.a
 
