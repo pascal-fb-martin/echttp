@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "echttp.h"
 #include "echttp_static.h"
@@ -72,13 +73,29 @@ static struct {
 
 static const char *echttp_static_file (int page, const char *filename) {
 
+    char index[1024];
+
     if (page < 0) {
         echttp_error (404, "Not found");
         return "";
     }
     struct stat fileinfo;
     if (fstat(page, &fileinfo) < 0) goto unsupported;
-    if ((fileinfo.st_mode & S_IFMT) != S_IFREG) goto unsupported;
+
+    switch (fileinfo.st_mode & S_IFMT) {
+    case S_IFDIR: // Use "index.html" as the default page name.
+        close(page);
+        snprintf (index, sizeof(index), "%s/index.html", filename);
+        if (echttp_isdebug()) printf ("Directory, defaulting to %s\n", index);
+        filename = index;
+        page = open (filename, O_RDONLY);
+        if (page < 0) goto unsupported; // Not 404: the directory exists.
+        if (fstat(page, &fileinfo) < 0) goto unsupported;
+        if ((fileinfo.st_mode & S_IFMT) != S_IFREG) goto unsupported;
+        break;
+    case S_IFREG: break; // Normal case.
+    default: goto unsupported;
+    }
     if (fileinfo.st_size < 0) goto unsupported;
 
     if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
