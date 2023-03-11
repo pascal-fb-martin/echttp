@@ -54,7 +54,7 @@ uninstall:
 purge: uninstall
 
 %.o: %.c
-	gcc -c -g -O -fPIC -o $@ $<
+	gcc -c -g -Os -fPIC -o $@ $<
 
 libechttp.a: $(OBJS)
 	ar r $@ $^
