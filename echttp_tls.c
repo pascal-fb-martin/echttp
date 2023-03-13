@@ -24,15 +24,40 @@
  * echttp_tls.c -- a TLS connection management layer.
  *
  * int  echttp_tls_initialize (int size, int argc, const char **argv);
+ *
+ *    Create the context needed to handle clients. The list of arguments
+ *    must reflect the application command line arguments, from which
+ *    this module consumes the following arguments:
+ *    -tls-debug        Enable TLS debug traces.
+ *    -tls-certs=PATH   Define the certificate directory to use.
+ *    If this later option is not provided, the OpenSSL default is used.
+ *
  * int  echttp_tls_attach (int client, int s, const char *host);
  *
+ *    Attach a new TCP socket to echttp_tls. This module will handle all
+ *    data exchanges (encrypted).
+ *
  * int  echttp_tls_send (int client, const char *data, int length);
+ *
+ *    Send data through TLS. This provides unencrypted data that the TLS
+ *    layer will encrypt and send through the TCP socket.
+ *
  * int  echttp_tls_transfer (int client, int fd, int offset);
+ *
+ *    Transfer the content of a file through TLS. The file is unencrypted.
  *
  * typedef int  echttp_tls_receiver (int client, char *data, int length);
  * int echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver);
  *
+ *    TLS data exchanges. If mode's bit 0 is set, incoming data is ready
+ *    to be received. If mode's bit 1 is set, the socket is ready to send
+ *    data. Both bits may be set, i.e. mode can get values 1, 2 or 3.
+ *
+ *    The receiver function is to be called when decrypted data is available.
+ *
  * void echttp_tls_detach_client (int client, const char *reason);
+ *
+ *    A client socket is going to be closed and the context can be cleaned up.
  */
 
 #include <errno.h>

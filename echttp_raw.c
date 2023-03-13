@@ -58,6 +58,11 @@
  *    sockets and any additional application file descriptor declared
  *    using echttp_raw_manage, echttp_raw_attach and echttp_raw_register.
  *
+ *    The acceptor function is called when a new client was accepted. The
+ *    received function is called with the data that was received (only if
+ *    this module handle data exchange--i.e. HTPP remote and local clients).
+ *    The terminate function is called before a client socket is closed.
+ *
  * int echttp_raw_connect (const char *host, const char *service);
  *
  *    Create a new socket, connected to the specified server.
