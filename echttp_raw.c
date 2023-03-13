@@ -25,28 +25,89 @@
  *
  * int echttp_raw_open (const char *service, int debug, int ttl);
  *
+ *    Open the HTTP service socket, using the port defined by the service
+ *    string (one need to remember that most echttp applciations do not
+ *    use port 80). The ttl parameter defines how long echttp waits before
+ *    killing an idle client connection.
+ *
  * int echttp_raw_capacity (void);
+ *
+ *    Return the maximum number of concurrent clients supported.
+ *    That number is typically the limit configured in the OS, but
+ *    it might not be this way forever..
+ *
  * int echttp_raw_server_port (int ip);
+ *
+ *    Return the current HTTP port being used. This might be a port
+ *    number allocated by the OS within the dynamic range if the
+ *    application specified the port number as 0.
+ *
+ *    The ip parameter is meant to represent the IP version (4 or 6).
+ *    The profile of this function is likely to change in the future.
  *
  * int echttp_raw_send (int client, const char *data, int length);
  *
- * typedef int echttp_raw_receiver (int client, char *data, int length);
+ *    Send raw data to the specified client. Note: this is used only for
+ *    un-encrypted connections. See echttp_tls_send for encrypted connections.
+ *
  * void echttp_raw_loop (echttp_raw_acceptor *acceptor,
  *                       echttp_raw_receiver *received,
  *                       echttp_raw_terminator *terminate);
  *
+ *    This is the main event loop. It handles the server sockets, client
+ *    sockets and any additional application file descriptor declared
+ *    using echttp_raw_manage, echttp_raw_attach and echttp_raw_register.
+ *
  * int echttp_raw_connect (const char *host, const char *service);
  *
+ *    Create a new socket, connected to the specified server.
+ *    This function does not cause echttp_raw to manage the connection:
+ *    see echttp_raw_manage, echttp_raw_register and echttp_raw_update.
+ *
  * int echttp_raw_manage   (int fd);
+ *
+ *    Declare a new HTTP local client. This is used when the application is
+ *    the HTTP client, and not for remote clients connected to this server.
+ *    The echttp_raw module will control this socket, i.e. handle data
+ *    exchanges and decide when to close it, like for remote clients.
+ *
  * int echttp_raw_attach   (int fd, int mode, echttp_listener *listener);
+ *
+ *    Attach a new TCP socket to echttp_raw. Data exchanges for this type of
+ *    socket is handled by an external module. This is typically used for TLS
+ *    connections. The echttp_raw module will still control when to close
+ *    the socket.
+ *
  * int echttp_raw_register (int fd, int mode,
  *                          echttp_listener *listener, int premium);
+ *
+ *    Attach a new file descriptor to echttp_raw. This is not necessarily
+ *    a TCP socket, and echttp_raw will never close it. The data is handled
+ *    by an external module. This is used for application I/O.
+ *
+ *    The premium parameter is a boolean that indicates if the file
+ *    descriptor must be processed before all sockets, or else if it
+ *    can be pocessed after.
+ *
  * int echttp_raw_update   (int client, int mode);
  *
+ *    Change the listening mode for the specified socket or file descriptor.
+ *    The mode parameter can be either 1 (read only), 2 (write only) or
+ *    3 (read and write). This defines what echttp_raw will listen for.
+ *
  * void echttp_raw_close_client (int i, const char *reason);
+ *
+ *    Close a client socket, either a local or remote client.
+ *
  * void echttp_raw_forget (int fd);
  *
+ *    Remove a file descriptor from the pool that echttp_raw listens to.
+ *    The application module must close the file descriptor on its own.
+ *
  * void echttp_raw_close (void);
+ *
+ *    Close the complete HTTP service. This also closes all local and remote
+ *    client sockets.
  */
 
 #include <errno.h>
