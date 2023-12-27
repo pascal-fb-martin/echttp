@@ -78,10 +78,10 @@
  *
  * int echttp_raw_attach   (int fd, int mode, echttp_listener *listener);
  *
- *    Attach a new TCP socket to echttp_raw. Data exchanges for this type of
- *    socket is handled by an external module. This is typically used for TLS
- *    connections. The echttp_raw module will still control when to close
- *    the socket.
+ *    Attach a new TCP local client socket to echttp_raw. Data exchanges for
+ *    this type of socket is handled by an external module. This is typically
+ *    used for TLS client connections. The echttp_raw module will still control
+ *    when to close the socket.
  *
  * int echttp_raw_register (int fd, int mode,
  *                          echttp_listener *listener, int premium);

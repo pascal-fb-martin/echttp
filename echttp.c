@@ -138,6 +138,10 @@
  *
  * Web client functions:
  *
+ * void echttp_escape (const char *s, char *d, int size);
+ *
+ *    Encode an HTTP parameter value.
+ *
  * const char *echttp_client (const char *method, const char *url);
  *
  *    Establish a new web client context. Return a null pointer on success
@@ -834,6 +838,10 @@ static void echttp_listener_tls (int client, int mode) {
 }
 
 static echttp_request *echttp_stacked = 0;
+
+void echttp_escape (const char *s, char *d, int size) {
+    echttp_encoding_escape (s, d, size);
+}
 
 const char *echttp_client (const char *method, const char *url) {
 
