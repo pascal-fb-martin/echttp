@@ -14,7 +14,7 @@ typedef struct {
     int type;
     union {
         int bool;
-        long integer;
+        long long integer;
         double real;
         char *string;
     } value;

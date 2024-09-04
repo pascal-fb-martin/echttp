@@ -208,7 +208,7 @@ static const char *echttp_json_number (ParserContext context) {
     } else {
         context->token[context->count].type = PARSER_INTEGER;
         context->token[context->count].value.integer =
-            strtol(context->source + context->cursor, &json, 0);
+            atoll(context->source + context->cursor);
     }
     context->token[context->count].length = 0;
     context->cursor = (int) (json - context->source) - 1;
