@@ -549,7 +549,7 @@ Then items can be added or removed individually:
 void echttp_sorted_add (echttp_sorted_list b,
                         unsigned long long key, void *data);
 void echttp_sorted_remove (echttp_sorted_list b,
-                        unsigned long long key, void *data);
+                           unsigned long long key, void *data);
 ```
 
 A list can then be iterated at any time, either in ascending or descending
