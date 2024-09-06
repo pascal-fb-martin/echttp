@@ -25,7 +25,7 @@
 struct echttp_sorted_bucket;
 typedef struct echttp_sorted_bucket *echttp_sorted_list;
 
-typedef void echttp_sorted_action (void *data);
+typedef int echttp_sorted_action (void *data);
 
 echttp_sorted_list echttp_sorted_new (void);
 
@@ -34,9 +34,13 @@ void echttp_sorted_add (echttp_sorted_list b,
 void echttp_sorted_remove (echttp_sorted_list b,
                            unsigned long long key, void *data);
 
-void echttp_sorted_descending (echttp_sorted_list b,
-                               echttp_sorted_action *action);
-void echttp_sorted_ascending (echttp_sorted_list b,
+int echttp_sorted_descending (echttp_sorted_list b,
                               echttp_sorted_action *action);
+int echttp_sorted_ascending (echttp_sorted_list b,
+                             echttp_sorted_action *action);
+
+int echttp_sorted_ascending_from (echttp_sorted_list b,
+                                  unsigned long long key,
+                                  echttp_sorted_action *action);
 
 void echttp_sorted_audit (echttp_sorted_list b, int *buckets, int *items);

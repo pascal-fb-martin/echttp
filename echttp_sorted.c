@@ -54,16 +54,37 @@
  *                            unsigned long long key, void *data);
  *
  *    Remove the specified item from the list, keeping the list sorted.
+ *    Return 1 when the end of the list was reached, 0 when the walk was
+ *    stopped before the end.
  *
- * void echttp_sorted_descending (echttp_sorted_list b,
- *                                echttp_sorted_action *action);
- *
- *    An iterator that walks the sorted list in descending order.
- *
- * void echttp_sorted_ascending (echttp_sorted_list b,
+ * int echttp_sorted_descending (echttp_sorted_list b,
  *                               echttp_sorted_action *action);
  *
+ *    An iterator that walks the sorted list in descending order.
+ *    The walk stops at the end of the list, or else when action returns 0.
+ *    Return 1 when the end of the list was reached, 0 when the walk was
+ *    stopped before the end.
+ *
+ * int echttp_sorted_ascending (echttp_sorted_list b,
+ *                              echttp_sorted_action *action);
+ *
  *    An iterator that walks the sorted list in ascending order.
+ *    The walk stops at the end of the list, or else when action returns 0.
+ *    Return 1 when the end of the list was reached, 0 when the walk was
+ *    stopped before the end.
+ *
+ * int echttp_sorted_ascending_from (echttp_sorted_list b,
+ *                                   unsigned long long key,
+ *                                   echttp_sorted_action *action);
+ *
+ *    An iterator that walks the sorted list in ascending order, starting
+ *    with the provided key value. This means that action will only be called
+ *    for items associated with keys greater or equal than the provided value.
+ *    The goal is to save the overhead thatcomes with walking the whole list
+ *    everytime there is a request for newer items.
+ *    The walk stops at the end of the list, or else when action returns 0.
+ *    Return 1 when the end of the list was reached, 0 when the walk was
+ *    stopped before the end.
  *
  * void echttp_sorted_audit (echttp_sorted_list b, int *buckets, int *items);
  *
@@ -229,52 +250,87 @@ void echttp_sorted_remove (echttp_sorted_list b, unsigned long long key, void *d
     }
 }
 
-static void echttp_sorted_descend_leaf (struct echttp_sorted_leaf *l,
-                                        echttp_sorted_action *action) {
+static int echttp_sorted_descend_leaf (struct echttp_sorted_leaf *l,
+                                       echttp_sorted_action *action) {
     struct echttp_sorted_leaf *cursor;
     for (cursor = l->next; cursor; cursor = cursor->prev) {
-        action(cursor->data);
+        if (!action(cursor->data)) return 0;
     }
+    return 1;
 }
 
-void echttp_sorted_descending (echttp_sorted_list b,
-                               echttp_sorted_action *action) {
-    if (!b) return;
+int echttp_sorted_descending (echttp_sorted_list b,
+                              echttp_sorted_action *action) {
+    if (!b) return 1;
     int i;
     if (b->depth == 7) {
         for (i = 255; i >= 0; --i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
-            if (leaf) echttp_sorted_descend_leaf(leaf, action);
+            if (leaf) {
+                if (!echttp_sorted_descend_leaf(leaf, action)) return 0;
+            }
         }
     } else {
         for (i = 255; i >= 0; --i) {
-            echttp_sorted_descending (b->index[i].sub, action);
+            if (!echttp_sorted_descending (b->index[i].sub, action)) return 0;
         }
     }
+    return 1;
 }
 
-static void echttp_sorted_ascend_leaf (struct echttp_sorted_leaf *l,
-                                          echttp_sorted_action *action) {
+static int echttp_sorted_ascend_leaf (struct echttp_sorted_leaf *l,
+                                      echttp_sorted_action *action) {
     struct echttp_sorted_leaf *cursor;
     for (cursor = l->prev; cursor; cursor = cursor->next) {
-        action(cursor->data);
+        if (!action(cursor->data)) return 0;;
     }
+    return 1;
 }
 
-void echttp_sorted_ascending (echttp_sorted_list b,
-                              echttp_sorted_action *action) {
-    if (!b) return;
+int echttp_sorted_ascending (echttp_sorted_list b,
+                             echttp_sorted_action *action) {
+    if (!b) return 1;
     int i;
     if (b->depth == 7) {
         for (i = 0; i < 256; ++i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
-            if (leaf) echttp_sorted_ascend_leaf(leaf, action);
+            if (leaf) {
+                if (!echttp_sorted_ascend_leaf(leaf, action)) return 0;
+            }
         }
     } else {
         for (i = 0; i < 256; ++i) {
-            echttp_sorted_ascending (b->index[i].sub, action);
+            if (!echttp_sorted_ascending (b->index[i].sub, action)) return 0;
         }
     }
+    return 1;
+}
+
+int echttp_sorted_ascending_from (echttp_sorted_list b,
+                                  unsigned long long key,
+                                  echttp_sorted_action *action) {
+    if (!b) return 1;
+    int i;
+    if (b->depth == 7) {
+        for (i = key & 0xff; i < 256; ++i) {
+            struct echttp_sorted_leaf *leaf = b->index[i].leaf;
+            if (leaf) {
+                if (!echttp_sorted_ascend_leaf(leaf, action)) return 0;
+            }
+        }
+    } else {
+        // Walk only the relevant part of the first sub-bucket, but walk
+        // all subsequent buckets in their entirety because they match
+        // greater hash (i.e. greater key) values.
+        //
+        int hash = (key >> (8*(7-b->depth))) & 0xff;
+        if (!echttp_sorted_ascending_from (b->index[hash].sub, key, action))
+            return 0;
+        for (i = hash+1; i < 256; ++i) {
+            if (!echttp_sorted_ascending (b->index[i].sub, action)) return 0;
+        }
+    }
+    return 1;
 }
 
 void echttp_sorted_audit (echttp_sorted_list b, int *buckets, int *items) {
