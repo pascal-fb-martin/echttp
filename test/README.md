@@ -17,3 +17,9 @@ cc -o httpserver httpserver.c -lechttp -lssl -lcrypto
 ```
 ./httpserver -http-service=8080 -http-debug
 ```
+* Run the test for echttp_sorted.c:
+```
+gcc -g -I.. -o sortedtest sortedtest.c ../echttp_sorted.c
+./sortedtest
+```
+

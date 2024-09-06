@@ -507,7 +507,7 @@ unsigned int echttp_catalog_signature (const char *name);
 ```
 This function computes a signature from the provided name. A signature is the hash value before applying the hash array modulo. This function can be reused when implementing a hash table module with different properties. This function is derived from the well known hash function by Daniel J. Bernstein.
 
-## HTTP Character encoding
+## HTTP Character Encoding
 
 The echttp library comes with a module for encoding and decoding strings per the HTTP encoding rules:
 ```
@@ -518,4 +518,48 @@ This function encodes the s string per the HTTP encoding rules and store the res
 char *echttp_encoding_unescape (char *data);
 ```
 This function decodes the escape sequences as per the HTTP encoding rules. The decoding happens in-place and the original (encoded) data is lost. A pointer to the result is returned, so that this function can be used in a parameter list.
+
+## Sorted List
+
+The echttp library comes with a module for creating and maintaining sorted
+lists. The order is maintained while adding and removing items. This module
+is intended for chronologically ordered lists:
+- The sort key is a 64 bit integer (unsigned),
+- The implementation is optimized for key values that are clumped together,
+  like timestamps from the last few weeks or months.
+- The sort key is not assumed to be unique, but the same item cannot be
+  present more than once. In other terms, the reference to the data must
+  be unique.
+
+Adding or removing an item has a fixed maximum cost (allocating or releasing
+up to 7 buckets and allocating or releasing up to 2 collision list items).
+Iterating through a list has a (mostly) linear cost.
+
+The list only contains opaque references to the items, and does not access
+the items data. It is the application's responsibility to handle the data
+storage as it sees fit.
+
+An empty list must be created first:
+```
+echttp_sorted_list echttp_sorted_new (void);
+```
+
+Then items can be added or removed individually:
+```
+void echttp_sorted_add (echttp_sorted_list b,
+                        unsigned long long key, void *data);
+void echttp_sorted_remove (echttp_sorted_list b,
+                        unsigned long long key, void *data);
+```
+
+A list can then be iterated at any time, either in ascending or descending
+order:
+```
+typedef void echttp_sorted_action (void *data);
+
+void echttp_sorted_descending (echttp_sorted_list b,
+                               echttp_sorted_action *action);
+void echttp_sorted_ascending (echttp_sorted_list b,
+                              echttp_sorted_action *action);
+```
 

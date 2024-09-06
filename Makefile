@@ -5,6 +5,7 @@ OBJS= echttp.o \
       echttp_tls.o \
       echttp_raw.o \
       echttp_hash.o \
+      echttp_sorted.o \
       echttp_catalog.o \
       echttp_encoding.o \
       echttp_option.o \
@@ -16,6 +17,7 @@ PUBLIC_INCLUDE=echttp.h \
               echttp_encoding.h \
               echttp_catalog.h \
               echttp_hash.h \
+              echttp_sorted.h \
               echttp_static.h \
               echttp_cors.h \
               echttp_json.h \
