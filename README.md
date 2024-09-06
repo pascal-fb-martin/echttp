@@ -553,13 +553,22 @@ void echttp_sorted_remove (echttp_sorted_list b,
 ```
 
 A list can then be iterated at any time, either in ascending or descending
-order:
+order. The iterator stops when the action returns 0, or else at the end of
+the list. The value returned is 1 when the end of list was reached, or
+0 otherwise:
 ```
-typedef void echttp_sorted_action (void *data);
+typedef int echttp_sorted_action (void *data);
 
-void echttp_sorted_descending (echttp_sorted_list b,
-                               echttp_sorted_action *action);
-void echttp_sorted_ascending (echttp_sorted_list b,
+int echttp_sorted_descending (echttp_sorted_list b,
                               echttp_sorted_action *action);
+int echttp_sorted_ascending (echttp_sorted_list b,
+                             echttp_sorted_action *action);
+
+int echttp_sorted_ascending_from (echttp_sorted_list b,
+                                  unsigned long long key,
+                                  echttp_sorted_action *action);
 ```
+The later function iterates only on items for which the key is greater or
+equal than the provided key value. This can be used to avoid the overhead
+of iterating repeatedly on older items when only recent ones are of interest.
 
