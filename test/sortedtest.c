@@ -199,7 +199,7 @@ int main (int argc, char **argv) {
     assert (buckets, 1, "Unexpected bucket count");
     assert (items, 0, "Unexpected item count");
 
-    unsigned long long randomized[10] = {3948294, 9483, 823, 84047592, 592856, 28452, 39684, 18346, 382945, 4856};
+    unsigned long long randomized[10] = {3948294, 9483, 823, 84047592, 592856, 28452, 28453, 39684, 18346, 382945};
 
     int i;
 
