@@ -39,6 +39,9 @@ int echttp_sorted_descending (echttp_sorted_list b,
 int echttp_sorted_ascending (echttp_sorted_list b,
                              echttp_sorted_action *action);
 
+int echttp_sorted_descending_from (echttp_sorted_list b,
+                                   unsigned long long key,
+                                   echttp_sorted_action *action);
 int echttp_sorted_ascending_from (echttp_sorted_list b,
                                   unsigned long long key,
                                   echttp_sorted_action *action);

@@ -564,11 +564,15 @@ int echttp_sorted_descending (echttp_sorted_list b,
 int echttp_sorted_ascending (echttp_sorted_list b,
                              echttp_sorted_action *action);
 
+int echttp_sorted_descending_from (echttp_sorted_list b,
+                                   unsigned long long key,
+                                   echttp_sorted_action *action);
 int echttp_sorted_ascending_from (echttp_sorted_list b,
                                   unsigned long long key,
                                   echttp_sorted_action *action);
 ```
-The later function iterates only on items for which the key is greater or
-equal than the provided key value. This can be used to avoid the overhead
-of iterating repeatedly on older items when only recent ones are of interest.
+The later two functions iterate only on items for which the key is less or
+equal (or greater or equal) than the provided key value. This can be used
+to avoid the overhead of iterating repeatedly over the same items again and
+again when specific key ranges are of interest.
 

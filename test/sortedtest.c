@@ -221,6 +221,11 @@ int main (int argc, char **argv) {
     echttp_sorted_descending (l, descentrandomized);
     assert (counter, 823, "Unexpected counter leftover");
 
+    title ("Check descending iteration from 592856 (randomized items)");
+    counter = 592857;
+    echttp_sorted_descending_from (l, base+592856, descentrandomized);
+    assert (counter, 823, "Unexpected counter leftover");
+
     echttp_sorted_audit (l, &buckets, &items);
     assert (items, 10, "Unexpected item count");
 
