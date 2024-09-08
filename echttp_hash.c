@@ -167,6 +167,7 @@ static int echttp_hash_forage (echttp_hash *d, int start,
 }
 
 int echttp_hash_find (echttp_hash *d, const char *name) {
+    if (!d) return 0;
     unsigned int signature = echttp_hash_signature(name);
     int hash = signature % ECHTTP_HASH;
     return echttp_hash_forage (d, d->index[hash], name, signature);
@@ -174,12 +175,14 @@ int echttp_hash_find (echttp_hash *d, const char *name) {
 
 int echttp_hash_next (echttp_hash *d, int from, const char *name) {
     if (from <= 0 || from >= ECHTTP_MAX_SYMBOL) return 0;
+    if (!d) return 0;
     return echttp_hash_forage (d, d->item[from].next,
                                name, d->item[from].signature);
 }
 
 int echttp_hash_add (echttp_hash *d, const char *name) {
 
+    if (!d) return 0;
     unsigned int signature = echttp_hash_signature(name);
     int hash = signature % ECHTTP_HASH;
     int index = d->count + 1;
@@ -200,6 +203,7 @@ int echttp_hash_add (echttp_hash *d, const char *name) {
 
 int echttp_hash_iterate (echttp_hash *d,
                          const char *name, echttp_hash_action *action) {
+    if (!d) return 0;
     int i;
     if (!name) {
         for (i = 1; i < d->count; ++i) {
@@ -216,6 +220,7 @@ int echttp_hash_iterate (echttp_hash *d,
 
 int echttp_hash_insert (echttp_hash *d, const char *name) {
 
+    if (!d) return 0;
     int index = echttp_hash_find (d, name);
 
     if (index <= 0) {
