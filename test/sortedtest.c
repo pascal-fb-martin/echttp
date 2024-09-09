@@ -32,6 +32,7 @@ static int errors = 0;
 #define assert(x, v, t) if ((x) != (v)) {printf ("** Line %d: %s = %ld\n", __LINE__, t, x); errors += 1;}
 
 static int counter;
+static time_t Base;
 
 int ascent (void *data) {
     long value = (long)((long long)data);
@@ -95,9 +96,19 @@ void check12 (echttp_sorted_list l) {
     echttp_sorted_descending (l, descent);
     assert (counter, 0, "Unexpected counter leftover");
 
+    title ("Check descending iteration from 1 (2 items)");
+    counter = 1;
+    echttp_sorted_descending_from (l, Base+1, descent);
+    assert (counter, 0, "Unexpected counter leftover");
+
     title ("Check ascending iteration (2 items)");
     counter = 1;
     echttp_sorted_ascending (l, ascent);
+    assert (counter, 3, "Unexpected counter leftover");
+
+    title ("Check ascending iteration from 2 (2 items)");
+    counter = 2;
+    echttp_sorted_ascending_from (l, Base+2, ascent);
     assert (counter, 3, "Unexpected counter leftover");
 }
 
@@ -115,6 +126,11 @@ void check123 (echttp_sorted_list l) {
     echttp_sorted_descending (l, descent);
     assert (counter, 0, "Unexpected counter leftover");
 
+    title ("Check descending iteration from 2 (3 items)");
+    counter = 2;
+    echttp_sorted_descending_from (l, Base+2, descent);
+    assert (counter, 0, "Unexpected counter leftover");
+
     title ("Check descending iteration down to 2 (2 items)");
     counter = 3;
     echttp_sorted_descending (l, descentstopped);
@@ -123,6 +139,11 @@ void check123 (echttp_sorted_list l) {
     title ("Check ascending iteration (3 items)");
     counter = 1;
     echttp_sorted_ascending (l, ascent);
+    assert (counter, 4, "Unexpected counter leftover");
+
+    title ("Check ascending iteration from 2 (3 items)");
+    counter = 2;
+    echttp_sorted_ascending_from (l, Base+2, ascent);
     assert (counter, 4, "Unexpected counter leftover");
 
     title ("Check ascending iteration up to 2 (2 items)");
@@ -145,9 +166,19 @@ void check1234 (echttp_sorted_list l) {
     echttp_sorted_descending (l, descent);
     assert (counter, 0, "Unexpected counter leftover");
 
+    title ("Check descending iteration from 2 (4 items)");
+    counter = 2;
+    echttp_sorted_descending_from (l, Base+2, descent);
+    assert (counter, 0, "Unexpected counter leftover");
+
     title ("Check ascending iteration (4 items)");
     counter = 1;
     echttp_sorted_ascending (l, ascent);
+    assert (counter, 5, "Unexpected counter leftover");
+
+    title ("Check ascending iteration from 2 (4 items)");
+    counter = 2;
+    echttp_sorted_ascending_from (l, Base+2, ascent);
     assert (counter, 5, "Unexpected counter leftover");
 }
 
@@ -156,44 +187,44 @@ int main (int argc, char **argv) {
     int buckets;
     int items;
 
-    time_t base = time(0) * 1000;
+    Base = time(0) * 1000;
     echttp_sorted_list l = echttp_sorted_new ();
 
-    echttp_sorted_add (l, base+1, (void *)1);
-    echttp_sorted_add (l, base+2, (void *)2);
-    echttp_sorted_add (l, base+3, (void *)3);
+    echttp_sorted_add (l, Base+1, (void *)1);
+    echttp_sorted_add (l, Base+2, (void *)2);
+    echttp_sorted_add (l, Base+3, (void *)3);
 
     check123 (l);
 
-    echttp_sorted_add (l, base+257, (void *)4);
+    echttp_sorted_add (l, Base+257, (void *)4);
 
     check1234 (l);
 
-    echttp_sorted_remove (l, base+257, (void *)4);
+    echttp_sorted_remove (l, Base+257, (void *)4);
 
     check123 (l);
 
-    echttp_sorted_remove (l, base+3, (void *)3);
+    echttp_sorted_remove (l, Base+3, (void *)3);
 
     check12 (l);
 
-    echttp_sorted_add (l, base+3, (void *)3);
+    echttp_sorted_add (l, Base+3, (void *)3);
 
     check123 (l);
 
-    echttp_sorted_remove (l, base+2, (void *)2);
+    echttp_sorted_remove (l, Base+2, (void *)2);
 
     echttp_sorted_audit (l, &buckets, &items);
     assert (buckets, 8, "Unexpected bucket count");
     assert (items, 2, "Unexpected item count");
 
-    echttp_sorted_remove (l, base+3, (void *)3);
+    echttp_sorted_remove (l, Base+3, (void *)3);
 
     echttp_sorted_audit (l, &buckets, &items);
     assert (buckets, 8, "Unexpected bucket count");
     assert (items, 1, "Unexpected item count");
 
-    echttp_sorted_remove (l, base+1, (void *)1);
+    echttp_sorted_remove (l, Base+1, (void *)1);
 
     echttp_sorted_audit (l, &buckets, &items);
     assert (buckets, 1, "Unexpected bucket count");
@@ -204,7 +235,7 @@ int main (int argc, char **argv) {
     int i;
 
     for (i = 0; i < 10; ++i) {
-        echttp_sorted_add (l, base+randomized[i], (void *)randomized[i]);
+        echttp_sorted_add (l, Base+randomized[i], (void *)randomized[i]);
     }
     title ("Check ascending iteration (randomized items)");
     counter = 0;
@@ -213,7 +244,7 @@ int main (int argc, char **argv) {
 
     title ("Check ascending iteration from 28452 (randomized items)");
     counter = 28451;
-    echttp_sorted_ascending_from (l, base+28452, ascentrandomized);
+    echttp_sorted_ascending_from (l, Base+28452, ascentrandomized);
     assert (counter, 84047592, "Unexpected counter leftover");
 
     title ("Check descending iteration (randomized items)");
@@ -223,14 +254,14 @@ int main (int argc, char **argv) {
 
     title ("Check descending iteration from 592856 (randomized items)");
     counter = 592857;
-    echttp_sorted_descending_from (l, base+592856, descentrandomized);
+    echttp_sorted_descending_from (l, Base+592856, descentrandomized);
     assert (counter, 823, "Unexpected counter leftover");
 
     echttp_sorted_audit (l, &buckets, &items);
     assert (items, 10, "Unexpected item count");
 
     for (i = 0; i < 10; ++i) {
-        echttp_sorted_remove (l, base+randomized[i], (void *)randomized[i]);
+        echttp_sorted_remove (l, Base+randomized[i], (void *)randomized[i]);
     }
     echttp_sorted_audit (l, &buckets, &items);
     assert (buckets, 1, "Unexpected bucket count");

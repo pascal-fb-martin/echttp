@@ -30,20 +30,20 @@ typedef int echttp_sorted_action (void *data);
 echttp_sorted_list echttp_sorted_new (void);
 
 void echttp_sorted_add (echttp_sorted_list b,
-                        unsigned long long key, void *data);
+                        const unsigned long long key, void *data);
 void echttp_sorted_remove (echttp_sorted_list b,
-                           unsigned long long key, void *data);
+                           const unsigned long long key, void *data);
 
-int echttp_sorted_descending (echttp_sorted_list b,
+int echttp_sorted_descending (const echttp_sorted_list b,
                               echttp_sorted_action *action);
-int echttp_sorted_ascending (echttp_sorted_list b,
+int echttp_sorted_ascending (const echttp_sorted_list b,
                              echttp_sorted_action *action);
 
-int echttp_sorted_descending_from (echttp_sorted_list b,
-                                   unsigned long long key,
+int echttp_sorted_descending_from (const echttp_sorted_list b,
+                                   const unsigned long long key,
                                    echttp_sorted_action *action);
-int echttp_sorted_ascending_from (echttp_sorted_list b,
-                                  unsigned long long key,
+int echttp_sorted_ascending_from (const echttp_sorted_list b,
+                                  const unsigned long long key,
                                   echttp_sorted_action *action);
 
-void echttp_sorted_audit (echttp_sorted_list b, int *buckets, int *items);
+void echttp_sorted_audit (const echttp_sorted_list b, int *buckets, int *items);

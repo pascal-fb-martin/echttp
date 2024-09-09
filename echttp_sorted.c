@@ -120,6 +120,16 @@
  * entries are removed and more recent new entries are created, keeping
  * the overall palm tree shape.
  *
+ * Lesson learned: the event indexed using this module are relatively spread,
+ * about 250 events within 12 hours, or about 20 events per hour. This leads
+ * to very sparse buckets. Thus two optimizations:
+ * - avoid walking all 256 slots in each bucket by remembering the lowest
+ *   and highest slots used. Even if imperfect (ignoring removals), this
+ *   should save a lot of empty slots checks since most slots were never
+ *   used.
+ * - Skip the two lower levels (only use 6 levels), and sort the resulting
+ *   collision lists (TBD).
+ *
  * LIMITATIONS
  *
  * This implementation would not work well with randomized keys: it could
@@ -151,7 +161,9 @@ struct echttp_sorted_leaf {
 };
 
 struct echttp_sorted_bucket {
-    int depth;
+    short depth;
+    short low;
+    short high;
     union {
         struct echttp_sorted_bucket *sub;  // if depth < 7
         struct echttp_sorted_leaf   *leaf; // if depth == 7
@@ -169,6 +181,8 @@ static struct echttp_sorted_leaf *echttp_sorted_new_leaf (void *data) {
 static struct echttp_sorted_bucket *echttp_sorted_new_bucket (int depth) {
     struct echttp_sorted_bucket *bucket = malloc (sizeof(struct echttp_sorted_bucket));
     bucket->depth = depth;
+    bucket->low = 255; // Inverted low and high means empty
+    bucket->high = 0;
     int i;
     for (i = 255; i >= 0; --i) bucket->index[i].sub = 0;
     return bucket;
@@ -194,12 +208,16 @@ void echttp_sorted_add (echttp_sorted_list b, unsigned long long key, void *data
         int hash = key & 0xff;
         if (!b->index[hash].leaf) {
             b->index[hash].leaf = echttp_sorted_new_leaf(0);
+            if (b->low > hash) b->low = hash;
+            if (b->high < hash) b->high = hash;
         }
         echttp_sorted_add_leaf (b->index[hash].leaf, data);
     } else {
         int hash = (key >> (8*(7-b->depth))) & 0xff;
         if (!b->index[hash].sub) {
             b->index[hash].sub = echttp_sorted_new_bucket (b->depth+1);
+            if (b->low > hash) b->low = hash;
+            if (b->high < hash) b->high = hash;
         }
         echttp_sorted_add (b->index[hash].sub, key, data);
     }
@@ -207,7 +225,7 @@ void echttp_sorted_add (echttp_sorted_list b, unsigned long long key, void *data
 
 static int echttp_sorted_bucket_empty (struct echttp_sorted_bucket *b) {
     int i;
-    for (i = 255; i >= 0; --i) if (b->index[i].sub) return 0;
+    for (i = b->high; i >= b->low; --i) if (b->index[i].sub) return 0;
     return 1;
 }
 
@@ -263,7 +281,7 @@ void echttp_sorted_remove (echttp_sorted_list b, unsigned long long key, void *d
     }
 }
 
-static int echttp_sorted_descend_leaf (struct echttp_sorted_leaf *l,
+static int echttp_sorted_descend_leaf (const struct echttp_sorted_leaf *l,
                                        echttp_sorted_action *action) {
     struct echttp_sorted_leaf *cursor;
     for (cursor = l->next; cursor; cursor = cursor->prev) {
@@ -272,27 +290,27 @@ static int echttp_sorted_descend_leaf (struct echttp_sorted_leaf *l,
     return 1;
 }
 
-int echttp_sorted_descending (echttp_sorted_list b,
+int echttp_sorted_descending (const echttp_sorted_list b,
                               echttp_sorted_action *action) {
     if (!b) return 1;
     int i;
     if (b->depth == 7) {
-        for (i = 255; i >= 0; --i) {
+        for (i = b->high; i >= b->low; --i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
             if (leaf) {
                 if (!echttp_sorted_descend_leaf(leaf, action)) return 0;
             }
         }
     } else {
-        for (i = 255; i >= 0; --i) {
+        for (i = b->high; i >= b->low; --i) {
             if (!echttp_sorted_descending (b->index[i].sub, action)) return 0;
         }
     }
     return 1;
 }
 
-int echttp_sorted_descending_from (echttp_sorted_list b,
-                                   unsigned long long key,
+int echttp_sorted_descending_from (const echttp_sorted_list b,
+                                   const unsigned long long key,
                                    echttp_sorted_action *action) {
     if (!b) return 1;
     int i;
@@ -312,14 +330,14 @@ int echttp_sorted_descending_from (echttp_sorted_list b,
         int hash = (key >> (8*(7-b->depth))) & 0xff;
         if (!echttp_sorted_descending_from (b->index[hash].sub, key, action))
             return 0;
-        for (i = hash-1; i >= 0; --i) {
+        for (i = hash-1; i >= b->low; --i) {
             if (!echttp_sorted_descending (b->index[i].sub, action)) return 0;
         }
     }
     return 1;
 }
 
-static int echttp_sorted_ascend_leaf (struct echttp_sorted_leaf *l,
+static int echttp_sorted_ascend_leaf (const struct echttp_sorted_leaf *l,
                                       echttp_sorted_action *action) {
     struct echttp_sorted_leaf *cursor;
     for (cursor = l->prev; cursor; cursor = cursor->next) {
@@ -328,32 +346,32 @@ static int echttp_sorted_ascend_leaf (struct echttp_sorted_leaf *l,
     return 1;
 }
 
-int echttp_sorted_ascending (echttp_sorted_list b,
+int echttp_sorted_ascending (const echttp_sorted_list b,
                              echttp_sorted_action *action) {
     if (!b) return 1;
     int i;
     if (b->depth == 7) {
-        for (i = 0; i < 256; ++i) {
+        for (i = b->low; i <= b->high; ++i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
             if (leaf) {
                 if (!echttp_sorted_ascend_leaf(leaf, action)) return 0;
             }
         }
     } else {
-        for (i = 0; i < 256; ++i) {
+        for (i = b->low; i <= b->high; ++i) {
             if (!echttp_sorted_ascending (b->index[i].sub, action)) return 0;
         }
     }
     return 1;
 }
 
-int echttp_sorted_ascending_from (echttp_sorted_list b,
-                                  unsigned long long key,
+int echttp_sorted_ascending_from (const echttp_sorted_list b,
+                                  const unsigned long long key,
                                   echttp_sorted_action *action) {
     if (!b) return 1;
     int i;
     if (b->depth == 7) {
-        for (i = key & 0xff; i < 256; ++i) {
+        for (i = key & 0xff; i <= b->high; ++i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
             if (leaf) {
                 if (!echttp_sorted_ascend_leaf(leaf, action)) return 0;
@@ -367,14 +385,17 @@ int echttp_sorted_ascending_from (echttp_sorted_list b,
         int hash = (key >> (8*(7-b->depth))) & 0xff;
         if (!echttp_sorted_ascending_from (b->index[hash].sub, key, action))
             return 0;
-        for (i = hash+1; i < 256; ++i) {
+        for (i = hash+1; i <= b->high; ++i) {
             if (!echttp_sorted_ascending (b->index[i].sub, action)) return 0;
         }
     }
     return 1;
 }
 
-void echttp_sorted_audit (echttp_sorted_list b, int *buckets, int *items) {
+// This function is for unit testing and troubleshooting. We are more
+// concerned about robustness than performances.
+//
+void echttp_sorted_audit (const echttp_sorted_list b, int *buckets, int *items) {
 
     *buckets = 0;
     *items = 0;
