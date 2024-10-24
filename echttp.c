@@ -106,6 +106,11 @@
  * service (e.g. houseportal). Dynamic port mode is activated using the
  * command line option -http-service=dynamic.
  *
+ * int echttp_connect (const char *host, const char *service);
+ *
+ * A simple helper for establishing a TCP connection. The returned socket
+ * has not been registered for listening: the application would have to
+ * call echttp_listen().
  *
  * typedef void *echttp_listener (int fd, int mode);
  * void echttp_listen (int fd, int mode, echttp_listener *listener);
@@ -808,6 +813,10 @@ int echttp_dynamic_port (void) {
 
 int echttp_isdebug (void) {
     return echttp_debug;
+}
+
+int echttp_connect (const char *host, const char *service) {
+    return echttp_raw_connect (host, service);
 }
 
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium) {

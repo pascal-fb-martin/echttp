@@ -171,7 +171,11 @@ Dynamic ports are typically used when multiple HTTP servers run on the same mach
 
 Dynamic port mode is activated using the command line option -http-service=dynamic.
 ```
-typedef void *echttp_listener (int fd, int mode);
+int echttp_connect (const char *host, const char *service);
+```
+Create a TCP connection to the specified target. The connection is created in non-blocking mode and might not have been established when the function returns. The socket is not registered for listening: the application will need to call echttp_listen() when echttp_connect() succeeds. This function is only a helper provided to applications that do not want to go through the lengthy sequence of calls needed to establish a TCP connection.
+```
+typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 void echttp_forget (int fd);
 ```

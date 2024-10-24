@@ -57,6 +57,8 @@ void echttp_content_type_css  (void);
 
 void echttp_transfer (int fd, int size);
 
+int echttp_connect (const char *host, const char *service);
+
 typedef void echttp_listener (int fd, int mode);
 void echttp_listen (int fd, int mode, echttp_listener *listener, int premium);
 void echttp_forget (int fd);
