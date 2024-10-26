@@ -480,7 +480,7 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
 
    if (error) {
        snprintf (echttp_json_error_text, sizeof(echttp_json_error_text),
-                 "%s at line %d, column %d\n",
+                 "%s at line %d, column %d",
                  error, context.line_count, context.cursor-context.line_start);
        return echttp_json_error_text;
    }
