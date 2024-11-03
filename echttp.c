@@ -932,6 +932,7 @@ const char *echttp_client (const char *method, const char *url) {
     snprintf (buffer, sizeof(buffer), "Host: %s%s\r\n", host, j?service:"");
     echttp_send (client, buffer, strlen(buffer));
 
+    echttp_catalog_reset(&(echttp_current->out));
     return 0;
 }
 
