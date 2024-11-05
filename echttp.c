@@ -473,6 +473,8 @@ static int echttp_newclient (int client) {
    context->transfer.size = 0;
    context->response = 0;
    context->origin = 0;
+   echttp_catalog_reset(&(context->in));
+   echttp_catalog_reset(&(context->out));
    return 1;
 }
 
@@ -931,8 +933,6 @@ const char *echttp_client (const char *method, const char *url) {
 
     snprintf (buffer, sizeof(buffer), "Host: %s%s\r\n", host, j?service:"");
     echttp_send (client, buffer, strlen(buffer));
-
-    echttp_catalog_reset(&(echttp_current->out));
     return 0;
 }
 
