@@ -952,7 +952,13 @@ int echttp_redirected (const char *method) {
     const char *redirect =
         echttp_catalog_get (&(echttp_current->in), "Location");
     if (redirect) {
+        // With this redirection, the pending request is complete.
+        // We need to open a new connection to the redirected location.
+        // This new connection does not stack on top of the original
+        // request: is replaces it.
+        echttp_request *stacked = echttp_stacked;
         const char *error = echttp_client (method, redirect);
+        echttp_stacked = stacked;
         if (!error) return 0;
     }
     return 500;
