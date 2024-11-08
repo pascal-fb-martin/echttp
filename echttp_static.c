@@ -68,6 +68,9 @@ static struct {
     {"png",  "image/png"},
     {"gif",  "image/gif"},
     {"svg",  "image/svg+xml"},
+    {"avi",  "video/x-msvideo"},
+    {"mkv",  "video/x-matroska"},
+    {"mp4",  "video/mp4"},
     {0, 0}
 };
 
