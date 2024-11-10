@@ -57,7 +57,6 @@ static char echttp_encoding_table[128]; // Encoding for punctuation.
 
 static void echttp_encoding_init (void) {
     echttp_encoding_table['%'] = 1; // Used as the "initialized" flag.
-    echttp_encoding_table['+'] = 1;
     echttp_encoding_table[','] = 1;
     echttp_encoding_table['/'] = 1;
     echttp_encoding_table[':'] = 1;
