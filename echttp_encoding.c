@@ -48,8 +48,9 @@ static int echttp_encoding_hextoi (char a) {
 
 static char echttp_encoding_itohex (unsigned int a) {
     if (a > 15) return 'F';
+    if (a < 0)  return '0';
     if (a < 10) return '0' + a;
-    return 'A' + a;
+    return 'A' + a - 10;
 }
 
 static char echttp_encoding_table[128]; // Encoding for punctuation.
