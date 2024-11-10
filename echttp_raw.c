@@ -486,7 +486,8 @@ static void echttp_raw_transmit (int i) {
                      buffer->data + buffer->start, (size_t)length, 0);
       if (length <= 0) {
           if (echttp_raw_debug) printf ("Client %d: send() error\n", i);
-          echttp_raw_close_client (i, strerror(errno));
+          if (errno != EAGAIN)
+              echttp_raw_close_client (i, strerror(errno));
           return;
       }
       if (echttp_raw_debug) {
@@ -510,7 +511,8 @@ static void echttp_raw_transmit (int i) {
        length = sendfile (echttp_raw_io[i].fd,
                           echttp_raw_io[i].data->tcp.transfer.fd, 0, length);
        if (length <= 0) {
-           echttp_raw_close_client (i, strerror(errno));
+           if (errno != EAGAIN)
+               echttp_raw_close_client (i, strerror(errno));
            return;
        }
        echttp_raw_io[i].data->tcp.transfer.size -= length;
@@ -539,8 +541,10 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
    if (length <= 0) {
        if (echttp_raw_debug)
            printf ("Client %d recv() error on socket %d\n", i, echttp_raw_io[i].fd);
-       if (received) received (i, 0, -1);
-       echttp_raw_close_client (i, strerror(errno));
+       if (errno != EAGAIN) {
+           if (received) received (i, 0, -1);
+           echttp_raw_close_client (i, strerror(errno));
+       }
        return;
    }
    buffer->end += length;
