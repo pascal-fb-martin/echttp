@@ -495,13 +495,13 @@ static void echttp_raw_transmit (int i) {
                   buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
       }
       if (echttp_raw_consume (buffer, length)) {
-          if (echttp_raw_io[i].data->tcp.transfer.size <= 0) {
-              echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
-          } else if (echttp_raw_debug) {
+          if (echttp_raw_debug &&
+              (echttp_raw_io[i].data->tcp.transfer.size > 0)) {
               printf ("Initiating field transfer (%d bytes)\n",
                       echttp_raw_io[i].data->tcp.transfer.size);
           }
       }
+      echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
 
    } else if (echttp_raw_io[i].data->tcp.transfer.size > 0) {
 
@@ -520,9 +520,8 @@ static void echttp_raw_transmit (int i) {
            close (echttp_raw_io[i].data->tcp.transfer.fd);
            echttp_raw_io[i].data->tcp.transfer.fd = -1;
            echttp_raw_io[i].data->tcp.transfer.size = 0;
-
-           echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
        }
+       echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
    }
 }
 
@@ -560,6 +559,7 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
        if (echttp_raw_io[i].fd >= 0 && length > 0)
            echttp_raw_consume (buffer, length);
    }
+   echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
 }
 
 static int echttp_raw_invalid (int client) {
