@@ -202,6 +202,13 @@ static int echttp_raw_ifcount = 0;
 static time_t echttp_raw_timestamp = 0;
 
 
+// The errno reported in non-blocking mode are quite confusing.
+// Take the most conservative approach here.
+//
+static int echttp_raw_inprogress (int code) {
+    return ((code == EAGAIN) || (code == EWOULDBLOCK) || (code == EINPROGRESS));
+}
+
 static void echttp_raw_io_cleanup (int i) {
    echttp_raw_io[i].fd = -1;
    echttp_raw_io[i].use = ECHTTP_RAW_UNUSED;
@@ -249,7 +256,7 @@ static int echttp_raw_io_new (char use, int fd) {
 
            if (i > echttp_raw_io_last) echttp_raw_io_last = i;
            if (echttp_raw_debug)
-               printf ("New client %d, socket %d (%s)\n", i, fd, toname[use]);
+               printf (__FILE__ " [client %d] new, socket %d (%s)\n", i, fd, toname[use]);
            return i;
        }
    }
@@ -277,7 +284,7 @@ static void echttp_raw_enumerate (void) {
         struct ifaddrs *cursor;
 
         if (echttp_raw_debug)
-            printf ("Network interfaces:\n");
+            printf (__FILE__ " Network interfaces:\n");
 
         echttp_raw_ifcount = 0;
 
@@ -324,29 +331,29 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
        fprintf (stderr, "cannot accept new client: %s\n", strerror(errno));
        exit(1);
    }
-   if (echttp_raw_debug) printf ("Accepting socket %d\n", s);
+   if (echttp_raw_debug) printf (__FILE__ " Accepting socket %d\n", s);
 
    i = echttp_raw_io_new(ECHTTP_RAW_TCP, s);
    if (i < 0) {
        if (echttp_raw_debug)
-           printf ("No client slot to accept socket %d\n", s);
+           printf (__FILE__ " No client slot to accept socket %d\n", s);
        close (s);
        return;
    }
    if (!acceptor(i)) {
-       fprintf (stderr, "Client rejected.\n");
+       fprintf (stderr, __FILE__ " Client rejected.\n");
        echttp_raw_io_cleanup(i);
        close (s);
        return;
    }
    if (echttp_raw_debug) {
        if (peer.sin6_family == AF_INET6) {
-           printf ("Client %d accepted IPv6 from port %d\n",
+           printf (__FILE__ " [client %d] accepted IPv6 from port %d\n",
                    i, ntohs(peer.sin6_port));
        } else if (peer.sin6_family == AF_INET) {
-           printf ("Client %d accepted IPv4\n", i); // Not expected.
+           printf (__FILE__ " [client %d] accepted IPv4\n", i); // Not expected.
        } else {
-           printf ("Client %d accepted unknown protocol\n", i);
+           printf (__FILE__ "[ client %d] accepted unknown protocol\n", i);
        }
    }
 
@@ -396,13 +403,14 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
        echttp_raw_serverport = port;
    }
 
-   if (echttp_raw_debug) printf ("Opening server for port %d\n", port);
+   if (echttp_raw_debug)
+       printf (__FILE__ " Opening server for port %d\n", port);
 
    signal(SIGPIPE, SIG_IGN);
 
    echttp_raw_server = socket(PF_INET6, SOCK_STREAM, 0);
    if (echttp_raw_server < 0) {
-       fprintf (stderr, "cannot open socket for service %s: %s\n",
+       fprintf (stderr, __FILE__ " Cannot open socket for service %s: %s\n",
                 service, strerror(errno));
        return 0;
    }
@@ -417,7 +425,7 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
 
    if (bind(echttp_raw_server,
             (struct sockaddr *)&netaddress6, sizeof(netaddress6)) < 0) {
-       fprintf (stderr, "cannot bind to service %s: %s\n",
+       fprintf (stderr, __FILE__ " Cannot bind to service %s: %s\n",
                 service, strerror(errno));
        exit(0);
    }
@@ -428,11 +436,11 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
                     (struct sockaddr *)&netaddress6, &addrlen);
        port = echttp_raw_serverport = ntohs(netaddress6.sin6_port);
        if (echttp_raw_debug)
-           printf ("Dynamic port allocated: %d\n", port);
+           printf (__FILE__ " Dynamic port allocated: %d\n", port);
    }
 
    if (listen (echttp_raw_server, 4) < 0) {
-       fprintf (stderr, "listen to service %s failed: %s\n",
+       fprintf (stderr, __FILE__ " listen to service %s failed: %s\n",
                 service, strerror(errno));
        return 0;
    }
@@ -447,7 +455,8 @@ int echttp_raw_capacity (void) {
 void echttp_raw_close_client (int i, const char *reason) {
 
     if (echttp_raw_io[i].fd >= 0) {
-        if (echttp_raw_debug) printf ("Client %d closing: %s\n", i, reason);
+        if (echttp_raw_debug)
+            printf (__FILE__ " [client %d] closing: %s\n", i, reason);
         switch (echttp_raw_io[i].use) {
             case ECHTTP_RAW_TCP:
                 if (echttp_raw_io[i].data->tcp.transfer.size > 0) {
@@ -485,20 +494,20 @@ static void echttp_raw_transmit (int i) {
       length = send (echttp_raw_io[i].fd,
                      buffer->data + buffer->start, (size_t)length, 0);
       if (length <= 0) {
-          if (echttp_raw_debug) printf ("Client %d: send() error\n", i);
-          if (errno != EAGAIN)
+          if (echttp_raw_debug)
+              printf (__FILE__ " [client %d] send() error\n", i);
+          if (!echttp_raw_inprogress(errno))
               echttp_raw_close_client (i, strerror(errno));
           return;
       }
       if (echttp_raw_debug) {
-          printf ("Transmit data at offset %d: %*.*s\n",
-                  buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
+          printf (__FILE__ " [client %d] Transmit data at offset %d: %*.*s\n",
+                  i, buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
       }
       if (echttp_raw_consume (buffer, length)) {
           if (echttp_raw_debug &&
               (echttp_raw_io[i].data->tcp.transfer.size > 0)) {
-              printf ("Initiating field transfer (%d bytes)\n",
-                      echttp_raw_io[i].data->tcp.transfer.size);
+              printf (__FILE__ " [Client %d] Transmit buffer is now empty.\n", i);
           }
       }
       echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
@@ -508,10 +517,19 @@ static void echttp_raw_transmit (int i) {
        length = echttp_raw_io[i].data->tcp.transfer.size;
        if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
 
+       if (echttp_raw_debug)
+           printf (__FILE__ " [client %d] transfer from %d to %d, %d out of %d bytes\n",
+                      i,
+                      echttp_raw_io[i].data->tcp.transfer.fd,
+                      echttp_raw_io[i].fd,
+                      length, echttp_raw_io[i].data->tcp.transfer.size);
        length = sendfile (echttp_raw_io[i].fd,
                           echttp_raw_io[i].data->tcp.transfer.fd, 0, length);
        if (length <= 0) {
-           if (errno != EAGAIN)
+           if (echttp_raw_debug)
+               printf (__FILE__ " [client %d] sendfile error %s\n",
+                       i, strerror(errno));
+           if (!echttp_raw_inprogress(errno))
                echttp_raw_close_client (i, strerror(errno));
            return;
        }
@@ -539,18 +557,18 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
                   buffer->data + buffer->end, (size_t)length-1, 0);
    if (length <= 0) {
        if (echttp_raw_debug)
-           printf ("Client %d recv() error on socket %d\n", i, echttp_raw_io[i].fd);
-       if (errno != EAGAIN) {
-           if (received) received (i, 0, -1);
-           echttp_raw_close_client (i, strerror(errno));
-       }
+           printf (__FILE__ " [client %d] recv() error %s on socket %d\n", i, strerror(errno), echttp_raw_io[i].fd);
+       // Since this is called only when data is available, any error
+       // is considered fatal.
+       if (received) received (i, 0, -1);
+       echttp_raw_close_client (i, strerror(errno));
        return;
    }
    buffer->end += length;
    buffer->data[buffer->end] = 0;
 
    if (echttp_raw_debug) {
-       printf ("Data (client %d) = %s\n", i, buffer->data);
+       printf (__FILE__ " [client %d] data = %s\n", i, buffer->data);
        fflush (stdout);
    }
    if (received) {
@@ -609,8 +627,11 @@ void echttp_raw_send (int client, const char *data, int length) {
 void echttp_raw_transfer (int client, int fd, int length) {
 
    if (echttp_raw_io[client].use != ECHTTP_RAW_TCP) return;
-
    if (echttp_raw_invalid(client)) return;
+
+   if (echttp_raw_debug)
+       printf (__FILE__ " [client %d] transfer requested, file %d, length %d\n",
+               client, fd, length);
    echttp_raw_io[client].data->tcp.transfer.fd = fd;
    echttp_raw_io[client].data->tcp.transfer.size = length;
 }
@@ -743,7 +764,7 @@ int echttp_raw_register (int fd, int mode,
         premium = 0;
     }
     if (echttp_raw_debug)
-        printf ("Registering socket %d, mode %d premium %d\n", fd, mode, premium);
+        printf (__FILE__ " Registering socket %d, mode %d premium %d\n", fd, mode, premium);
 
     // Is this an existing I/O to update?
     //
@@ -764,14 +785,14 @@ int echttp_raw_register (int fd, int mode,
     //
     i = echttp_raw_io_new (use, fd);
     if (i < 0) {
-        fprintf (stderr, __FILE__ ": too many listeners\n");
+        fprintf (stderr, __FILE__ " Too many listeners\n");
         return -1;
     }
     echttp_raw_io[i].premium = premium;
     echttp_raw_io[i].data->listen.mode = mode;
     echttp_raw_io[i].data->listen.listener = listener;
     if (echttp_raw_debug)
-        printf ("Client %d registered socket %d (%s)\n",
+        printf (__FILE__ " [client %d] registered socket %d (%s)\n",
                 i, fd, (use == ECHTTP_RAW_LISTEN)?"listen":"app");
     return i;
 }
@@ -818,7 +839,8 @@ int echttp_raw_connect (const char *host, const char *service) {
     struct addrinfo *resolved;
     struct addrinfo *cursor;
 
-    if (echttp_raw_debug) printf ("Connecting to %s:%s\n", host, service);
+    if (echttp_raw_debug)
+        printf (__FILE__ " Connecting to %s:%s\n", host, service);
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -842,9 +864,9 @@ int echttp_raw_connect (const char *host, const char *service) {
         fcntl(s, F_SETFL, flags);
 
         if (connect(s, cursor->ai_addr, cursor->ai_addrlen) != 0) {
-            if (errno != EINPROGRESS) {
+            if (!echttp_raw_inprogress(errno)) {
                 if (echttp_raw_debug)
-                    printf ("connection failed: %s\n", strerror(errno));
+                    printf (__FILE__ " connection failed: %s\n", strerror(errno));
                 close(s);
                 s = -1;
                 continue;
@@ -860,16 +882,16 @@ int echttp_raw_manage (int s) {
 
     if (s < 0) return -1;
 
-    if (echttp_raw_debug) printf ("Managing socket %d\n", s);
+    if (echttp_raw_debug) printf (__FILE__ " Managing socket %d\n", s);
     int i = echttp_raw_io_new (ECHTTP_RAW_TCP, s);
     if (i < 0) {
         if (echttp_raw_debug)
-            printf ("No client slot for managing socket %d\n", s);
+            printf (__FILE__ " No client slot for managing socket %d\n", s);
         close(s);
         return -1;
     }
     if (echttp_raw_debug)
-        printf ("Client %d managing socket %d\n", i, s);
+        printf (__FILE__ " [client %d] managing socket %d\n", i, s);
     echttp_raw_io[i].data->tcp.peer = (struct sockaddr_in6){0};
     return i;
 }
