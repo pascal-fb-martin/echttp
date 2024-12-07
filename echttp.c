@@ -213,8 +213,8 @@ typedef struct {
     int route;
     int client;
     int contentlength;
-    char *method;
-    char *uri;
+    char method[64];
+    char uri[512];
     char *content;
     echttp_catalog in;
     echttp_catalog out;
@@ -669,17 +669,15 @@ static int echttp_received (int client, char *data, int length) {
                return length; // Consume everything, since we are closing.
            }
            wordcount = echttp_split (request[1], "?", rawuri, 4);
-           context->method = echttp_encoding_unescape(request[0]);
-           context->uri = echttp_encoding_unescape(rawuri[0]);
+           char *method = echttp_encoding_unescape(request[0]);
+           char *uri = echttp_encoding_unescape(rawuri[0]);
 
-           if (context->method == 0) {
-               echttp_invalid (client, "Invalid Method");
+           if ((method == 0)  || (uri == 0)) {
+               echttp_invalid (client, "Invalid request format");
                return length; // Consume everything, since we are closing.
            }
-           if (context->uri == 0) {
-               echttp_invalid (client, "Invalid URI");
-               return length; // Consume everything, since we are closing.
-           }
+           snprintf (context->method, sizeof(context->method), method);
+           snprintf (context->uri, sizeof(context->uri), uri);
 
            echttp_catalog_reset(&(context->params));
            if (wordcount == 2) {
@@ -753,6 +751,7 @@ static int echttp_received (int client, char *data, int length) {
               consumed += ((int) (endreq - data)); // Consumed the header.
               if ((context->route > 0) &&
                   echttp_routing.item[context->route].asynchronous) {
+                  if (echttp_debug) printf("HTTP: asynchronous request.\n");
                   echttp_execute_async (context->route, client,
                                         context->method, context->uri,
                                         context->content, available);
