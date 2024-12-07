@@ -80,14 +80,19 @@ typedef const char *echttp_callback (const char *method, const char *uri,
                                      const char *data, int length);
 ```
 The profile for any HTTP request processing function. The string returned contains the data to send back to the client; it must not be a local (stack) variable, since it is used after the callback returned.
+
 ```
 int echttp_route_uri (const char *uri, echttp_callback *call);
 ```
 Define a route for processing the exact specified URI. Return the route descriptor or -1 on failure.
+
+The callback declared here is called only when all the content data has been received.
 ```
 int echttp_route_match (const char *root, echttp_callback *call);
 ```
 Defines a route for a parent URI and all its children. Return the route descriptor or -1 on failure.
+
+The callback declared here is called only when all the content data has been received.
 ```
 typedef void echttp_protect_callback (const char *method, const char *uri);
 int echttp_protect (int route, echttp_protect_callback *call);
@@ -104,6 +109,28 @@ The global protect (route 0) is called first, then the protect for the specific 
 * If the status is any other 2xx, the route callback is called.
 
 This mechanism is meant to facilitates the implementation of access control extensions, this is not an access control method on its own.
+
+This function returns the original route descriptor (to allow to chain calls) or -1 on failure.
+
+```
+int echttp_asynchronous_route (int route, echttp_callback *call);
+```
+Declare an asynchronous callback for the specified route (see echttp_callback above). Return the original route descriptor, which allows to chain calls, or -1 on failure.
+
+The asynchronous route mode is intended for PUT or POST requests that transfer large amounts of data, like image or video.
+
+You cannot declare route 0 (i.e. all routes) as asynchronous, as this could impact routes that never expected to be called in asynchronous mode.
+
+You can change a route back to the default (synchronous) mode by assigning a null callback. You can also change the callback function. This take effect immediately, including for pending requests. This is not necessarily recommended..
+
+The asynchronous callback is different from the normal callback in that it is called only if not all content data has been received. The provided data is the portion of the content that _was_ received. The code should compare the value of Content-Length with the length argument to retrieve how much content is still expected. The function _must_ save all received content, call echttp_transfer to start the transfer of the remaining content and then return no data (null pointer).
+
+If the asynchronous callback function does not call echttp_transfer and does not trigger an error or a redirect, the pending request reverts to synchronous mode.
+
+The request processing stops if the asynchronous callback triggers a redirect or an error: the HTTP response is immediately sent and the remaining content is ignored.
+
+Otherwise, the normal (synchronous) callback will be called, with no data, once the full content has been transfered. This callback may retrieve the length of the content through the Content-Length attribute. (If Content-Length is 0, the request has no content.)
+
 ```
 const char *echttp_attribute_get (const char *name); 
 ```
@@ -153,7 +180,16 @@ This function returns the error message stored last for the current request (see
 ```
 void echttp_transfer (int fd, int size);
 ```
-Declare a file descriptor to transfer after the returned response. This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred from the file to the client. This transfer only happens after the HTTP preamble and the response string returned by the callback have been sent.
+Declare a file descriptor to use to transfer data with the remote.
+
+This function works in one of two modes:
+
+- If the current context is still waiting for more content data (see echttp_asynchronous_route()), then the data is to be transfered in, from the remote to the file descriptor provided (open in append mode). Once the transfer is complete, the normal application callback is called.
+
+- If no more content data is expected, then the data is to be transfered out, from the file descriptor provided (open in read mode) to the remote. That data will be sent _after_ the content data returned by the callback.
+
+This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred.
+
 ```
 void echttp_islocal (void);
 ```

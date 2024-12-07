@@ -39,6 +39,8 @@ typedef void echttp_protect_callback (const char *method, const char *uri);
 
 int echttp_protect (int route, echttp_protect_callback *call);
 
+int echttp_asynchronous_route (int route, echttp_callback *callback);
+
 const char *echttp_attribute_get (const char *name);
 const char *echttp_parameter_get  (const char *name);
 void        echttp_parameter_join (char *text, int size);
