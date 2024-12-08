@@ -618,8 +618,14 @@ static int echttp_received (int client, char *data, int length) {
        if (context->transfer.state == ECHTTP_TRANSFER_IN) { // Asynchronous.
            int size = length;
            if (context->transfer.size < length) size = context->transfer.size;
-           write (context->transfer.fd, data, size);
-           context->transfer.size -= size;
+           size = write (context->transfer.fd, data, size);
+           if (size <= 0) {
+               context->state == ECHTTP_STATE_ERROR;
+               context->transfer.size = 0;
+               size = length; // Discard all received data (see return below).
+           } else {
+               context->transfer.size -= size;
+           }
            if (context->transfer.size <= 0) {
                context->state = ECHTTP_STATE_IDLE;
                echttp_transfer_cancel(context);
