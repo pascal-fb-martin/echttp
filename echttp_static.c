@@ -25,6 +25,9 @@
  * int echttp_static_route (const char *uri, const char *path);
  *
  *    Declare a mapping between an URI and a local file or folder.
+ *    The same URI may be mapped multiple times: only the latest path
+ *    declared will be used. This allows applications to move the root
+ *    directory while running.
  *
  * void echttp_static_content_map (const char *extension, const char *content);
  *
@@ -183,7 +186,14 @@ void echttp_static_content_map (const char *extension, const char *content) {
 
 int echttp_static_route (const char *uri, const char *path) {
     echttp_static_initialize();
-    echttp_catalog_set (&echttp_static_roots, uri, path);
-    return echttp_route_match (uri, echttp_static_page);
+    const char *existing = echttp_catalog_get (&echttp_static_roots, uri);
+    if (existing) {
+        if (strcmp (existing, path)) {
+            echttp_catalog_set (&echttp_static_roots, uri, path); // Changed.
+        }
+    } else {
+        echttp_catalog_set (&echttp_static_roots, uri, path);
+        return echttp_route_match (uri, echttp_static_page); // All new URI.
+    }
 }
 

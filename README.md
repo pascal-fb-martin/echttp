@@ -257,6 +257,9 @@ As soon as a static route has been declared, the extension takes over the root U
 
 This function returns the route descriptor or -1 on failure. This route descriptor can be used to protect the whole path.
 
+It is allowed to declare the same URI route multiple times. Only the last path provided will be used (previous paths are discarded). This allows applications
+to change their URI mapping while running.
+
 ## Cross-Origin Resource Sharing (CORS) Extension
 
 The CORS extension facilitate the support for the CORS HTTP mechanism. See web public documentation for more details about this mechanism.
