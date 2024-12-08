@@ -269,6 +269,14 @@ static void echttp_transfer_reset (echttp_request *context) {
    context->transfer.size = 0;
 }
 
+static void echttp_transfer_cancel (echttp_request *context) {
+   if ((context->transfer.fd >= 0) &&
+       (context->transfer.state != ECHTTP_TRANSFER_IDLE)) {
+       close (context->transfer.fd);
+   }
+   echttp_transfer_reset (context);
+}
+
 static int echttp_split (char *data, const char *sep, char **items, int max) {
     int count = 0;
     int length = strlen(sep);
@@ -333,10 +341,13 @@ static void echttp_send_content (int client, const char *data, int length) {
         // all the preamble was submitted. Otherwise the raw layer may
         // start the file transfer before the HTTP preamble was sent..
         //
+        // Once this has been submitted to the raw layer, forget about it:
+        // the raw layer has become responsible for closing the file.
+        //
         echttp_raw_transfer (client,
                              context->transfer.fd,
                              context->transfer.size);
-        echttp_transfer_reset (context);
+        echttp_transfer_reset (context); // Forget.
     }
 }
 
@@ -351,7 +362,7 @@ static void echttp_send_error (int client, int status, const char *text) {
     char buffer[1024];
     int length = snprintf (buffer, sizeof(buffer), errorformat, status, text);
     echttp_send (client, buffer, length);
-    echttp_transfer_reset (context);
+    echttp_transfer_cancel (context);
     context->state = ECHTTP_STATE_ERROR;
 }
 
@@ -611,7 +622,7 @@ static int echttp_received (int client, char *data, int length) {
            context->transfer.size -= size;
            if (context->transfer.size <= 0) {
                context->state = ECHTTP_STATE_IDLE;
-               echttp_transfer_reset(context);
+               echttp_transfer_cancel(context);
                echttp_execute (context->route, client,
                                context->method, context->uri, 0, 0);
            }

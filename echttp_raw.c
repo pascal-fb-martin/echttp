@@ -100,6 +100,11 @@
  *    The mode parameter can be either 1 (read only), 2 (write only) or
  *    3 (read and write). This defines what echttp_raw will listen for.
  *
+ * void echttp_raw_transfer (int client, int fd, int length);
+ *
+ *    Initiate a data transfer from the specified file descriptor to the
+ *    specified client's socket. This is always an output transfer.
+ *
  * void echttp_raw_close_client (int i, const char *reason);
  *
  *    Close a client socket, either a local or remote client.
