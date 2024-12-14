@@ -123,9 +123,9 @@ You cannot declare route 0 (i.e. all routes) as asynchronous, as this could impa
 
 You can change a route back to the default (synchronous) mode by assigning a null callback. You can also change the callback function. This take effect immediately, including for pending requests. This is not necessarily recommended..
 
-The asynchronous callback is different from the normal callback in that it is called only if not all content data has been received. The provided data is the portion of the content that _was_ received. The code should compare the value of Content-Length with the length argument to retrieve how much content is still expected. The function _must_ save all received content, call echttp_transfer to start the transfer of the remaining content and then return no data (null pointer).
+The asynchronous callback is different from the normal callback in that it is called only if not all content data has been received. The provided data is the portion of the content that _was_ received. The code should compare the value of Content-Length with the length argument to retrieve how much content is still expected. The function _must_ save all received content, call echttp_transfer() to start the transfer of the remaining content and then return no data (null pointer).
 
-If the asynchronous callback function does not call echttp_transfer and does not trigger an error or a redirect, the pending request reverts to synchronous mode.
+If the asynchronous callback function does not call echttp_transfer() and does not trigger an error or a redirect, the pending request reverts to synchronous mode.
 
 The request processing stops if the asynchronous callback triggers a redirect or an error: the HTTP response is immediately sent and the remaining content is ignored.
 
@@ -324,6 +324,16 @@ A client request can be initiated from within an HTTP request callback (i.e. whi
 const char *echttp_client (const char *method, const char *url);
 ````
 Initiate a client context. This function returns 0 (null pointer) on success, or an error text on failure. There is no specific assumption made regarding the method string: any name compatible with the HTTP syntax would do, as long as the server supports it. The function will automatically use a TLS connection is the URL starts with "https:".
+
+```
+void echttp_asynchronous (echttp_response *asynchronous);
+```
+Declare this client request as asynchronous. This function can only be called just before calling echttp_submit().
+
+The asynchronous response callback is different from the normal response callback in that it is called only if not all content data has been received yet. The provided data is the portion of the content that _was_ received. The code should compare the value of Content-Length with the length argument to retrieve how much content is still expected. The function _must_ save all received content and call echttp_transfer() to start the transfer of the remaining content.
+
+If the asynchronous response callback function does not call echttp_transfer(), the pending request reverts to synchronous mode.
+
 ```
 typedef void echttp_response (void *origin, int status, char *data, int length);
 

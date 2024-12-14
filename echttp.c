@@ -230,6 +230,7 @@ typedef struct {
     } transfer;
 
     echttp_response *response;
+    echttp_response *asynchronous;
     void *origin;
 
 } echttp_request;
@@ -537,6 +538,21 @@ static int echttp_route_search (const char *uri, int match) {
 }
 
 
+static void echttp_respond_async (int client, char *data, int length) {
+
+   // Do not rely on echttp_current internally: this is processing a response
+   // and there is no current request processing.
+   //
+   echttp_request *context = echttp_context[client];
+
+   if (context->asynchronous) {
+       echttp_current = context;
+       context->asynchronous (context->origin, context->status, data, length);
+       echttp_current = 0;
+       context->asynchronous = 0;
+   }
+}
+
 static void echttp_respond (int client, char *data, int length) {
 
    // Do not rely on echttp_current internally: this is processing a response
@@ -571,6 +587,7 @@ static int echttp_newclient (int client) {
    context->mode = ECHTTP_RAW;
    echttp_transfer_reset (context);
    context->response = 0;
+   context->asynchronous = 0;
    context->origin = 0;
    context->route = 0;
    echttp_catalog_reset(&(context->in));
@@ -627,6 +644,15 @@ static int echttp_received (int client, char *data, int length) {
                context->transfer.size -= size;
            }
            if (context->transfer.size <= 0) {
+               if (context->response) {
+                   // Client connections are not reused: handle the response
+                   // and close.
+                   echttp_respond (client, 0, 0);
+                   echttp_raw_close_client(context->client, "end of response");
+                   return 0; // Connection was closed, nothing more to do.
+               }
+               // Server connections are kept open: the client may submit
+               // a subsequent request.
                context->state = ECHTTP_STATE_IDLE;
                echttp_transfer_cancel(context);
                echttp_execute (context->route, client,
@@ -638,10 +664,14 @@ static int echttp_received (int client, char *data, int length) {
        // Synchronous.
        if (context->contentlength > length) return 0; // Wait for more.
        if (context->response) {
+           // Client connections are not reused: handle the response
+           // and close.
            echttp_respond (client, data, context->contentlength);
            echttp_raw_close_client(context->client, "end of response");
            return 0; // Connection was closed, nothing more to do.
        }
+       // Server connections are kept open: the client may submit
+       // a subsequent request.
        echttp_execute (context->route, client,
                        context->method, context->uri,
                        data, context->contentlength);
@@ -738,7 +768,7 @@ static int echttp_received (int client, char *data, int length) {
            context->route = i;
        }
 
-       // Decode the header parameters after the request/status line.
+       // Decode the header attributes after the request/status line.
        //
        echttp_catalog_reset(&(context->in));
        for (i = 1; i < linecount; ++i) {
@@ -766,7 +796,17 @@ static int echttp_received (int client, char *data, int length) {
               if (echttp_debug) printf("HTTP: waiting for end of content.\n");
               context->state = ECHTTP_STATE_CONTENT;
               consumed += ((int) (endreq - data)); // Consumed the header.
-              if ((context->route > 0) &&
+
+              // Asynchronous request (client side).
+              if (context->asynchronous) {
+                  if (echttp_debug) printf("HTTP: asynchronous response.\n");
+                  echttp_respond_async (client, context->content, available);
+                  if (context->state == ECHTTP_STATE_ERROR) return length;
+                  if (context->transfer.state == ECHTTP_TRANSFER_IN)
+                      consumed += available; // Consumed the received content.
+
+              // Asynchronous endpoint (server side).
+              } else if ((context->route > 0) &&
                   echttp_routing.item[context->route].asynchronous) {
                   if (echttp_debug) printf("HTTP: asynchronous request.\n");
                   echttp_execute_async (context->route, client,
@@ -1092,6 +1132,12 @@ const char *echttp_client (const char *method, const char *url) {
     snprintf (buffer, sizeof(buffer), "Host: %s%s\r\n", host, j?service:"");
     echttp_send (client, buffer, strlen(buffer));
     return 0;
+}
+
+void echttp_asynchronous (echttp_response *asynchronous) {
+    if (echttp_current) {
+        echttp_current->asynchronous = asynchronous;
+    }
 }
 
 int echttp_redirected (const char *method) {

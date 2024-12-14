@@ -78,9 +78,9 @@ void echttp_escape (const char *s, char *d, int size);
 typedef void echttp_response (void *origin, int status, char *data, int length);
 
 const char *echttp_client (const char *method, const char *url);
-
-void echttp_submit (const char *data, int length,
-                    echttp_response *response, void *origin);
+void echttp_asynchronous  (echttp_response *asynchronous);
+void echttp_submit        (const char *data, int length,
+                           echttp_response *response, void *origin);
 
 int echttp_redirected (const char *method);
 #endif
