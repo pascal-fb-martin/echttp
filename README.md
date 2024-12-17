@@ -190,6 +190,8 @@ This function works in one of two modes:
 
 This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred.
 
+The echttp_transfer() function uses sendfile(2) when transferring data out (to the remote), but uses normal file operations (read(2) and write(2)) when transferring data in, from the remote.
+
 ```
 void echttp_islocal (void);
 ```

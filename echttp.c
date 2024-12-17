@@ -969,12 +969,14 @@ void echttp_transfer (int fd, int size) {
     if (!echttp_current) return;
     if (echttp_current->transfer.state != ECHTTP_TRANSFER_IDLE) return;
 
-    if ((echttp_current->state == ECHTTP_STATE_CONTENT) &&
-        echttp_current->route &&
-        echttp_routing.item[echttp_current->route].asynchronous) {
-       echttp_current->transfer.state = ECHTTP_TRANSFER_IN;
-    } else {
-       echttp_current->transfer.state = ECHTTP_TRANSFER_OUT;
+    echttp_current->transfer.state = ECHTTP_TRANSFER_OUT; // Default.
+
+    if (echttp_current->state == ECHTTP_STATE_CONTENT) {
+       if (echttp_current->asynchronous ||
+           (echttp_current->route &&
+            echttp_routing.item[echttp_current->route].asynchronous)) {
+           echttp_current->transfer.state = ECHTTP_TRANSFER_IN;
+       }
     }
     echttp_current->transfer.fd = fd;
     echttp_current->transfer.size = size;
@@ -1140,6 +1142,15 @@ void echttp_asynchronous (echttp_response *asynchronous) {
     }
 }
 
+static void echttp_copy_attributes (echttp_request *src, echttp_request *dst) {
+    int i;
+    for (i = 1; i <= src->out.count; ++i) {
+        if (src->out.item[i].name == 0) continue;
+        echttp_catalog_set (&(dst->out),
+                            src->out.item[i].name, src->out.item[i].value);
+    }
+}
+
 int echttp_redirected (const char *method) {
 
     switch (echttp_current->status) {
@@ -1159,11 +1170,14 @@ int echttp_redirected (const char *method) {
         // With this redirection, the pending request is complete.
         // We need to open a new connection to the redirected location.
         // This new connection does not stack on top of the original
-        // request: is replaces it.
+        // request: is replaces it, with the same HTTP header attributes.
+        echttp_request *redirected = echttp_current;
         echttp_request *stacked = echttp_stacked;
         const char *error = echttp_client (method, redirect);
         echttp_stacked = stacked;
-        if (!error) return 0;
+        if (error) return 500;
+        echttp_copy_attributes (redirected, echttp_current);
+        return 0;
     }
     return 500;
 }

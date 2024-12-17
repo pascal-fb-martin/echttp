@@ -113,13 +113,52 @@ static const char *echttp_static_file (int page, const char *filename) {
             echttp_content_type_set (content);
         }
     }
-    echttp_transfer (page, fileinfo.st_size);
+    int size = fileinfo.st_size;
+
+    // Support for partial content requests.
+    //
+    const char *rangespec = echttp_attribute_get ("Range");
+    if (rangespec) {
+        // This only supports a single range,
+        // supported format is: 'bytes=' begin '-' [end].
+printf ("%s: range request\n", filename);
+        while (*rangespec == ' ') rangespec += 1;
+        if (strncasecmp (rangespec, "bytes=", 6)) goto unsupported;
+        rangespec += 6;
+
+        if (strchr (rangespec, ',')) goto unsupported;
+        const char *sep = strchr (rangespec, '-');
+        if (!sep) goto unsupported;
+
+        int offset = atoi (rangespec);
+        if (offset < 0) goto unsupported;
+
+        int end = atoi (sep+1);
+        if (end > 0) {
+            if (end <= offset) goto unsupported;
+            size = end + 1 - offset;
+        } else {
+            size -= offset; // All the rest of the file.
+        }
+
+        if (offset > 0) {
+            if (lseek (page, offset, SEEK_SET) != offset) goto unsupported;
+        }
+printf ("%s: valid range request at offset %d\n", filename, offset);
+        if (size != fileinfo.st_size) {
+            echttp_error (206, "Partial Content"); // Not really an error.
+        }
+    }
+
+    echttp_transfer (page, size);
     return "";
 
-    unsupported:
-        if (echttp_isdebug()) printf ("File type violation: %s\n", filename);
-        echttp_error (406, "File Not Acceptable");
-        return "";
+unsupported:
+printf ("%s: invalid request\n", filename);
+    if (echttp_isdebug()) printf ("File type violation: %s\n", filename);
+    echttp_error (406, "File Not Acceptable");
+    close (page);
+    return "";
 }
 
 static const char *echttp_static_page (const char *action,
