@@ -121,7 +121,6 @@ static const char *echttp_static_file (int page, const char *filename) {
     if (rangespec) {
         // This only supports a single range,
         // supported format is: 'bytes=' begin '-' [end].
-printf ("%s: range request\n", filename);
         while (*rangespec == ' ') rangespec += 1;
         if (strncasecmp (rangespec, "bytes=", 6)) goto unsupported;
         rangespec += 6;
@@ -144,7 +143,6 @@ printf ("%s: range request\n", filename);
         if (offset > 0) {
             if (lseek (page, offset, SEEK_SET) != offset) goto unsupported;
         }
-printf ("%s: valid range request at offset %d\n", filename, offset);
         if (size != fileinfo.st_size) {
             echttp_error (206, "Partial Content"); // Not really an error.
         }
@@ -154,7 +152,6 @@ printf ("%s: valid range request at offset %d\n", filename, offset);
     return "";
 
 unsupported:
-printf ("%s: invalid request\n", filename);
     if (echttp_isdebug()) printf ("File type violation: %s\n", filename);
     echttp_error (406, "File Not Acceptable");
     close (page);
