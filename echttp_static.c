@@ -122,19 +122,19 @@ static const char *echttp_static_file (int page, const char *filename) {
         // This only supports a single range,
         // supported format is: 'bytes=' begin '-' [end].
         while (*rangespec == ' ') rangespec += 1;
-        if (strncasecmp (rangespec, "bytes=", 6)) goto unsupported;
+        if (strncasecmp (rangespec, "bytes=", 6)) goto fullcontent;
         rangespec += 6;
 
-        if (strchr (rangespec, ',')) goto unsupported;
+        if (strchr (rangespec, ',')) goto fullcontent;
         const char *sep = strchr (rangespec, '-');
-        if (!sep) goto unsupported;
+        if (!sep) goto fullcontent;
 
         int offset = atoi (rangespec);
-        if (offset < 0) goto unsupported;
+        if (offset < 0) goto fullcontent;
 
         int end = atoi (sep+1);
         if (end > 0) {
-            if (end <= offset) goto unsupported;
+            if (end <= offset) goto fullcontent;
             size = end + 1 - offset;
         } else {
             size -= offset; // All the rest of the file.
@@ -144,10 +144,15 @@ static const char *echttp_static_file (int page, const char *filename) {
             if (lseek (page, offset, SEEK_SET) != offset) goto unsupported;
         }
         if (size != fileinfo.st_size) {
+            char ascii[128];
+            snprintf (ascii, sizeof(ascii), "bytes %d-%d/%d",
+                      offset, offset+size-1, fileinfo.st_size);
+            echttp_attribute_set ("Content-Range", ascii);
             echttp_error (206, "Partial Content"); // Not really an error.
         }
     }
 
+fullcontent:
     echttp_transfer (page, size);
     return "";
 
