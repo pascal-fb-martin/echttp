@@ -214,14 +214,25 @@ static int echttp_raw_inprogress (int code) {
     return ((code == EAGAIN) || (code == EWOULDBLOCK) || (code == EINPROGRESS));
 }
 
-// In some cases the fixed TTL is not good enough, for example a client
+// In some cases the fixed TTL is too short, for example a client
 // sending large amount of data. This function allows extending the
-// deadline bit-by-bit as needed.
+// deadline by small increments as needed.
 //
 static void echttp_raw_extendlife (int client) {
     if (!echttp_raw_io[client].deadline) return; // No deadline to extend.
-    if (echttp_raw_io[client].deadline <= time(0))
-        echttp_raw_io[client].deadline += 1;
+    time_t now = time(0);
+    if (echttp_raw_io[client].deadline <= now)
+        echttp_raw_io[client].deadline = now + 2;
+}
+
+// In some cases the fixed TTL is too long, for example a browser
+// issuing large number of requests. Once the transfer of the response
+// has started, a long TTL is no longer useful.
+// This function allows adjusting the deadline as needed.
+//
+static void echttp_raw_adjustlife (int client) {
+    if (!echttp_raw_io[client].deadline) return; // No deadline to adjust.
+    echttp_raw_io[client].deadline = time(0) + 1;
 }
 
 static void echttp_raw_io_cleanup (int i) {
@@ -513,7 +524,9 @@ static void echttp_raw_prune (time_t now) {
 }
 
 static int echttp_raw_consume (echttp_buffer *buffer, int length) {
-   buffer->start += length;
+   if (length > 0) {
+       buffer->start += length;
+   }
    if (buffer->start >= buffer->end) {
        buffer->start = buffer->end = 0;
    }
@@ -578,7 +591,24 @@ static void echttp_raw_transmit (int i) {
            echttp_raw_io[i].data->tcp.transfer.fd = -1;
            echttp_raw_io[i].data->tcp.transfer.size = 0;
        }
+       echttp_raw_adjustlife (i);
    }
+}
+
+// Process the input accumulated in the buffer.
+//
+static int echttp_raw_bufferedinput (int i, echttp_raw_receiver received) {
+    echttp_buffer *buffer = &(echttp_raw_io[i].data->tcp.in);
+    int length = buffer->end - buffer->start;
+    if (length <= 0) return 0; // No data.
+    if (received) {
+        length = received (i, buffer->data+buffer->start, length);
+    }
+    if (echttp_raw_io[i].fd >= 0) {
+        echttp_raw_consume (buffer, length);
+        return length;
+    }
+    return 0;
 }
 
 static void echttp_raw_receive (int i, echttp_raw_receiver received) {
@@ -609,12 +639,7 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
        printf (__FILE__ " [client %d] data = %s\n", i, buffer->data);
        fflush (stdout);
    }
-   if (received) {
-       length =
-           received (i, buffer->data+buffer->start, buffer->end-buffer->start);
-       if (echttp_raw_io[i].fd >= 0 && length > 0)
-           echttp_raw_consume (buffer, length);
-   }
+   echttp_raw_bufferedinput (i, received);
    echttp_raw_extendlife (i);
 }
 
@@ -700,8 +725,11 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                   if (echttp_raw_io[i].data->tcp.out.end > 0 ||
                       echttp_raw_io[i].data->tcp.transfer.size > 0) {
                       FD_SET(fd, &writeset);
-                  } else {
-                      // Receive only after the previous response has been sent.
+                  } else if (! echttp_raw_bufferedinput (i, received)) {
+                      // Receive new data only after the previous response
+                      // has been sent and all the received data that can
+                      // be consumed has been consumed. This is done to avoid
+                      // mixing data between output buffer and transfer later.
                       FD_SET(fd, &readset);
                   }
                   break;

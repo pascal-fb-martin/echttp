@@ -681,8 +681,13 @@ static int echttp_received (int client, char *data, int length) {
    }
 
    // We are waiting for a new HTTP PDU.
-   // (The code handles multiple requests queued one after the other,
-   // even while that might not be permitted by the HTTP standard.)
+   // The HTTP standard allows sending requests back to back, however
+   // echttp cannot send a new response before the previous has been sent
+   // when the transfer mechanism is being used. The problem is that there
+   // is no mechanism to sequence multiple transfers one after the other,
+   // combined with buffer data.
+   // Here we loop _until_ a full HTTP request has been processed, at which
+   // time the code breaks free.
    //
    while ((data < enddata) && ((endreq = strstr(data, endpattern)) != 0)) {
        // Decode this complete HTTP header.
@@ -831,6 +836,9 @@ static int echttp_received (int client, char *data, int length) {
        echttp_execute (context->route, client,
                       context->method, context->uri,
                       context->content, context->contentlength);
+       // Avoid processing a subsequent request before the response has been
+       // sent. Otherwise there could be a problem with concurrent transfers.
+       break;
    }
    return consumed;
 }
