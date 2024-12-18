@@ -214,6 +214,16 @@ static int echttp_raw_inprogress (int code) {
     return ((code == EAGAIN) || (code == EWOULDBLOCK) || (code == EINPROGRESS));
 }
 
+// In some cases the fixed TTL is not good enough, for example a client
+// sending large amount of data. This function allows extending the
+// deadline bit-by-bit as needed.
+//
+static void echttp_raw_extendlife (int client) {
+    if (!echttp_raw_io[client].deadline) return; // No deadline to extend.
+    if (echttp_raw_io[client].deadline <= time(0))
+        echttp_raw_io[client].deadline += 1;
+}
+
 static void echttp_raw_io_cleanup (int i) {
    echttp_raw_io[i].fd = -1;
    echttp_raw_io[i].use = ECHTTP_RAW_UNUSED;
@@ -477,6 +487,31 @@ void echttp_raw_close_client (int i, const char *reason) {
     }
 }
 
+// Close lingering connections.
+// This only applies to clients that have a deadline set (deadline not null).
+// The pruning is also delayed as long as there is queued data to send.
+//
+static void echttp_raw_prune (time_t now) {
+
+    static time_t LastDeadlineCheck = 0;
+    if (LastDeadlineCheck == now) return;
+    LastDeadlineCheck = now;
+
+    int i;
+    for (i = 0; i <= echttp_raw_io_last; ++i) {
+        echttp_raw_context *context = echttp_raw_io + i;
+        if (context->deadline == 0) continue; // No deadline was set.
+        if (now > context->deadline) {
+            if (context->use == ECHTTP_RAW_TCP) {
+                if (context->data->tcp.transfer.size > 0) continue;
+                echttp_buffer *buffer = &(context->data->tcp.out);
+                if (buffer->end > buffer->start) continue;
+            }
+            echttp_raw_close_client (i, "deadline reached");
+        }
+    }
+}
+
 static int echttp_raw_consume (echttp_buffer *buffer, int length) {
    buffer->start += length;
    if (buffer->start >= buffer->end) {
@@ -515,7 +550,6 @@ static void echttp_raw_transmit (int i) {
               printf (__FILE__ " [Client %d] Transmit buffer is now empty.\n", i);
           }
       }
-      echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
 
    } else if (echttp_raw_io[i].data->tcp.transfer.size > 0) {
 
@@ -544,7 +578,6 @@ static void echttp_raw_transmit (int i) {
            echttp_raw_io[i].data->tcp.transfer.fd = -1;
            echttp_raw_io[i].data->tcp.transfer.size = 0;
        }
-       echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
    }
 }
 
@@ -582,7 +615,7 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
        if (echttp_raw_io[i].fd >= 0 && length > 0)
            echttp_raw_consume (buffer, length);
    }
-   echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
+   echttp_raw_extendlife (i);
 }
 
 static int echttp_raw_invalid (int client) {
@@ -734,7 +767,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                      if (mode) {
                          int id = fd;
                          if (echttp_raw_io[i].use == ECHTTP_RAW_APP) {
-                             echttp_raw_io[i].deadline = now + echttp_raw_ttl;
+                             echttp_raw_extendlife (i);
                              id = i;
                          }
                          echttp_raw_io[i].data->listen.listener (id, mode);
@@ -750,12 +783,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           }
       }
 
-      for (i = 0; i <= echttp_raw_io_last; ++i) {
-          if (echttp_raw_io[i].deadline == 0) continue;
-          if (now > echttp_raw_io[i].deadline) {
-              echttp_raw_close_client (i, "deadline reached");
-          }
-      }
+      echttp_raw_prune (now);
    }
 }
 
