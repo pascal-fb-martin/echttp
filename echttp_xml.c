@@ -109,6 +109,7 @@ static const char *echttp_xml_string (ParserContext context, int parent) {
     if (quoted) to = ++from;
 
     const char *error = add_token (context, PARSER_STRING);
+    if (error) return error;
     context->token[string].value.string = to;
 
     if (parent >= 0) context->token[parent].length += 1;

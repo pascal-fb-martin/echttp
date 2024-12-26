@@ -315,7 +315,6 @@ int echttp_sorted_descending_from (const echttp_sorted_list b,
     if (!b) return 1;
     int i;
     if (b->depth == 7) {
-        int low = key & 0xff;
         for (i = key & 0xff; i >= 0; --i) {
             struct echttp_sorted_leaf *leaf = b->index[i].leaf;
             if (leaf) {

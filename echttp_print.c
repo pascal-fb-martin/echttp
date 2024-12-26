@@ -61,15 +61,23 @@ static void print_tokens (ParserToken *token, int count) {
             name = typeascii;
         }
         switch (token[i].type) {
-            case PARSER_NULL: value = "null"; break;
-            case PARSER_BOOL: value = (token[i].value.bool)?"true":"false"; break;
+            case PARSER_NULL:
+                value = "null";
+                break;
+            case PARSER_BOOL:
+                value = (token[i].value.bool)?"true":"false";
+                break;
             case PARSER_INTEGER:
-                snprintf (valueascii, sizeof(valueascii), "%ld", token[i].value.integer);
+                snprintf (valueascii, sizeof(valueascii), "%lld", token[i].value.integer);
+                value = valueascii;
                 break;
             case PARSER_REAL:
                 snprintf (valueascii, sizeof(valueascii), "%e", token[i].value.real);
+                value = valueascii;
                 break;
-            case PARSER_STRING: value = token[i].value.string; break;
+            case PARSER_STRING:
+                value = token[i].value.string;
+                break;
             default: value = "";
         }
         printf ("Token type %s at index %d, length %d, key %s, value = %s\n",
@@ -77,7 +85,7 @@ static void print_tokens (ParserToken *token, int count) {
     }
 }
 
-void main (int argc, const char **argv) {
+int main (int argc, const char **argv) {
 
     int i;
     int size;
@@ -186,7 +194,6 @@ void main (int argc, const char **argv) {
     // These are useless (we exit anyway), make static analysis happy.
     if (token) free(token);
     if (outbuffer) free(outbuffer);
-    exit(0);
-
+    return 0;
 }
 

@@ -81,7 +81,7 @@ static void echttp_cors_initialize (void) {
     if (echttp_allowed_origin.count == 0) {
         // Always allow this local host, either under its name or 'localhost'..
         char hostname[256];
-        char buffer[256];
+        char buffer[300];
         gethostname (hostname, sizeof(hostname));
         snprintf (buffer, sizeof(buffer),
                   "http://%s:%d", hostname, echttp_port(4));

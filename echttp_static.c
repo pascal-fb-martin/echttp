@@ -79,7 +79,7 @@ static struct {
 
 static const char *echttp_static_file (int page, const char *filename) {
 
-    char index[1024];
+    char index[1040];
 
     if (page < 0) {
         echttp_error (404, "Not found");
@@ -113,7 +113,7 @@ static const char *echttp_static_file (int page, const char *filename) {
             echttp_content_type_set (content);
         }
     }
-    int size = fileinfo.st_size;
+    off_t size = fileinfo.st_size;
 
     // Support for partial content requests.
     //
@@ -129,10 +129,10 @@ static const char *echttp_static_file (int page, const char *filename) {
         const char *sep = strchr (rangespec, '-');
         if (!sep) goto fullcontent;
 
-        int offset = atoi (rangespec);
+        off_t offset = atol (rangespec);
         if (offset < 0) goto fullcontent;
 
-        int end = atoi (sep+1);
+        off_t end = atoi (sep+1);
         if (end > 0) {
             if (end <= offset) goto fullcontent;
             size = end + 1 - offset;
@@ -145,7 +145,7 @@ static const char *echttp_static_file (int page, const char *filename) {
         }
         if (size != fileinfo.st_size) {
             char ascii[128];
-            snprintf (ascii, sizeof(ascii), "bytes %d-%d/%d",
+            snprintf (ascii, sizeof(ascii), "bytes %ld-%ld/%ld",
                       offset, offset+size-1, fileinfo.st_size);
             echttp_attribute_set ("Content-Range", ascii);
             echttp_error (206, "Partial Content"); // Not really an error.
@@ -226,15 +226,17 @@ void echttp_static_content_map (const char *extension, const char *content) {
 }
 
 int echttp_static_route (const char *uri, const char *path) {
+
     echttp_static_initialize();
-    const char *existing = echttp_catalog_get (&echttp_static_roots, uri);
-    if (existing) {
+    int route = echttp_route_find (uri);
+    if (route >= 0) {
+        const char *existing = echttp_catalog_get (&echttp_static_roots, uri);
         if (strcmp (existing, path)) {
             echttp_catalog_set (&echttp_static_roots, uri, path); // Changed.
         }
-    } else {
-        echttp_catalog_set (&echttp_static_roots, uri, path);
-        return echttp_route_match (uri, echttp_static_page); // All new URI.
+        return route;
     }
+    echttp_catalog_set (&echttp_static_roots, uri, path);
+    return echttp_route_match (uri, echttp_static_page); // All new URI.
 }
 

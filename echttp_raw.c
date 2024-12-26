@@ -198,16 +198,6 @@ static int echttp_raw_serverport = 0;
 static echttp_raw_terminator *echttp_raw_terminate = 0;
 
 
-#define ECHTTP_IF_MAX 16
-static struct {
-    uint32_t ifaddr;
-    uint32_t ifmask;
-} echttp_raw_if[ECHTTP_IF_MAX];
-
-static int echttp_raw_ifcount = 0;
-static time_t echttp_raw_timestamp = 0;
-
-
 // The errno reported in non-blocking mode are quite confusing.
 // Take the most conservative approach here.
 //
@@ -283,13 +273,23 @@ static int echttp_raw_io_new (char use, int fd) {
 
            if (i > echttp_raw_io_last) echttp_raw_io_last = i;
            if (echttp_raw_debug)
-               printf (__FILE__ " [client %d] new, socket %d (%s)\n", i, fd, toname[use]);
+               printf (__FILE__ " [client %d] new, socket %d (%s)\n", i, fd, toname[(int)use]);
            return i;
        }
    }
    fprintf (stderr, "Too many IO, reject this new one.\n");
    return -1;
 }
+
+/* NOT USED FOR NOW.
+#define ECHTTP_IF_MAX 16
+static struct {
+    uint32_t ifaddr;
+    uint32_t ifmask;
+} echttp_raw_if[ECHTTP_IF_MAX];
+
+static int echttp_raw_ifcount = 0;
+static time_t echttp_raw_timestamp = 0;
 
 static const char *echttp_printip (long ip) {
     static char ascii[16];
@@ -347,6 +347,7 @@ static void echttp_raw_enumerate (void) {
         echttp_raw_timestamp = now;
     }
 }
+*/
 
 static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    int i;
@@ -458,7 +459,7 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
    }
 
    if (port == 0) {
-       int addrlen = sizeof(netaddress6);
+       socklen_t addrlen = sizeof(netaddress6);
        getsockname (echttp_raw_server,
                     (struct sockaddr *)&netaddress6, &addrlen);
        port = echttp_raw_serverport = ntohs(netaddress6.sin6_port);
@@ -571,7 +572,7 @@ static void echttp_raw_transmit (int i) {
        if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
 
        if (echttp_raw_debug)
-           printf (__FILE__ " [client %d] transfer from %d to %d, %d out of %d bytes\n",
+           printf (__FILE__ " [client %d] transfer from %d to %d, %ld out of %d bytes\n",
                       i,
                       echttp_raw_io[i].data->tcp.transfer.fd,
                       echttp_raw_io[i].fd,

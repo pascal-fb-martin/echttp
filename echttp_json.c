@@ -200,8 +200,8 @@ static const char *echttp_json_number (ParserContext context) {
         isvalidnumber['E'] = 2;
     }
     JSONTRACE ("number");
-    while (*json > 0 && isvalidnumber[*json] == 1) json += 1;
-    if (*json > 0 && isvalidnumber[*json] == 2) {
+    while (*json > 0 && isvalidnumber[(int)(*json)] == 1) json += 1;
+    if (*json > 0 && isvalidnumber[(int)(*json)] == 2) {
         context->token[context->count].type = PARSER_REAL;
         context->token[context->count].value.real =
             strtof(context->source + context->cursor, &json);
@@ -385,7 +385,6 @@ static const char *echttp_json_object (ParserContext context) {
 
     int i = context->count;
     ParserToken *token = context->token;
-    char *json = context->source;
 
     token[i].type = PARSER_OBJECT;
     token[i].length = 0;
@@ -589,7 +588,7 @@ static void echttp_json_gen_string (ParserContext context, int i) {
 
     while (*value) {
         if (*value > 0) {
-            char escape = escapelist[*value];
+            char escape = escapelist[(int)(*value)];
             if (escape) {
                 *to++ = '\\';
                 *to++ = escape;

@@ -133,7 +133,7 @@ unsigned int echttp_hash_signature (const char *name) {
 
     unsigned int hash = 5381;
     int c;
-    while (c = *name++)
+    while ((c = *name++) != 0)
         hash = ((hash << 5) + hash) + tolower(c); /* hash * 33 + c */
     return hash;
 }
