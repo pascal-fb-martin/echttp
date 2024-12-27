@@ -576,7 +576,7 @@ static void echttp_raw_transmit (int i) {
                       i,
                       echttp_raw_io[i].data->tcp.transfer.fd,
                       echttp_raw_io[i].fd,
-                      length, echttp_raw_io[i].data->tcp.transfer.size);
+                      (long)length, echttp_raw_io[i].data->tcp.transfer.size);
        length = sendfile (echttp_raw_io[i].fd,
                           echttp_raw_io[i].data->tcp.transfer.fd, 0, length);
        if (length <= 0) {
