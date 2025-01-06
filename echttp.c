@@ -613,6 +613,7 @@ static int echttp_received (int client, char *data, int length) {
        if (echttp_debug)
            printf ("End of connection while waiting for %s\n",
                    context->response?"response":"request");
+       echttp_transfer_cancel(context); // Done with data transfer, if any.
        if (context->response) {
            context->status = 505;
            echttp_respond (client, 0, 0);
@@ -641,12 +642,12 @@ static int echttp_received (int client, char *data, int length) {
            size = write (context->transfer.fd, data, size);
            if (size <= 0) {
                context->state = ECHTTP_STATE_ERROR;
-               context->transfer.size = 0;
-               size = length; // Discard all received data (see return below).
-           } else {
-               context->transfer.size -= size;
+               echttp_transfer_cancel(context);
+               return length; // Discard all received data.
            }
+           context->transfer.size -= size;
            if (context->transfer.size <= 0) {
+               echttp_transfer_cancel(context); // Done with that transfer.
                if (context->response) {
                    // Client connections are not reused: handle the response
                    // and close.
@@ -657,7 +658,6 @@ static int echttp_received (int client, char *data, int length) {
                // Server connections are kept open: the client may submit
                // a subsequent request.
                context->state = ECHTTP_STATE_IDLE;
-               echttp_transfer_cancel(context);
                echttp_execute (context->route, client,
                                context->method, context->uri, 0, 0);
            }

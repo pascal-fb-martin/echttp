@@ -156,7 +156,7 @@ static char next_word (ParserContext context) {
 
 static const char *add_token (ParserContext context) {
     context->count += 1;
-    if (context->count > context->max) return "JSON structure is too long";
+    if (context->count >= context->max) return "JSON structure is too long";
     return 0;
 }
 
@@ -425,7 +425,9 @@ int echttp_json_estimate (const char *json) {
     // and does not account for a ',' after an object or array: it might
     // overestimates the number of tokens needed. This is OK because
     // we are looking for enough space, not for the smallest space.
-    int count = 0;
+    // We are also counting 1 token more because this code tends to fill
+    // the latest token before checking for overflow.. :-(
+    int count = 1;
     for (;;) {
         switch (*(json++)) {
             case ']':
