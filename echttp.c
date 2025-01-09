@@ -727,6 +727,17 @@ static int echttp_received (int client, char *data, int length) {
            char *method = echttp_encoding_unescape(request[0]);
            char *uri = echttp_encoding_unescape(rawuri[0]);
 
+           if (strstr (uri, "..")) {
+               // There is no legitimate reason to use ".." in any URL, even
+               // this is not a file URL.
+               // (The same protection is already implemented in echttp_static
+               // and then in a few other places. That it was needed in more
+               // than one place is what motivated this low-level check: too
+               // much risk of having the check missing in some places.
+               echttp_raw_close_client(context->client, "path traversal");
+               return 0; // Connection was closed, nothing more to do.
+           }
+
            if ((method == 0)  || (uri == 0)) {
                echttp_invalid (client, "Invalid request format");
                return length; // Consume everything, since we are closing.
@@ -943,35 +954,43 @@ int echttp_asynchronous_route (int route, echttp_callback *callback) {
 }
 
 const char *echttp_attribute_get (const char *name) {
+    if (! echttp_current) return 0;
     return echttp_catalog_get (&(echttp_current->in), name);
 }
 
 const char *echttp_parameter_get (const char *name) {
+    if (! echttp_current) return 0;
     return echttp_catalog_get (&(echttp_current->params), name);
 }
 
 void echttp_parameter_join (char *text, int size) {
+    if (! echttp_current) return;
     echttp_catalog_join (&(echttp_current->params), "&", text, size);
 }
 
 void echttp_attribute_set (const char *name, const char *value) {
+    if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out), name, value);
 }
 
 void echttp_content_type_set (const char *value) {
+    if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out), "Content-Type", value);
 }
 
 void echttp_content_type_json (void) {
+    if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out),
                         "Content-Type", "application/json");
 }
 
 void echttp_content_type_html (void) {
+    if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/html");
 }
 
 void echttp_content_type_css (void) {
+    if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/css");
 }
 
@@ -994,11 +1013,13 @@ void echttp_transfer (int fd, int size) {
 }
 
 void echttp_error (int code, const char *message) {
+    if (! echttp_current) return;
     echttp_current->status = code;
     echttp_current->reason = message;
 }
 
 const char *echttp_reason (void) {
+    if (! echttp_current) return 0;
     return echttp_current->reason;
 }
 
@@ -1013,6 +1034,7 @@ void echttp_permanent_redirect (const char *url) {
 }
 
 int echttp_islocal (void) {
+    if (! echttp_current) return 0;
     return echttp_raw_is_local(echttp_current->client);
 }
 
