@@ -228,7 +228,7 @@ The echttp_forget() function is used to remove the I/O from the list. It has no 
 ```
 void echttp_background (echttp_listener *listener);
 ```
-Call the specified listener before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to on the next cycle. Expect this listener to be called once a second at least, if not a lot more.
+Call the specified listener before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to on the next cycle. This listener will be called once a second at most.
 
 There is only one background listener.
 ```

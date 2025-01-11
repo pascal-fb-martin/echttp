@@ -710,6 +710,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
    fd_set writeset;
    int i;
    int count;
+   time_t now = time(0);
 
    echttp_raw_terminate = terminate;
 
@@ -718,6 +719,20 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
       FD_ZERO(&readset);
       FD_ZERO(&writeset);
       FD_SET(echttp_raw_server, &readset);
+
+      // The background call is made after I/O processing (remember, this is
+      // a loop), being the lowest priority, but before evaluating the IOs
+      // to listen to so that the background function may change the list.
+      // Don't call the background function more than once a second,
+      // in case there are continuous events waking up select().
+      //
+      if (echttp_raw_backgrounder) {
+          static time_t LastBackground = 0;
+          if (now != LastBackground) {
+              echttp_raw_backgrounder (0, 0);
+              LastBackground = now;
+          }
+      }
 
       for (i = 0; i <= echttp_raw_io_last; ++i) {
           int mode;
@@ -752,15 +767,11 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           if (fd > maxfd) maxfd = fd;
       }
 
-      if (echttp_raw_backgrounder) {
-          echttp_raw_backgrounder (0, 0);
-      }
-
       timeout.tv_sec = 1;
       timeout.tv_usec = 0;
       count = select(maxfd+1, &readset, &writeset, NULL, &timeout);
 
-      time_t now = time(0);
+      now = time(0);
 
       if (count > 0) {
           for (i = 0; i <= echttp_raw_io_last; ++i) {
