@@ -245,6 +245,17 @@ Immediately close the HTTP server and all current HTTP connections.
 The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include echttp_static.h.
 The static page extension primitives are:
 ```
+void echttp_static_default (const char *arg);
+```
+Set a default value for a command line argument accepted by the static pages extension. This default value takes the form of a command line option (typically --name=value). The value will be overriden if the option is present in the command line (see echttp_static_initialize() below).
+```
+void echttp_static_initialize (int argc, const char *argv[]);
+```
+Initialize the static pages extensions according to the command line options. This extension accepts the following options:
+* --http-root=PATH: Define a route for the root URI ("/") using PATH.
+
+The echttp_static_default() and echttp_static_initialize() functions are optional. If not used, the application will have to declare the root URI explicitly. Their purpose is to make it easy to declare an alternate root path in the command line without much code logic in the application.
+```
 void echttp_static_content_map (const char *extension, const char *content);
 ```
 Define the content type associated with a specific file extension. The content type is implicitely defined for the following file extensions: html, htm, json, jsn, css.

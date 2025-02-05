@@ -22,6 +22,17 @@
  * A minimal HTTP server library designed for simplicity and embedding in
  * existing applications.
  *
+ * void echttp_static_default (const char *arg);
+ *
+ *    Declare a default option, which will be ignored if an alternate value
+ *    is provided in the command line (see below).
+ *    
+ * void echttp_static_initialize (int argc, const char *argv[]);
+ *
+ *    Initialize this module according to command line options.
+ *
+ *    Compatibility with previous versions: this initialization is optional.
+ *
  * int echttp_static_route (const char *uri, const char *path);
  *
  *    Declare a mapping between an URI and a local file or folder.
@@ -205,7 +216,7 @@ static const char *echttp_static_page (const char *action,
     return echttp_static_file (open (filename, O_RDONLY), filename);
 }
 
-static void echttp_static_initialize (void) {
+static void echttp_static_internal_initialization (void) {
 
     static int Initialized = 0;
     if (!Initialized) {
@@ -221,13 +232,13 @@ static void echttp_static_initialize (void) {
 }
 
 void echttp_static_content_map (const char *extension, const char *content) {
-    echttp_static_initialize();
+    echttp_static_internal_initialization ();
     echttp_catalog_set (&echttp_static_type, extension, content);
 }
 
 int echttp_static_route (const char *uri, const char *path) {
 
-    echttp_static_initialize();
+    echttp_static_internal_initialization ();
     int route = echttp_route_find (uri);
     if (route >= 0) {
         const char *existing = echttp_catalog_get (&echttp_static_roots, uri);
@@ -238,5 +249,22 @@ int echttp_static_route (const char *uri, const char *path) {
     }
     echttp_catalog_set (&echttp_static_roots, uri, path);
     return echttp_route_match (uri, echttp_static_page); // All new URI.
+}
+
+static const char *EchttpStaticRoot = 0;
+
+void echttp_static_default (const char *arg) {
+
+    if (echttp_option_match ("-http-root=", arg, &EchttpStaticRoot)) return;
+}
+
+void echttp_static_initialize (int argc, const char *argv[]) {
+
+    int i;
+    for (i = 1; i < argc; ++i) {
+        echttp_static_default (argv[i]); // Override the defaults.
+    }
+    echttp_static_internal_initialization ();
+    if (EchttpStaticRoot) echttp_static_route ("/", EchttpStaticRoot);
 }
 
