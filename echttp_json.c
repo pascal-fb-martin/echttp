@@ -545,7 +545,7 @@ static void echttp_json_gen_integer (ParserContext context, int i) {
 
 static void echttp_json_gen_real (ParserContext context, int i) {
     char buffer[64];
-    snprintf (buffer, sizeof(buffer), "%e", context->token[i].value.real);
+    snprintf (buffer, sizeof(buffer), "%1.8e", context->token[i].value.real);
     echttp_json_gen_append (context, buffer);
 }
 

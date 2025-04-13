@@ -837,10 +837,53 @@ static int echttp_received (int client, char *data, int length) {
               }
               return consumed; // Wait for more.
           }
+          // All expected data was received.
+          consumed += ((int) (endreq - data) + context->contentlength);
+          data = endreq + context->contentlength;
+       } else {
+           // Maybe this is (short) chunked data..
+           field = echttp_catalog_get(&(context->in), "Transfer-Encoding");
+           if (field) {
+               if (strcmp (field, "chunked")) {
+                   echttp_raw_close_client(context->client,
+                                           "unsupported transfer encoding");
+                   return length; // Consume everything, invalid.
+               }
+               // Time to panic: the length is not known yet, as it will
+               // be provided in chunks. Did we receive it all?
+               int extracted = 0;
+               char *decode = endreq;
+               char *cursor = endreq;
+               for (;;) {
+                   while ((*decode) && (*decode <= ' ')) decode += 1;
+                   if (decode >= enddata) {
+                       echttp_raw_close_client(context->client,
+                                               "incomplete chunked data");
+                       return 0; // Nothing more to do with this connection.
+                   }
+                   int size = strtol (decode, &decode, 16);
+                   while (*decode != '\n') decode += 1;
+                   decode += 1; // Skip LF.
+                   if (size == 0) break; // Last chunk.
+
+                   // Eliminate the chunking by moving the data.
+                   memmove (cursor, decode, size);
+                   decode += size; // Skip the data.
+                   cursor += size;
+                   extracted += size;
+               }
+               // We received it all: accept that easy case for now.
+               *cursor = 0;
+               context->contentlength = extracted;
+               consumed = (int) (decode - data);
+               data = decode;
+           } else {
+               // No data?
+              consumed += ((int) (endreq - data)); // Consumed the header.
+              data = endreq;
+           }
        }
        if (!context->contentlength) context->content = 0;
-       consumed += ((int) (endreq - data) + context->contentlength);
-       data = endreq + context->contentlength;
 
        if (context->response) {
            echttp_respond (client, context->content, context->contentlength);
