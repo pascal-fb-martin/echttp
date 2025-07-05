@@ -10,6 +10,7 @@ OBJS= echttp.o \
       echttp_encoding.o \
       echttp_option.o \
       echttp_json.o \
+      echttp_reduce.o \
       echttp_xml.o \
       echttp_parser.o
 
@@ -21,6 +22,7 @@ PUBLIC_INCLUDE=echttp.h \
               echttp_static.h \
               echttp_cors.h \
               echttp_json.h \
+              echttp_reduce.h \
               echttp_xml.h \
               echttp_parser.h
 
