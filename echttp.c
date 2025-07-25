@@ -495,14 +495,23 @@ static void echttp_execute (int route, int client,
 
 static int echttp_route_add (const char *uri, echttp_callback *call, int match) {
 
-    int i = echttp_routing.count + 1;
-    unsigned int signature = echttp_hash_signature (uri);
-    int index = signature % ECHTTP_HASH;
-
+    // Try reusing a discarded slot first. This is not the most efficient
+    // method (make a free list instead?) but adding a route is rare..
+    // If no discarded slot is found, then "i" will automatically index
+    // a new entry.
+    int i;
+    for (i = 1; i <= echttp_routing.count; ++i) {
+        if (!echttp_routing.item[i].uri) break;
+    }
     if (i >= ECHTTP_MAX_ROUTES) {
         fprintf (stderr, "Too many routes.\n");
         return -1;
     }
+    if (i > echttp_routing.count) echttp_routing.count = i; // New slot.
+
+    unsigned int signature = echttp_hash_signature (uri);
+    int index = signature % ECHTTP_HASH;
+
     echttp_routing.item[i].uri = uri;
     echttp_routing.item[i].call = call;
     echttp_routing.item[i].protect = 0;
@@ -511,7 +520,6 @@ static int echttp_route_add (const char *uri, echttp_callback *call, int match) 
     echttp_routing.item[i].signature = signature;
     echttp_routing.item[i].next = echttp_routing.index[index];
     echttp_routing.index[index] = i;
-    echttp_routing.count = i;
     return i;
 }
 
@@ -981,17 +989,48 @@ int echttp_route_match (const char *root, echttp_callback *call) {
     return echttp_route_add (root, call, ECHTTP_MATCH_PARENT);
 }
 
+void echttp_route_remove (const char *uri) {
+
+    int i = echttp_route_find (uri);
+    if (i <= 0) return;
+
+    // Remove the route from the hash list.
+    // This may take a loop since this is a single link list,
+    // but the remove operation is considered rare.
+    // Plus this is a collision list, which is short almost all the time.
+    //
+    unsigned int signature = echttp_hash_signature (uri);
+    int index = signature % ECHTTP_HASH;
+    if (echttp_routing.index[index] == i)
+       echttp_routing.index[index] = echttp_routing.item[i].next;
+    else {
+       int j;
+       for (j = echttp_routing.index[index];
+            j > 0; j = echttp_routing.item[j].next) {
+            if (echttp_routing.item[j].next == i) {
+               echttp_routing.item[j].next = echttp_routing.item[i].next;
+               break;
+            }
+       }
+    }
+
+    echttp_routing.item[i].uri = 0; // Garbage collection is up to the caller.
+}
+
 int echttp_protect (int route, echttp_protect_callback *call) {
-    if (route < 0 || route > echttp_routing.count) return -1;
     if (route == 0)
         echttp_routing.protect = call;
-    else
+    else {
+        if (route < 0 || route > echttp_routing.count) return -1;
+        if (!echttp_routing.item[route].uri) return -1;
         echttp_routing.item[route].protect = call;
+    }
     return route;
 }
 
 int echttp_asynchronous_route (int route, echttp_callback *callback) {
     if (route <= 0 || route > echttp_routing.count) return -1;
+    if (!echttp_routing.item[route].uri) return -1;
     echttp_routing.item[route].asynchronous = callback;
     return route;
 }

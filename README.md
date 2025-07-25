@@ -94,6 +94,12 @@ Defines a route for a parent URI and all its children. Return the route descript
 
 The callback declared here is called only when all the content data has been received.
 ```
+void echttp_route_remove (const char *uri);
+```
+Remove a previously declared route, either an exact route or a root match.
+The caller is responsible for deallocating the uri (or root) string, if
+necessary.
+```
 typedef void echttp_protect_callback (const char *method, const char *uri);
 int echttp_protect (int route, echttp_protect_callback *call);
 ```
