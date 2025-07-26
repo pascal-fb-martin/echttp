@@ -158,7 +158,7 @@ typedef struct {
     echttp_listener *listener;
 } echttp_raw_listen;
 
-#define ECHTTP_CLIENT_BUFFER 131072 // 128 KB
+#define ECHTTP_CLIENT_BUFFER 614400 // 600 KB
 
 typedef struct {
     char data[ECHTTP_CLIENT_BUFFER];
