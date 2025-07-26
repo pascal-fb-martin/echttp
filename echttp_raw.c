@@ -184,7 +184,7 @@ typedef struct {
     union {
         echttp_raw_listen listen; // Also used by ECHTTP_RAW_APP.
         echttp_raw_tcp    tcp;
-    } *data;
+    } *state;
 } echttp_raw_context;
 
 static echttp_raw_context *echttp_raw_io = 0;
@@ -251,23 +251,23 @@ static int echttp_raw_io_new (char use, int fd) {
            echttp_raw_io[i].deadline = 0;
            echttp_raw_io[i].premium = 0;
 
-           if (!echttp_raw_io[i].data)
-               echttp_raw_io[i].data =
-                   malloc (sizeof(*(echttp_raw_io[i].data)));
+           if (!echttp_raw_io[i].state)
+               echttp_raw_io[i].state =
+                   malloc (sizeof(*(echttp_raw_io[i].state)));
 
            switch (use) {
                case ECHTTP_RAW_TCP:
-                   echttp_raw_io[i].data->tcp.in.start = 0;
-                   echttp_raw_io[i].data->tcp.in.end = 0;
-                   echttp_raw_io[i].data->tcp.out.start = 0;
-                   echttp_raw_io[i].data->tcp.out.end = 0;
-                   echttp_raw_io[i].data->tcp.transfer.fd = -1;
-                   echttp_raw_io[i].data->tcp.transfer.size = 0;
+                   echttp_raw_io[i].state->tcp.in.start = 0;
+                   echttp_raw_io[i].state->tcp.in.end = 0;
+                   echttp_raw_io[i].state->tcp.out.start = 0;
+                   echttp_raw_io[i].state->tcp.out.end = 0;
+                   echttp_raw_io[i].state->tcp.transfer.fd = -1;
+                   echttp_raw_io[i].state->tcp.transfer.size = 0;
                    break;
                case ECHTTP_RAW_APP:
                case ECHTTP_RAW_LISTEN:
-                   echttp_raw_io[i].data->listen.mode = 0;
-                   echttp_raw_io[i].data->listen.listener = 0;
+                   echttp_raw_io[i].state->listen.mode = 0;
+                   echttp_raw_io[i].state->listen.listener = 0;
                    break;
            }
 
@@ -386,7 +386,7 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    }
 
    echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
-   echttp_raw_io[i].data->tcp.peer = peer;
+   echttp_raw_io[i].state->tcp.peer = peer;
 }
 
 int echttp_raw_open (const char *service, int debug, int ttl) {
@@ -409,7 +409,7 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
        echttp_raw_io[i].fd = -1;
        echttp_raw_io[i].premium = 0;
        echttp_raw_io[i].deadline = 0;
-       echttp_raw_io[i].data = 0;
+       echttp_raw_io[i].state = 0;
    }
 
    if (strcmp ("dynamic", service) == 0) {
@@ -487,8 +487,8 @@ void echttp_raw_close_client (int i, const char *reason) {
             printf (__FILE__ " [client %d] closing: %s\n", i, reason);
         switch (echttp_raw_io[i].use) {
             case ECHTTP_RAW_TCP:
-                if (echttp_raw_io[i].data->tcp.transfer.size > 0) {
-                    close (echttp_raw_io[i].data->tcp.transfer.fd);
+                if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
+                    close (echttp_raw_io[i].state->tcp.transfer.fd);
                 }
             case ECHTTP_RAW_APP:
                 if (echttp_raw_terminate)
@@ -516,8 +516,8 @@ static void echttp_raw_prune (time_t now) {
         if (context->deadline == 0) continue; // No deadline was set.
         if (now > context->deadline) {
             if (context->use == ECHTTP_RAW_TCP) {
-                if (context->data->tcp.transfer.size > 0) continue;
-                echttp_buffer *buffer = &(context->data->tcp.out);
+                if (context->state->tcp.transfer.size > 0) continue;
+                echttp_buffer *buffer = &(context->state->tcp.out);
                 if (buffer->end > buffer->start) continue;
             }
             echttp_raw_close_client (i, "deadline reached");
@@ -539,7 +539,7 @@ static void echttp_raw_transmit (int i) {
 
    if (echttp_raw_io[i].use != ECHTTP_RAW_TCP) return;
 
-   echttp_buffer *buffer = &(echttp_raw_io[i].data->tcp.out);
+   echttp_buffer *buffer = &(echttp_raw_io[i].state->tcp.out);
 
    ssize_t length = buffer->end - buffer->start;
    if (length > 0) {
@@ -561,24 +561,24 @@ static void echttp_raw_transmit (int i) {
       }
       if (echttp_raw_consume (buffer, length)) {
           if (echttp_raw_debug &&
-              (echttp_raw_io[i].data->tcp.transfer.size > 0)) {
+              (echttp_raw_io[i].state->tcp.transfer.size > 0)) {
               printf (__FILE__ " [Client %d] Transmit buffer is now empty.\n", i);
           }
       }
 
-   } else if (echttp_raw_io[i].data->tcp.transfer.size > 0) {
+   } else if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
 
-       length = echttp_raw_io[i].data->tcp.transfer.size;
+       length = echttp_raw_io[i].state->tcp.transfer.size;
        if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
 
        if (echttp_raw_debug)
            printf (__FILE__ " [client %d] transfer from %d to %d, %ld out of %d bytes\n",
                       i,
-                      echttp_raw_io[i].data->tcp.transfer.fd,
+                      echttp_raw_io[i].state->tcp.transfer.fd,
                       echttp_raw_io[i].fd,
-                      (long)length, echttp_raw_io[i].data->tcp.transfer.size);
+                      (long)length, echttp_raw_io[i].state->tcp.transfer.size);
        length = sendfile (echttp_raw_io[i].fd,
-                          echttp_raw_io[i].data->tcp.transfer.fd, 0, length);
+                          echttp_raw_io[i].state->tcp.transfer.fd, 0, length);
        if (length <= 0) {
            if (echttp_raw_debug)
                printf (__FILE__ " [client %d] sendfile error %s\n",
@@ -587,11 +587,11 @@ static void echttp_raw_transmit (int i) {
                echttp_raw_close_client (i, strerror(errno));
            return;
        }
-       echttp_raw_io[i].data->tcp.transfer.size -= length;
-       if (echttp_raw_io[i].data->tcp.transfer.size <= 0) {
-           close (echttp_raw_io[i].data->tcp.transfer.fd);
-           echttp_raw_io[i].data->tcp.transfer.fd = -1;
-           echttp_raw_io[i].data->tcp.transfer.size = 0;
+       echttp_raw_io[i].state->tcp.transfer.size -= length;
+       if (echttp_raw_io[i].state->tcp.transfer.size <= 0) {
+           close (echttp_raw_io[i].state->tcp.transfer.fd);
+           echttp_raw_io[i].state->tcp.transfer.fd = -1;
+           echttp_raw_io[i].state->tcp.transfer.size = 0;
        }
        echttp_raw_adjustlife (i);
    }
@@ -600,7 +600,7 @@ static void echttp_raw_transmit (int i) {
 // Process the input accumulated in the buffer.
 //
 static int echttp_raw_bufferedinput (int i, echttp_raw_receiver received) {
-    echttp_buffer *buffer = &(echttp_raw_io[i].data->tcp.in);
+    echttp_buffer *buffer = &(echttp_raw_io[i].state->tcp.in);
     int length = buffer->end - buffer->start;
     if (length <= 0) return 0; // No data.
     if (received) {
@@ -615,7 +615,7 @@ static int echttp_raw_bufferedinput (int i, echttp_raw_receiver received) {
 
 static void echttp_raw_receive (int i, echttp_raw_receiver received) {
 
-   echttp_buffer *buffer = &(echttp_raw_io[i].data->tcp.in);
+   echttp_buffer *buffer = &(echttp_raw_io[i].state->tcp.in);
 
    ssize_t length = sizeof(buffer->data) - buffer->end - 1;
    if (length <= 0) {
@@ -659,7 +659,7 @@ static int echttp_raw_invalid (int client) {
 
 int  echttp_raw_is_local (int client) {
 
-    if (echttp_raw_io[client].data->tcp.peer.sin6_family != AF_INET6) return 1;
+    if (echttp_raw_io[client].state->tcp.peer.sin6_family != AF_INET6) return 1;
 
     return 1; // TBD: adjust this check to IPv6 addresses.
 
@@ -679,7 +679,7 @@ void echttp_raw_send (int client, const char *data, int length) {
 
    if (echttp_raw_io[client].use != ECHTTP_RAW_TCP) return;
 
-   echttp_buffer *buffer = &(echttp_raw_io[client].data->tcp.out);
+   echttp_buffer *buffer = &(echttp_raw_io[client].state->tcp.out);
    if (echttp_raw_invalid(client)) return;
    if (length > sizeof(buffer->data) - buffer->end) {
        echttp_raw_close_client (client, "Transmit data is too large");
@@ -697,8 +697,8 @@ void echttp_raw_transfer (int client, int fd, int length) {
    if (echttp_raw_debug)
        printf (__FILE__ " [client %d] transfer requested, file %d, length %d\n",
                client, fd, length);
-   echttp_raw_io[client].data->tcp.transfer.fd = fd;
-   echttp_raw_io[client].data->tcp.transfer.size = length;
+   echttp_raw_io[client].state->tcp.transfer.fd = fd;
+   echttp_raw_io[client].state->tcp.transfer.size = length;
 }
 
 void echttp_raw_loop (echttp_raw_acceptor *accept,
@@ -739,8 +739,8 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           int fd = echttp_raw_io[i].fd;
           switch (echttp_raw_io[i].use) {
               case ECHTTP_RAW_TCP:
-                  if (echttp_raw_io[i].data->tcp.out.end > 0 ||
-                      echttp_raw_io[i].data->tcp.transfer.size > 0) {
+                  if (echttp_raw_io[i].state->tcp.out.end > 0 ||
+                      echttp_raw_io[i].state->tcp.transfer.size > 0) {
                       FD_SET(fd, &writeset);
                   } else if (! echttp_raw_bufferedinput (i, received)) {
                       // Receive new data only after the previous response
@@ -752,7 +752,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                   break;
               case ECHTTP_RAW_APP:
               case ECHTTP_RAW_LISTEN:
-                  mode = echttp_raw_io[i].data->listen.mode;
+                  mode = echttp_raw_io[i].state->listen.mode;
                   if (!mode) continue;
                   if (mode & 1) {
                       FD_SET(fd, &readset);
@@ -777,13 +777,13 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           for (i = 0; i <= echttp_raw_io_last; ++i) {
               if (!echttp_raw_io[i].premium) continue;
               if (echttp_raw_io[i].use != ECHTTP_RAW_LISTEN) continue;
-              if (!echttp_raw_io[i].data->listen.mode) continue;
+              if (!echttp_raw_io[i].state->listen.mode) continue;
               int fd = echttp_raw_io[i].fd;
               int mode = 0;
               if (FD_ISSET(fd, &readset)) mode |= 1;
               if (FD_ISSET(fd, &writeset)) mode |= 2;
               if (mode) {
-                  echttp_raw_io[i].data->listen.listener (fd, mode);
+                  echttp_raw_io[i].state->listen.listener (fd, mode);
               }
           }
 
@@ -801,7 +801,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                  case ECHTTP_RAW_LISTEN:
                      if (echttp_raw_io[i].premium) continue;
                  case ECHTTP_RAW_APP:
-                     if (!echttp_raw_io[i].data->listen.mode) continue;
+                     if (!echttp_raw_io[i].state->listen.mode) continue;
                      int mode = 0;
                      if (FD_ISSET(fd, &readset)) mode |= 1;
                      if (FD_ISSET(fd, &writeset)) mode |= 2;
@@ -811,7 +811,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                              echttp_raw_extendlife (i);
                              id = i;
                          }
-                         echttp_raw_io[i].data->listen.listener (id, mode);
+                         echttp_raw_io[i].state->listen.listener (id, mode);
                      }
                      break;
                  default:
@@ -845,10 +845,10 @@ int echttp_raw_register (int fd, int mode,
     for (i = 0; i <= echttp_raw_io_last; ++i) {
         if (echttp_raw_io[i].fd == fd) { // Update existing entry.
             if (echttp_raw_io[i].use != use) return -1;
-            echttp_raw_io[i].data->listen.mode = mode;
+            echttp_raw_io[i].state->listen.mode = mode;
             if (mode) {
                 echttp_raw_io[i].premium = premium;
-                echttp_raw_io[i].data->listen.listener = listener;
+                echttp_raw_io[i].state->listen.listener = listener;
             }
             return i;
         }
@@ -863,8 +863,8 @@ int echttp_raw_register (int fd, int mode,
         return -1;
     }
     echttp_raw_io[i].premium = premium;
-    echttp_raw_io[i].data->listen.mode = mode;
-    echttp_raw_io[i].data->listen.listener = listener;
+    echttp_raw_io[i].state->listen.mode = mode;
+    echttp_raw_io[i].state->listen.listener = listener;
     if (echttp_raw_debug)
         printf (__FILE__ " [client %d] registered socket %d (%s)\n",
                 i, fd, (use == ECHTTP_RAW_LISTEN)?"listen":"app");
@@ -882,7 +882,7 @@ int echttp_raw_update (int client, int mode) {
     switch (echttp_raw_io[client].use) {
         case ECHTTP_RAW_APP:
         case ECHTTP_RAW_LISTEN:
-            echttp_raw_io[client].data->listen.mode = mode;
+            echttp_raw_io[client].state->listen.mode = mode;
             break;
         default:
             break;
@@ -966,7 +966,7 @@ int echttp_raw_manage (int s) {
     }
     if (echttp_raw_debug)
         printf (__FILE__ " [client %d] managing socket %d\n", i, s);
-    echttp_raw_io[i].data->tcp.peer = (struct sockaddr_in6){0};
+    echttp_raw_io[i].state->tcp.peer = (struct sockaddr_in6){0};
     return i;
 }
 
