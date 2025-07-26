@@ -232,7 +232,13 @@ static void echttp_raw_io_cleanup (int i) {
    echttp_raw_io[i].premium = 0;
    echttp_raw_io[i].deadline = 0;
    if (i == echttp_raw_io_last) {
-       while (echttp_raw_io[--echttp_raw_io_last].use == ECHTTP_RAW_UNUSED) ;
+       do {
+           if (echttp_raw_io[echttp_raw_io_last].state) {
+               free (echttp_raw_io[echttp_raw_io_last].state);
+               echttp_raw_io[echttp_raw_io_last].state = 0;
+           }
+           if (echttp_raw_io_last <= 0) break;
+       } while (echttp_raw_io[--echttp_raw_io_last].use == ECHTTP_RAW_UNUSED);
    }
 }
 
