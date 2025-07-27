@@ -213,6 +213,7 @@ typedef struct {
     int route;
     int client;
     int contentlength;
+    int contentlengthout;
     char method[64];
     char uri[512];
     char *content;
@@ -472,6 +473,7 @@ static void echttp_execute (int route, int client,
         echttp_current = 0;
         return;
     }
+    context->contentlengthout = 0;
     data = echttp_routing.item[route].call (action, uri, data, length);
     echttp_current = 0;
 
@@ -479,7 +481,12 @@ static void echttp_execute (int route, int client,
         echttp_send_error (client, context->status, context->reason);
         return;
     }
-    length = data?strlen(data):0;
+    if (! data)
+        length = 0;
+    else if (context->contentlengthout > 0)
+        length = context->contentlengthout;
+    else
+        length = strlen(data);
 
     char buffer[256];
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
@@ -1074,6 +1081,11 @@ void echttp_content_type_html (void) {
 void echttp_content_type_css (void) {
     if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out), "Content-Type", "text/css");
+}
+
+void echttp_content_length (int length) {
+    if (! echttp_current) return;
+    echttp_current->contentlengthout = length;
 }
 
 void echttp_transfer (int fd, int size) {

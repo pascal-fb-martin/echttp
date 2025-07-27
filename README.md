@@ -175,6 +175,10 @@ void echttp_content_type_css (void);
 ```
 A shorthand for setting the Content-Type attribute to CSS.
 ```
+void echttp_content_length (int length);
+```
+Force the length of the data that will be returned. This is mostly intended to handle binary data, for which the length cannot be calculated.
+```
 void echttp_error (int code, const char *message);
 ```
 The HTTP response will return the specified error instead of OK.
