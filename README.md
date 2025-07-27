@@ -11,6 +11,7 @@ After initializing the HTTP server, and then completing its own initialization, 
 This web server can be configured to use dynamic port allocation for its server socket. Before you hit your head against the proverbial wall trying to understand why the hell this is even allowed, please take a look at [houseportal](https://github.com/pascal-fb-martin/houseportal).
 
 # Installation
+
 * Clone the repository.
 * cd echttp
 * make
@@ -72,6 +73,7 @@ int echttp_open (int argc, const char **argv);
 Initialize the HTTP server. The HTTP-specific arguments are removed from the argument list and the count of remaining arguments is returned.
 
 The arguments consumed by echttp_open are:
+
 * -http-service=_name_ (Service name or port number to listen to; default is "http", i.e. port 80. A dynamic port number will be used if the service name is "dynamic".)
 * -http-debug (If present, expect to see a lot of debug traces.)
 
@@ -110,6 +112,7 @@ If the route is 0 the protect callback applies to all routes, in addition of eac
 Note that the protect callback is associated with a route, i.e. the URI string, not with a callback function: one may define two routes to the same callback function, and protect one route but not the other. This is intentional, as this allows protecting specific file paths without protecting all file paths (see the static page extention later).
 
 The global protect (route 0) is called first, then the protect for the specific route. However the later is not called if the global protect changed the HTTP status to something different than 200. How the HTTP request is then processed depends on the HTTP status after both protect calls:
+
 * If the status is not a 2xx, the route callback is not called and the connection is closed after the response has been sent.
 * If the status is 204, the route callback is not called and no data is returned with the response.
 * If the status is any other 2xx, the route callback is called.
@@ -258,6 +261,7 @@ Set a default value for a command line argument accepted by the static pages ext
 void echttp_static_initialize (int argc, const char *argv[]);
 ```
 Initialize the static pages extensions according to the command line options. This extension accepts the following options:
+
 * --http-root=PATH: Define a route for the root URI ("/") using PATH.
 
 The echttp_static_default() and echttp_static_initialize() functions are optional. If not used, the application will have to declare the root URI explicitly. Their purpose is to make it easy to declare an alternate root path in the command line without much code logic in the application.
@@ -328,6 +332,7 @@ The echttp library includes support for the HTTP and HTTPS client side. This is 
 The intent is to allow an application using echttp to access other web servers to collect information, or to access web services. For example a sprinkler controller may need to access public web sites to get weather information, or control relays through local web services.
 
 A web client request is processed in three steps:
+
 * Initialize the query context (providing the method and URL).
 * Set optional attributes if needed, using the standard echttp API (i.e. the same function as used to prepare a server response).
 * Send the request to the server.
@@ -368,6 +373,7 @@ The echttp client functions do not automatically follow redirection (HTTP status
 int echttp_redirected (const char *method);
 ```
 This function handles the common cases of redirections. If used, this must be called from the application's response callback, and it must be the first thing that the response callback do. How the response callback then behaves depends on the return code:
+
 * Non-zero: the response was not handled and the response must be processed as normal. The value returned is an updated HTTP status.
 * 0: the response was fully handled and the response callback must now (re)build the request data, call echttp_submit and then return without processing the response further.
 
@@ -428,6 +434,7 @@ typedef struct {
 } ParserToken;
 ```
 The possible types are:
+
 * PARSER_NULL
 * PARSER_BOOL
 * PARSER_INTEGER
@@ -441,6 +448,7 @@ Arrays and objects have no value, but the length items indicates how many elemen
 The key pointer is null for anynymous items.
 
 This token structure closely matches the JSON syntax. When decoding XML, the following rules apply:
+
 * The only token types generated are PARSER_OBJECT and PARSER_STRING.
 * An anonymous top level object is always created.
 * Every XML tag is type PARSER_OBJECT.
@@ -505,6 +513,7 @@ const char *echttp_json_export (ParserContext context, char *buffer, int size);
 This group of functions makes it easy to create JSON data directly from the application. The typical usage is in an HTTP request handler, to build a JSON response to the client's request for live data. The echttp_json_start() function allocates a JSON context used in all subsequent calls. The application provides the JSON token array and a memory pool for storing strings (JSON keys and values). The echttp_json_add_XXX() functions add one more JSON token to the data structure. The parent argument is used for generating nested structures: a valid parent argument is the return value from a previous call to echttp_json_add_object() or echttp_json_add_array(). The order of the calls must be consistent with the JSON data structure as it defines the order in which the JSON entities will be generated: an object or array must be completely defined before the next non-nested object or array is created. The key argument must be present when the parent is an object, and will be ignored when the parent is an array. The echttp_json_end() function deletes the context and return the count of tokens that have been created. The token array can then be used for create JSON text using echttp_json_format(). Function echttp_json_export() combines echttp_json_end() and echttp_json_format() in a single call (with pretty printing disabled).
 
 There are also two JSON utilities provided with echttp:
+
 * echttp_print reformats the content of the JSON or XML files provided and prints it to standard output as JSON. By default the output is pretty-printed; if the -r option is used, the output is generated as a single line with no space between JSON elements.
 * echttp_get loads the JSON or XML data from the file name (first argument) and prints the value associated with each path provided (subsequent arguments). Note that the JavaScript array syntax used for the path requires quoting in shell.
 
@@ -539,11 +548,13 @@ void echttp_catalog_reset (echttp_catalog *d);
 ```
 
 There are two ways to add (or update) entries in a catalog:
+
 * The simplest method works if the value was not allocated, or is referenced in another place:
 ```
 void echttp_catalog_set (echttp_catalog *d,
                          const char *name, const char *value);
 ```
+
 * The more generic method returns the old (and discarded) value, if any, which allows it do be deallocated cleanly if necessary:
 ```
 const char *echttp_catalog_refresh
@@ -552,10 +563,12 @@ const char *echttp_catalog_refresh
 In both case the value of an existing entry is replaced with the new value, or a new entry is added if non match the name. The timestamp parameter indicates the age of the entry, which can be useful when using the catalog for discovery, i.e. when expired entries should be ignored.
 
 A catalog entry can be retrieved in two ways:
+
 * Find the entry, for example when both the value and timestamp must be accessed:
 ```
 int echttp_catalog_find (echttp_catalog *d, const char *name);
 ```
+
 * Get the value:
 ```
 const char *echttp_catalog_get (echttp_catalog *d, const char *name);
@@ -596,6 +609,7 @@ This function decodes the escape sequences as per the HTTP encoding rules. The d
 The echttp library comes with a module for creating and maintaining sorted
 lists. The order is maintained while adding and removing items. This module
 is intended for chronologically ordered lists:
+
 - The sort key is a 64 bit integer (unsigned),
 - The implementation is optimized for key values that are clumped together,
   like timestamps from the last few weeks or months.
