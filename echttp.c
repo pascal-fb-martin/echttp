@@ -206,6 +206,14 @@ static int         echttp_debug = 0;
 
 enum echttp_transport {ECHTTP_RAW = 0, ECHTTP_TLS = 1};
 
+typedef struct echttp_queue_data *echttp_queue;
+
+struct echttp_queue_data {
+    echttp_queue next;
+    const char *data;
+    int length;
+};
+
 typedef struct {
     enum echttp_transport mode;
     short state;
@@ -223,6 +231,10 @@ typedef struct {
 
     int status;
     const char *reason;
+
+    echttp_queue next;
+    echttp_queue last;
+    int queued;
 
     struct {
         int state; // IDLE, IN or OUT (see ECHTTP_TRANSFER_ constants)
@@ -324,7 +336,8 @@ static void echttp_send_content (int client, const char *data, int length) {
         transfer_size = context->transfer.size;
 
     int size = snprintf (buffer, sizeof(buffer)-1,
-                         "Content-Length: %d\r\n", length + transfer_size);
+                         "Content-Length: %d\r\n",
+                         length + context->queued + transfer_size);
     echttp_send (client, buffer, size);
 
     for (i = 1; i <= context->out.count; ++i) {
@@ -338,6 +351,20 @@ static void echttp_send_content (int client, const char *data, int length) {
     if (length > 0) {
        echttp_send (client, data, length);
     }
+
+    // Data queued can now be sent. Count on echttp_raw to absorb
+    // any burst size (with its own buffers).
+    echttp_queue cursor = context->next;
+    while (cursor) {
+        echttp_send (client, cursor->data, cursor->length);
+        echttp_queue next = cursor->next;
+        free ((void*)(cursor->data));
+        free (cursor);
+        cursor = next;
+    }
+    context->next = context->last = 0;
+    context->queued = 0;
+
     if (transfer_size > 0) {
         // This transfer must be submitted to the raw layer only after
         // all the preamble was submitted. Otherwise the raw layer may
@@ -600,6 +627,7 @@ static int echttp_newclient (int client) {
    if (!context) {
        context = echttp_context[client] = malloc (sizeof(echttp_request));
        context->client = client;
+       context->next = context->last = 0;
    }
    context->state = ECHTTP_STATE_IDLE;
    context->mode = ECHTTP_RAW;
@@ -610,6 +638,7 @@ static int echttp_newclient (int client) {
    context->route = 0;
    echttp_catalog_reset(&(context->in));
    echttp_catalog_reset(&(context->out));
+   context->queued = 0;
    return 1;
 }
 
@@ -924,6 +953,15 @@ static void echttp_terminate (int client, const char *reason) {
             echttp_tls_detach_client (client, reason);
             break;
     }
+    echttp_queue cursor = echttp_context[client]->next;
+    while (cursor) {
+        echttp_queue next = cursor->next;
+        free ((void*)(cursor->data));
+        free (cursor);
+        cursor = next;
+    }
+    echttp_context[client]->next = echttp_context[client]->last = 0;
+    echttp_context[client]->queued = 0;
 }
 
 const char *echttp_help (int level) {
@@ -1086,6 +1124,20 @@ void echttp_content_type_css (void) {
 void echttp_content_length (int length) {
     if (! echttp_current) return;
     echttp_current->contentlengthout = length;
+}
+
+void echttp_content_queue (const char *data, int length) {
+    if (! echttp_current) return;
+    echttp_queue item = malloc (sizeof(struct echttp_queue_data));
+    item->next = 0;
+    item->data = data;
+    item->length = length;
+    if (echttp_current->last)
+       echttp_current->last->next = item;
+    else
+       echttp_current->next = item;
+    echttp_current->last = item;
+    echttp_current->queued += length;
 }
 
 void echttp_transfer (int fd, int size) {

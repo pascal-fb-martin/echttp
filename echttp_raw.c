@@ -158,9 +158,12 @@ typedef struct {
     echttp_listener *listener;
 } echttp_raw_listen;
 
-#define ECHTTP_CLIENT_BUFFER 614400 // 600 KB
+#define ECHTTP_CLIENT_BUFFER 0x20000 // 128 KB, way enough for most cases.
 
-typedef struct {
+typedef struct _echttp_buffer *echttp_queue;
+
+typedef struct _echttp_buffer {
+    echttp_queue next;
     char data[ECHTTP_CLIENT_BUFFER];
     int start;
     int end;
@@ -170,6 +173,8 @@ typedef struct {
     struct sockaddr_in6 peer;
     echttp_buffer in;
     echttp_buffer out;
+    echttp_queue  next;
+    echttp_queue  last;
     struct {
         int fd;
         int size;
@@ -263,10 +268,14 @@ static int echttp_raw_io_new (char use, int fd) {
 
            switch (use) {
                case ECHTTP_RAW_TCP:
+                   echttp_raw_io[i].state->tcp.in.next = 0;
                    echttp_raw_io[i].state->tcp.in.start = 0;
                    echttp_raw_io[i].state->tcp.in.end = 0;
+                   echttp_raw_io[i].state->tcp.out.next = 0;
                    echttp_raw_io[i].state->tcp.out.start = 0;
                    echttp_raw_io[i].state->tcp.out.end = 0;
+                   echttp_raw_io[i].state->tcp.next = 0;
+                   echttp_raw_io[i].state->tcp.last = 0;
                    echttp_raw_io[i].state->tcp.transfer.fd = -1;
                    echttp_raw_io[i].state->tcp.transfer.size = 0;
                    break;
@@ -496,6 +505,15 @@ void echttp_raw_close_client (int i, const char *reason) {
                 if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
                     close (echttp_raw_io[i].state->tcp.transfer.fd);
                 }
+                echttp_queue buffer = echttp_raw_io[i].state->tcp.next;
+                while (buffer) {
+                    echttp_queue next = buffer->next;
+                    free (buffer);
+                    buffer = next;
+                }
+                echttp_raw_io[i].state->tcp.next =
+                    echttp_raw_io[i].state->tcp.last = 0;
+                // Keep going...
             case ECHTTP_RAW_APP:
                 if (echttp_raw_terminate)
                     echttp_raw_terminate (i, reason);
@@ -522,8 +540,11 @@ static void echttp_raw_prune (time_t now) {
         if (context->deadline == 0) continue; // No deadline was set.
         if (now > context->deadline) {
             if (context->use == ECHTTP_RAW_TCP) {
+                // Don't terminate the connection if there is still
+                // data to send.
                 if (context->state->tcp.transfer.size > 0) continue;
-                echttp_buffer *buffer = &(context->state->tcp.out);
+                if (context->state->tcp.next) continue;
+                echttp_queue buffer = &(context->state->tcp.out);
                 if (buffer->end > buffer->start) continue;
             }
             echttp_raw_close_client (i, "deadline reached");
@@ -543,13 +564,19 @@ static int echttp_raw_consume (echttp_buffer *buffer, int length) {
 
 static void echttp_raw_transmit (int i) {
 
+   // This function is where the data stored in the buffers or
+   // part of a transfer is being sent through the socket.
+
    if (echttp_raw_io[i].use != ECHTTP_RAW_TCP) return;
 
-   echttp_buffer *buffer = &(echttp_raw_io[i].state->tcp.out);
+   echttp_queue buffer = &(echttp_raw_io[i].state->tcp.out);
 
    ssize_t length = buffer->end - buffer->start;
+   if (length <= 0) {
+       buffer = echttp_raw_io[i].state->tcp.next;
+       length = buffer ? (buffer->end - buffer->start) : 0;
+   }
    if (length > 0) {
-
       if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
 
       length = send (echttp_raw_io[i].fd,
@@ -566,13 +593,22 @@ static void echttp_raw_transmit (int i) {
                   i, buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
       }
       if (echttp_raw_consume (buffer, length)) {
+          if (buffer == echttp_raw_io[i].state->tcp.next) {
+              echttp_queue next = buffer->next;
+              free (buffer);
+              echttp_raw_io[i].state->tcp.next = next;
+              if (next) return; // Ready to send more.
+              echttp_raw_io[i].state->tcp.last = 0;
+          }
           if (echttp_raw_debug &&
               (echttp_raw_io[i].state->tcp.transfer.size > 0)) {
-              printf (__FILE__ " [Client %d] Transmit buffer is now empty.\n", i);
+              printf (__FILE__ " [Client %d] Transmit buffers are now empty.\n", i);
           }
       }
+      return;
+   }
 
-   } else if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
+   if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
 
        length = echttp_raw_io[i].state->tcp.transfer.size;
        if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
@@ -652,8 +688,13 @@ static void echttp_raw_receive (int i, echttp_raw_receiver received) {
 }
 
 static int echttp_raw_invalid (int client) {
+
    if ((client < 0) || (client > echttp_raw_io_last)) {
        fprintf (stderr, "Invalid client number %d (out of range)\n", client);
+       return 1;
+   }
+   if (echttp_raw_io[client].use != ECHTTP_RAW_TCP) {
+       fprintf (stderr, "Invalid client number %d (not raw TCP)\n", client);
        return 1;
    }
    if (echttp_raw_io[client].fd < 0) {
@@ -683,21 +724,50 @@ int  echttp_raw_server_port (int ip) {
 
 void echttp_raw_send (int client, const char *data, int length) {
 
-   if (echttp_raw_io[client].use != ECHTTP_RAW_TCP) return;
-
-   echttp_buffer *buffer = &(echttp_raw_io[client].state->tcp.out);
    if (echttp_raw_invalid(client)) return;
-   if (length > sizeof(buffer->data) - buffer->end) {
-       echttp_raw_close_client (client, "Transmit data is too large");
-       return;
+
+   // The data is not sent right away: it is stored until
+   // the socket is ready to transmit.
+   // The initial data buffer is always pre-allocated,
+   // while subsequent buffers are allocated on demand.
+   // The rationale is that most data being sent is small,
+   // so there will be less heap activity.
+   //
+   echttp_queue buffer = &(echttp_raw_io[client].state->tcp.out);
+   int empty = sizeof(buffer->data) - buffer->end;
+   int copy;
+   if (empty > 0) {
+       copy = (length > empty) ? empty : length;
+       memcpy (buffer->data+buffer->end, data, copy);
+       buffer->end += copy;
+       data += copy;
+       length -= copy;
    }
-   memcpy (buffer->data+buffer->end, data, length);
-   buffer->end += length;
+   buffer = echttp_raw_io[client].state->tcp.last;
+   while (length > 0) {
+       empty = buffer ? (sizeof(buffer->data) - buffer->end) : 0;
+       if (empty <= 0) {
+           buffer = malloc (sizeof (echttp_buffer));
+           buffer->next = 0;
+           buffer->start = 0;
+           buffer->end = 0;
+           if (echttp_raw_io[client].state->tcp.last)
+               echttp_raw_io[client].state->tcp.last->next = buffer;
+           else
+               echttp_raw_io[client].state->tcp.next = buffer;
+           echttp_raw_io[client].state->tcp.last = buffer;
+           empty = sizeof(buffer->data);
+       }
+       copy = (length > empty) ? empty : length;
+       memcpy (buffer->data+buffer->end, data, copy);
+       buffer->end += copy;
+       data += copy;
+       length -= copy;
+   }
 }
 
 void echttp_raw_transfer (int client, int fd, int length) {
 
-   if (echttp_raw_io[client].use != ECHTTP_RAW_TCP) return;
    if (echttp_raw_invalid(client)) return;
 
    if (echttp_raw_debug)
@@ -746,6 +816,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           switch (echttp_raw_io[i].use) {
               case ECHTTP_RAW_TCP:
                   if (echttp_raw_io[i].state->tcp.out.end > 0 ||
+                      echttp_raw_io[i].state->tcp.next ||
                       echttp_raw_io[i].state->tcp.transfer.size > 0) {
                       FD_SET(fd, &writeset);
                   } else if (! echttp_raw_bufferedinput (i, received)) {

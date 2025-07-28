@@ -60,6 +60,7 @@ void echttp_content_type_html (void);
 void echttp_content_type_json (void);
 void echttp_content_type_css  (void);
 void echttp_content_length    (int length);
+void echttp_content_queue     (const char *data, int length);
 
 void echttp_transfer (int fd, int size);
 

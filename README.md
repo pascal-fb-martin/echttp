@@ -179,6 +179,10 @@ void echttp_content_length (int length);
 ```
 Force the length of the data that will be returned. This is mostly intended to handle binary data, for which the length cannot be calculated.
 ```
+void echttp_content_queue (const char *data, int length);
+```
+Queue more content to be transmitted later. This function must be called within an HTTP callback. This allows the application to handle large data in chunks of known size when the total size of the data is not known beforehand. The data queued will be sent _after_ the data directly returned by the HTTP callback, but before any transfer data (see `echttp_transfer()` below). The data's buffer must have been allocated from the heap (i.e. using `malloc()`, `strdup()` and friends) and will be free'd once the data has been transmitted or when the connection breaks (whichever happens first).
+```
 void echttp_error (int code, const char *message);
 ```
 The HTTP response will return the specified error instead of OK.
@@ -199,7 +203,7 @@ This function works in one of two modes:
 
 - If the current context is still waiting for more content data (see echttp_asynchronous_route()), then the data is to be transfered in, from the remote to the file descriptor provided (open in append mode). Once the transfer is complete, the normal application callback is called.
 
-- If no more content data is expected, then the data is to be transfered out, from the file descriptor provided (open in read mode) to the remote. That data will be sent _after_ the content data returned by the callback.
+- If no more content data is expected, then the data is to be transfered out, from the file descriptor provided (open in read mode) to the remote. That data will be sent _after_ the content data returned, or queued, by the callback.
 
 This function should be called from within an HTTP callback, while processing an HTTP request. Size defines how many bytes must be transferred.
 
