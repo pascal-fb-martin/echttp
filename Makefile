@@ -44,8 +44,8 @@ dev:
 install: dev
 
 clean:
-	rm -f *.o *.a echttp_print echttp_get
-	rm -f echttp_jsonprint echttp_jsonget
+	rm -f *.o *.a *.so
+	rm -f echttp_print echttp_get
 
 rebuild: clean all
 
@@ -54,8 +54,6 @@ uninstall:
 	rm -f $(DESTDIR)$(prefix)/include/echttp*.h
 	rm -f $(DESTDIR)$(prefix)/bin/echttp_print
 	rm -f $(DESTDIR)$(prefix)/bin/echttp_get
-	rm -f $(DESTDIR)$(prefix)/bin/echttp_jsonget
-	rm -f $(DESTDIR)$(prefix)/bin/echttp_jsonprint
 
 purge: uninstall
 
