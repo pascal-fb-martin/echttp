@@ -1,6 +1,7 @@
 prefix=/usr/local
 
 INSTALL=/usr/bin/install
+LDCONFIG=/usr/sbin/ldconfig
 
 OBJS= echttp.o \
       echttp_static.o \
@@ -29,14 +30,16 @@ PUBLIC_INCLUDE=echttp.h \
               echttp_xml.h \
               echttp_parser.h
 
-all: libechttp.a echttp_print echttp_get
+all: libechttp.so libechttp.a echttp_print echttp_get
 
 dev:
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib
-	$(INSTALL) -m 0644 libechttp.a $(DESTDIR)$(prefix)/lib
+	$(INSTALL) -m 0644 libechttp.so $(DESTDIR)$(prefix)/lib
+	rm -f $(DESTDIR)$(prefix)/lib/libechttp.a
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/include
 	$(INSTALL) -m 0644 $(PUBLIC_INCLUDE) $(DESTDIR)$(prefix)/include
-	$(INSTALL) -m 0755 echttp_print echttp_get $(DESTDIR)$(prefix)/bin
+	$(INSTALL) -m 0755 -s echttp_print echttp_get $(DESTDIR)$(prefix)/bin
+	$(LDCONFIG)
 
 install: dev
 
@@ -58,6 +61,9 @@ purge: uninstall
 
 %.o: %.c
 	gcc -c -Wall -g -Os -fPIC -o $@ $<
+
+libechttp.so: $(OBJS)
+	gcc -shared -o $@ $^
 
 libechttp.a: $(OBJS)
 	ar r $@ $^
