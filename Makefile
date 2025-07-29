@@ -1,3 +1,6 @@
+prefix=/usr/local
+
+INSTALL=/usr/bin/install
 
 OBJS= echttp.o \
       echttp_static.o \
@@ -29,17 +32,11 @@ PUBLIC_INCLUDE=echttp.h \
 all: libechttp.a echttp_print echttp_get
 
 dev:
-	mkdir -p /usr/local/lib
-	cp libechttp.a /usr/local/lib
-	chown root:root /usr/local/lib/libechttp.a
-	chmod 644 /usr/local/lib/libechttp.a
-	mkdir -p /usr/local/include
-	cp $(PUBLIC_INCLUDE) /usr/local/include
-	chown root:root /usr/local/include/echttp*.h
-	chmod 644 /usr/local/include/echttp*.h
-	cp echttp_print echttp_get /usr/local/bin
-	chown root:root /usr/local/bin/echttp_*
-	chmod 755 /usr/local/bin/echttp_*
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib
+	$(INSTALL) -m 0644 libechttp.a $(DESTDIR)$(prefix)/lib
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/include
+	$(INSTALL) -m 0644 $(PUBLIC_INCLUDE) $(DESTDIR)$(prefix)/include
+	$(INSTALL) -m 0755 echttp_print echttp_get $(DESTDIR)$(prefix)/bin
 
 install: dev
 
@@ -50,10 +47,12 @@ clean:
 rebuild: clean all
 
 uninstall:
-	rm -f /usr/local/lib/libechttp.a
-	rm -f /usr/local/include/echttp*.h
-	rm -f /usr/local/bin/echttp_print /usr/local/bin/echttp_get
-	rm -f /usr/local/bin/echttp_jsonprint /usr/local/bin/echttp_jsonget
+	rm -f $(DESTDIR)$(prefix)/lib/libechttp.a
+	rm -f $(DESTDIR)$(prefix)/include/echttp*.h
+	rm -f $(DESTDIR)$(prefix)/bin/echttp_print
+	rm -f $(DESTDIR)$(prefix)/bin/echttp_get
+	rm -f $(DESTDIR)$(prefix)/bin/echttp_jsonget
+	rm -f $(DESTDIR)$(prefix)/bin/echttp_jsonprint
 
 purge: uninstall
 
