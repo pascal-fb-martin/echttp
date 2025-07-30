@@ -1,7 +1,7 @@
 # Overview
 A minimal HTTP server to serve as an application console for configuration and monitoring.
 
-This is a small HTTP/1.1 server designed for simple API and minimal dependencies. The target use case is an application that needs to be administrated or monitored remotely. Typically this application would run on a Raspberry Pi or a small PC acting as a home server, both running Linux.
+This is a small HTTP/1.1 server designed with a simple API in plain C and minimal dependencies. The target use case is an application that needs to be administrated or monitored remotely, or that exports (or is the client of) a web API. Typically this application would run on a Raspberry Pi or an old mini PC acting as a home server, running Linux.
 
 There is no security mechanism planned at this time: use this library only for applications accessible from a protected network.
 (In the long term, it will eventually interface with a TLS library and manage accounts, but don't hold your breath..)

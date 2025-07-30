@@ -30,6 +30,8 @@ prefix=/usr/local
 INSTALL=/usr/bin/install
 LDCONFIG=/usr/sbin/ldconfig
 
+PACKAGE=build/echttp
+
 OBJS= echttp.o \
       echttp_static.o \
       echttp_cors.o \
@@ -65,8 +67,9 @@ dev:
 	rm -f $(DESTDIR)$(prefix)/lib/libechttp.so
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/include
 	$(INSTALL) -m 0644 $(PUBLIC_INCLUDE) $(DESTDIR)$(prefix)/include
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/bin
 	$(INSTALL) -m 0755 -s echttp_print echttp_get $(DESTDIR)$(prefix)/bin
-	$(LDCONFIG)
+	if [ "x$(DESTDIR)" = "x" ] ; then $(LDCONFIG) ; fi
 
 install: dev
 
@@ -83,6 +86,16 @@ uninstall:
 	rm -f $(DESTDIR)$(prefix)/bin/echttp_get
 
 purge: uninstall
+
+# Build a private Debian package.
+debian-package:
+	rm -rf build
+	mkdir -p $(PACKAGE)/DEBIAN
+	sed "s/{arch}/`dpkg --print-architecture`/" < debian/control > $(PACKAGE)/DEBIAN/control
+	cp debian/copyright $(PACKAGE)/DEBIAN
+	cp debian/changelog $(PACKAGE)/DEBIAN
+	make DESTDIR=$(PACKAGE) install
+	cd build ; fakeroot dpkg-deb -b echttp .
 
 %.o: %.c
 	gcc -c -Wall -g -Os -fPIC -o $@ $<
