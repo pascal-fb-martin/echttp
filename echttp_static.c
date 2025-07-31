@@ -46,17 +46,24 @@
  *    already declared, so this function should only be used in rare cases.
  */
 
+#define _DEFAULT_SOURCE
+#define _XOPEN_SOURCE
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <magic.h>
 
 #include "echttp.h"
 #include "echttp_static.h"
 #include "echttp_catalog.h"
+
+static magic_t echttp_magic_cookie = 0;
 
 static echttp_catalog echttp_static_roots;
 
@@ -85,8 +92,32 @@ static struct {
     {"avi",  "video/x-msvideo"},
     {"mkv",  "video/x-matroska"},
     {"mp4",  "video/mp4"},
+    {"mp3",  "audio/mpeg"},
+    {"gz",   "application/gzip"},
+    {"zip",  "application/zip"},
+    {"7z",   "application/x-7z-compressed"},
+    {"pdf",  "application/pdf"},
+    {"svg",  "image/svg+xml"},
     {0, 0}
 };
+
+static const char *echttp_static_type_fallback (void) {
+
+    // This function is called when the file content type cannot be determined.
+    // This function always returns something..
+    // The default behavior is to describe the data as a sequence of bytes.
+    // We cheat a little: if the client does not accept any application
+    // type but accept text types, then pretend this is plain text..
+    // (Note that both values are string litterals, i.e. inherently static.)
+    //
+    const char *accepted = echttp_attribute_get ("Accept");
+    if (accepted) {
+        if (!strstr (accepted, "application/")) {
+            if (strstr (accepted, "text/")) return "text/plain";
+        }
+    }
+    return "application/octet-stream";
+}
 
 static const char *echttp_static_file (int page, const char *filename) {
 
@@ -117,13 +148,44 @@ static const char *echttp_static_file (int page, const char *filename) {
 
     if (echttp_isdebug()) printf ("Serving static file: %s\n", filename);
 
-    const char *sep = strrchr (filename, '.');
-    if (sep) {
-        const char *content = echttp_catalog_get (&echttp_static_type, sep+1);
-        if (content) {
-            echttp_content_type_set (content);
+    const char *condition = echttp_attribute_get ("If-Modified-Since");
+    if (condition) {
+        // The client wants to know if the file has changed; if not,
+        // send HTTP status 302 and stop there.
+        // Example of time format: Thu, 31 Jul 2025 02:05:19 GMT
+        struct tm time_info = {0};
+        const char *format = "%a, %d %b %Y %H:%M:%S";
+        char *result = strptime (condition, format, &time_info);
+        if (result) {
+           time_t reference = timegm (&time_info);
+           if (fileinfo.st_mtim.tv_sec <= reference) {
+               echttp_error (304, "Not Modified");
+               return "";
+           }
         }
     }
+
+    static char datestring[80];
+    int formatted = strftime (datestring, sizeof(datestring),
+                              "%a, %d %b %Y %H:%M:%S %Z",
+                              gmtime (&(fileinfo.st_mtim.tv_sec)));
+    if (formatted > 0) echttp_attribute_set ("Last-Modified", datestring);
+
+    // Determine the mime type for that file.
+    // Try using the extension first.
+    // If there is no extension, or it is unknown, use the magic database.
+    // If everything has failed, use some reasonable fallback value.
+    //
+    const char *content = 0;
+    const char *sep = strrchr (filename, '.');
+    if (sep)
+        content = echttp_catalog_get (&echttp_static_type, sep+1);
+    if ((!content) && echttp_magic_cookie)
+        content = magic_file (echttp_magic_cookie, filename);
+    if (!content)
+        content = echttp_static_type_fallback ();
+    echttp_content_type_set (content);
+
     off_t size = fileinfo.st_size;
 
     // Support for partial content requests.
@@ -227,6 +289,7 @@ static void echttp_static_internal_initialization (void) {
                                 echttp_static_default_types[i].extension,
                                 echttp_static_default_types[i].content);
         }
+        echttp_magic_cookie = magic_open (MAGIC_MIME_TYPE);
         Initialized = 1;
     }
 }

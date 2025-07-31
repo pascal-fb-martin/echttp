@@ -382,17 +382,19 @@ static void echttp_send_content (int client, const char *data, int length) {
 
 static void echttp_send_error (int client, int status, const char *text) {
 
+    // Note: an error reported by HTTP is not a protocol error that requires
+    // breaking the connection. (Hint: the Debian apt client uses repeated
+    // HTTP requests to check which files are present.)
+    //
     static const char errorformat[] =
         "HTTP/1.1 %d %s\r\n"
-        "Content-Length: 0\r\n"
-        "Connection: Closed\r\n\r\n";
+        "Content-Length: 0\r\n\r\n";
 
     echttp_request *context = echttp_context[client];
     char buffer[1024];
     int length = snprintf (buffer, sizeof(buffer), errorformat, status, text);
     echttp_send (client, buffer, length);
     echttp_transfer_cancel (context);
-    context->state = ECHTTP_STATE_ERROR;
 }
 
 static void echttp_unknown (int client) {
@@ -482,6 +484,15 @@ static void echttp_execute_async (int route, int client,
     // we are still waiting for more content data.
 }
 
+static void echttp_date (void) {
+    // See RFC 2616, section 14.18.
+    static char datestring[80];
+    time_t now = time(0);
+    int result = strftime (datestring, sizeof(datestring),
+                           "%a, %d %b %Y %H:%M:%S %Z", gmtime (&now));
+    if (result > 0) echttp_attribute_set ("Date", datestring);
+}
+
 static void echttp_execute (int route, int client,
                            const char *action, const char *uri,
                            const char *data, int length) {
@@ -502,6 +513,7 @@ static void echttp_execute (int route, int client,
     }
     context->contentlengthout = 0;
     data = echttp_routing.item[route].call (action, uri, data, length);
+    echttp_date ();
     echttp_current = 0;
 
     if (echttp_has_error (client)) {
