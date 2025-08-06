@@ -211,24 +211,15 @@ static int echttp_raw_inprogress (int code) {
 }
 
 // In some cases the fixed TTL is too short, for example a client
-// sending large amount of data. This function allows extending the
-// deadline by small increments as needed.
+// sending or requesting large amount of data, or making multiple requests.
+// This function allows extending the deadline by the TTL value as needed.
+// Note that the TTL value is really to avoid hanging idle connections.
 //
 static void echttp_raw_extendlife (int client) {
     if (!echttp_raw_io[client].deadline) return; // No deadline to extend.
-    time_t now = time(0);
-    if (echttp_raw_io[client].deadline <= now)
-        echttp_raw_io[client].deadline = now + 2;
-}
-
-// In some cases the fixed TTL is too long, for example a browser
-// issuing large number of requests. Once the transfer of the response
-// has started, a long TTL is no longer useful.
-// This function allows adjusting the deadline as needed.
-//
-static void echttp_raw_adjustlife (int client) {
-    if (!echttp_raw_io[client].deadline) return; // No deadline to adjust.
-    echttp_raw_io[client].deadline = time(0) + 1;
+    time_t newdeadline = time(0) + echttp_raw_ttl;
+    if (echttp_raw_io[client].deadline < newdeadline)
+        echttp_raw_io[client].deadline = newdeadline;
 }
 
 static void echttp_raw_io_cleanup (int i) {
@@ -366,6 +357,7 @@ static void echttp_raw_enumerate (void) {
 
 static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    int i;
+   time_t now = time(0);
    struct sockaddr_in6 peer;
    socklen_t peerlength = sizeof(peer);
 
@@ -374,7 +366,8 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
        fprintf (stderr, "cannot accept new client: %s\n", strerror(errno));
        exit(1);
    }
-   if (echttp_raw_debug) printf (__FILE__ " Accepting socket %d\n", s);
+   if (echttp_raw_debug)
+       printf (__FILE__ " Accepting socket %d at %lld\n", s, (long long)now);
 
    i = echttp_raw_io_new(ECHTTP_RAW_TCP, s);
    if (i < 0) {
@@ -400,7 +393,7 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
        }
    }
 
-   echttp_raw_io[i].deadline = time(0) + echttp_raw_ttl;
+   echttp_raw_io[i].deadline = now + echttp_raw_ttl;
    echttp_raw_io[i].state->tcp.peer = peer;
 }
 
@@ -499,7 +492,8 @@ void echttp_raw_close_client (int i, const char *reason) {
 
     if (echttp_raw_io[i].fd >= 0) {
         if (echttp_raw_debug)
-            printf (__FILE__ " [client %d] closing: %s\n", i, reason);
+            printf (__FILE__ " [client %d] closing at %lld: %s\n",
+                    i, (long long)time(0), reason);
         switch (echttp_raw_io[i].use) {
             case ECHTTP_RAW_TCP:
                 if (echttp_raw_io[i].state->tcp.transfer.size > 0) {
@@ -592,6 +586,8 @@ static void echttp_raw_transmit (int i) {
           printf (__FILE__ " [client %d] Transmit data at offset %d: %*.*s\n",
                   i, buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
       }
+      echttp_raw_extendlife (i); // That connection is actively transmitting
+
       if (echttp_raw_consume (buffer, length)) {
           if (buffer == echttp_raw_io[i].state->tcp.next) {
               echttp_queue next = buffer->next;
@@ -629,13 +625,14 @@ static void echttp_raw_transmit (int i) {
                echttp_raw_close_client (i, strerror(errno));
            return;
        }
+       echttp_raw_extendlife (i); // That connection is actively transmitting
+
        echttp_raw_io[i].state->tcp.transfer.size -= length;
        if (echttp_raw_io[i].state->tcp.transfer.size <= 0) {
            close (echttp_raw_io[i].state->tcp.transfer.fd);
            echttp_raw_io[i].state->tcp.transfer.fd = -1;
            echttp_raw_io[i].state->tcp.transfer.size = 0;
        }
-       echttp_raw_adjustlife (i);
    }
 }
 
