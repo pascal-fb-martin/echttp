@@ -91,7 +91,7 @@ purge: uninstall
 debian-package:
 	rm -rf build
 	mkdir -p $(PACKAGE)/DEBIAN
-	sed "s/{arch}/`dpkg --print-architecture`/" < debian/control > $(PACKAGE)/DEBIAN/control
+	sed "s/{{arch}}/`dpkg --print-architecture`/" < debian/control > $(PACKAGE)/DEBIAN/control
 	cp debian/copyright $(PACKAGE)/DEBIAN
 	cp debian/changelog $(PACKAGE)/DEBIAN
 	make DESTDIR=$(PACKAGE) install

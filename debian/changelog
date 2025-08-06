@@ -1,6 +1,6 @@
-echttp (2.0b) UNREALEASED; urgency=low
+echttp (2.0) UNRELEASED; urgency=medium
 
-   * Initial release.
+  * Initial release as a Debian package
 
- -- Pascal Martin <pascal.fb.martin@gmail.com>  Wed, 30 Jul 2025 17:48:19 +0000
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Tue, 05 Aug 2025 17:23:00 -0700
 

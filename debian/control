@@ -1,12 +1,12 @@
 Source: echttp
-Version: 2.0b
+Version: 2.0
 Section: Web servers
 Maintainer: Pascal Martin <pascal.fb.martin@gmail.com>
 Priority: optional
 Homepage: https://github.com/pascal-fb-martin/echttp
 Standard-Version: 4.7.0
 Package: echttp-dev
-Architecture: {arch}
+Architecture: {{arch}}
 Depends: libssl-dev
 Description: An HTTP server library to be embedded in C applications as a console for configuration and monitoring
  This is a small HTTP/1.1 server designed with a simple API in plain C and
