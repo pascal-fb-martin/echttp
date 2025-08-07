@@ -44,8 +44,16 @@
 
 #define PRINT_MAX 20480
 
+static int show_raw_value = 0;
+
 static void print_string (const char *key, const char *value) {
+
     static char escapelist [128];
+
+    if (show_raw_value) {
+        printf ("%s\n", value);
+        return;
+    }
 
     char *buffer = (char *)malloc (3*strlen(value) + 1); // Worst case
     char *to = buffer;
@@ -143,6 +151,7 @@ int main (int argc, const char **argv) {
     int xml_input = 0;
     const char *error;
     ParserToken token[PRINT_MAX];
+    char *buffer;
 
     for (i = 1; i < argc; ++i) {
         if (strcmp (argv[i], "-d") == 0) {
@@ -157,12 +166,16 @@ int main (int argc, const char **argv) {
             xml_input = 1;
             continue;
         }
+        if (strcmp (argv[i], "-r") == 0) {
+            show_raw_value = 1;
+            continue;
+        }
 
         if (!count) { // The first non-option is the file name.
 
             if (strstr(argv[i], ".xml")) xml_input = 1;
 
-            char *buffer = echttp_parser_load (argv[i]);
+            buffer = echttp_parser_load (argv[i]);
 
             count = PRINT_MAX;
             if (xml_input)
@@ -175,12 +188,11 @@ int main (int argc, const char **argv) {
                 return -1;
             }
             if (show_tokens) print_tokens (token, count);
-            echttp_parser_free (buffer);
             continue;
         }
 
         index = echttp_json_search (token, argv[i]);
-        printf ("%s (%d): ", argv[i], index);
+        if (!show_raw_value) printf ("%s (%d): ", argv[i], index);
         if (index >= 0) print_json (token, index, 1);
         else printf ("invalid path\n");
     }
