@@ -203,6 +203,12 @@ static const char *echttp_static_file (int page, const char *filename) {
         content = echttp_static_type_fallback ();
     echttp_content_type_set (content);
 
+    // If the application contemplates creating pages of the fly, then
+    // pages may change and we need the clients to revalidate their cache
+    // every time.
+    if (echttp_static_not_found != echttp_static_cannot_find)
+        echttp_attribute_set ("Cache-Control", "no-cache");
+
     off_t size = fileinfo.st_size;
 
     // Support for partial content requests.
