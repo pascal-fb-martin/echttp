@@ -1117,6 +1117,12 @@ void echttp_content_type_set (const char *value) {
     echttp_catalog_set (&(echttp_current->out), "Content-Type", value);
 }
 
+void echttp_content_type_text (void) {
+    if (! echttp_current) return;
+    echttp_catalog_set (&(echttp_current->out),
+                        "Content-Type", "text/plain");
+}
+
 void echttp_content_type_json (void) {
     if (! echttp_current) return;
     echttp_catalog_set (&(echttp_current->out),

@@ -40,6 +40,17 @@
  *    declared will be used. This allows applications to move the root
  *    directory while running.
  *
+ * typedef int echttp_not_found_handler (const char *path);
+ * echttp_not_found_handler *echttp_static_on_not_found (echttp_not_found_handler *handler);
+ *
+ *    Declare a handler that is called when the target URI is not found. This
+ *    gives the application a chance to create the target file on the fly.
+ *    This function returns the previous handler, allowing the application
+ *    to chain handlers, if needed.
+ *
+ *    The handler must return a file descriptor to the file at the given path,
+ *    or -1 if the file cannot be created.
+ *
  * void echttp_static_content_map (const char *extension, const char *content);
  *
  *    Declare an additional file content type. The most common file types are
@@ -68,6 +79,9 @@ static magic_t echttp_magic_cookie = 0;
 static echttp_catalog echttp_static_roots;
 
 static echttp_catalog echttp_static_type;
+
+static int echttp_static_cannot_find (const char *path) {return -1;}
+static echttp_not_found_handler *echttp_static_not_found = echttp_static_cannot_find;
 
 /* Define default content type for the most frequent file extensions.
  * Don't define too many: it would load the catalog with lot of unused items.
@@ -122,6 +136,9 @@ static const char *echttp_static_type_fallback (void) {
 static const char *echttp_static_file (int page, const char *filename) {
 
     char index[1040];
+
+    // Give the application a last chance to create the page on the fly.
+    if (page < 0) page = echttp_static_not_found (filename);
 
     if (page < 0) {
         echttp_error (404, "Not found");
@@ -270,10 +287,7 @@ static const char *echttp_static_page (const char *action,
     }
     if (echttp_isdebug()) printf ("found match for %s: %s\n", rooturi, path);
 
-    size_t pathlen = strlen(path);
-    strncpy (filename, path, sizeof(filename));
-    strncpy (filename+pathlen, uri+strlen(rooturi), sizeof(filename)-pathlen);
-    filename[sizeof(filename)-1] = 0;
+    snprintf (filename, sizeof(filename), "%s%s", path, uri+strlen(rooturi));
 
     return echttp_static_file (open (filename, O_RDONLY), filename);
 }
@@ -292,6 +306,12 @@ static void echttp_static_internal_initialization (void) {
         echttp_magic_cookie = magic_open (MAGIC_MIME_TYPE);
         Initialized = 1;
     }
+}
+
+echttp_not_found_handler *echttp_static_on_not_found (echttp_not_found_handler *handler) {
+    echttp_not_found_handler *old = echttp_static_not_found;
+    echttp_static_not_found = handler ? handler : echttp_static_cannot_find;
+    return old;
 }
 
 void echttp_static_content_map (const char *extension, const char *content) {
