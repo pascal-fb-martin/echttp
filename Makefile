@@ -33,6 +33,7 @@ LDCONFIG=/usr/sbin/ldconfig
 PACKAGE=build/echttp
 
 HMAN=/var/lib/house/note/content/manuals/infrastructure
+HMANCACHE=/var/lib/house/note/cache
 
 OBJS= echttp.o \
       echttp_static.o \
@@ -76,6 +77,7 @@ dev:
 install: dev
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(HMAN)
 	$(INSTALL) -m 0644 README.md $(DESTDIR)$(HMAN)/echttp.md
+	rm -rf $(DESTDIR)$(HMANCACHE)/*
 
 clean:
 	rm -f *.o *.a *.so
@@ -96,8 +98,9 @@ debian-package:
 	rm -rf build
 	mkdir -p $(PACKAGE)/DEBIAN
 	sed "s/{{arch}}/`dpkg --print-architecture`/" < debian/control > $(PACKAGE)/DEBIAN/control
-	cp debian/copyright $(PACKAGE)/DEBIAN
-	cp debian/changelog $(PACKAGE)/DEBIAN
+	$(INSTALL) -m 644 debian/copyright $(PACKAGE)/DEBIAN
+	$(INSTALL) -m 644 debian/changelog $(PACKAGE)/DEBIAN
+	$(INSTALL) -m 755 debian/postinst $(PACKAGE)/DEBIAN
 	make DESTDIR=$(PACKAGE) install
 	cd build ; fakeroot dpkg-deb -b echttp .
 

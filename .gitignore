@@ -56,4 +56,5 @@ build
 donotcommit
 echttp_get
 echttp_print
+httpserver
 
