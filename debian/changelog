@@ -1,3 +1,9 @@
+echttp (2.1) UNRELEASED; urgency=medium
+
+  * Add support for on-demand HTML page creation, used by HouseNote.
+
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Tue, 05 Aug 2025 17:23:00 -0700
+
 echttp (2.0) UNRELEASED; urgency=medium
 
   * Initial release as a Debian package

@@ -1,29 +1,31 @@
-# Overview
-A minimal HTTP server to serve as an application console for configuration and monitoring.
+# The echttp Library
 
-This is a small HTTP/1.1 server designed with a simple API in plain C and minimal dependencies. The target use case is an application that needs to be administrated or monitored remotely, or that exports (or is the client of) a web API. Typically this application would run on a Raspberry Pi or an old mini PC acting as a home server, running Linux.
+## Overview
+This is a minimal HTTP server library to serve as an application console for configuration and monitoring.
 
-There is no security mechanism planned at this time: use this library only for applications accessible from a protected network.
-(In the long term, it will eventually interface with a TLS library and manage accounts, but don't hold your breath..)
+It implements a small HTTP/1.1 server designed with a simple API in plain C and limited dependencies. The target use case is an application that needs to be administrated or monitored remotely, or that exports (or is the client of) a web API. Typically this application would run on a Raspberry Pi or an old mini PC acting as a home server, running Linux.
+
+There is no security mechanism planned at this time: use this library for applications only accessible from inside a protected network.
+(In the long term, it may eventually interface with a TLS library and manage accounts, but don't hold your breath..)
 
 After initializing the HTTP server, and then completing its own initialization, the application reacts to file descriptor events and HTTP requests as provided by the HTTP server.
 
 This web server can be configured to use dynamic port allocation for its server socket. Before you hit your head against the proverbial wall trying to understand why the hell this is even allowed, please take a look at [houseportal](https://github.com/pascal-fb-martin/houseportal).
 
-# Installation
+## Installation
 
 * Clone the repository.
 * cd echttp
 * make
 * sudo make install (this installs files in the /usr/local tree)
 
-Use the OpenSSL and -lechttp options when building your application. For example:
+Use the OpenSSL, -lmagic and -lechttp options when building your application. For example:
 
 ```
-cc -o httpserver httpserver.c -lechttp -lssl -lcrypto
+cc -o httpserver httpserver.c -lechttp -lssl -lcrypto -lmagic
 ```
 
-# Example
+## Minimum viable example
 Below is an example of a small, but fully functional web server written using echttp. This server returns pages from the current directory as well as an embedded welcome message.
 
 ```
@@ -56,8 +58,8 @@ int main (int argc, const char **argv) {
 }
 ```
 
-# API
-## Base HTTP Server
+## API
+### Base HTTP Server
 The application must include echttp.h as a prerequisit to using the echttp API.
 
 The echttp primitives are:
@@ -320,7 +322,7 @@ void echttp_close (void);
 
 Immediately close the HTTP server and all current HTTP connections.
 
-## Static Pages Extension
+### Static Pages Extension
 
 The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include echttp_static.h.
 The static page extension primitives are:
@@ -371,7 +373,7 @@ This function returns the route descriptor or -1 on failure. This route descript
 It is allowed to declare the same URI route multiple times. Only the last path provided will be used (previous paths are discarded). This allows applications
 to change their URI mapping while running.
 
-## Cross-Origin Resource Sharing (CORS) Extension
+### Cross-Origin Resource Sharing (CORS) Extension
 
 The CORS extension facilitate the support for the CORS HTTP mechanism. See web public documentation for more details about this mechanism.
 
@@ -397,7 +399,7 @@ This function must be called from a protect callback. It returns 0 if the reques
 
 In the later case, this function has setup the HTTP status and headers necessary: there is nothing more that the caller can or should do.
 
-## Command Line Options
+### Command Line Options
 
 The echttp library comes with a handful of functions to help decode command line arguments.
 
@@ -422,7 +424,7 @@ int echttp_isdebug (void);
 
 Return true if the HTTP debug option was selected. Only used for debug or troubleshooting.
 
-## HTTP Client
+### HTTP Client
 
 The echttp library includes support for the HTTP and HTTPS client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
 
@@ -503,7 +505,7 @@ void echttp_escape (const char *s, char *d, int size);
 
 This support function encodes the s string according to the HTTP character encoding rules and stores the result to the d location. The result is no larger than size characters, including the null terminator.
 
-## JSON and XML Support
+### JSON and XML Support
 
 The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include echttp_json.h or echttp_xml.h (depending on the format used).
 
@@ -637,9 +639,9 @@ There are also two JSON utilities provided with echttp:
 
 Both tools have minimal features. They were intended to test the JSON and XML functions, but can be useful to analyze the content of a JSON file, especially when the JSON data was not formatted for readability.
 
-## Catalog (a minimalist associative array module)
+### Catalog
 
-The echttp library uses its own associative array mechanism for managing HTTP attributes or routes. This module is made public because it is somewhat useful for the echttp applications as well, for example when maintaining a catalog of known web services.
+The echttp library uses its own (minimalist) associative array mechanism for managing HTTP attributes or routes. This module is made public because it is somewhat useful for the echttp applications as well, for example when maintaining a catalog of known web services.
 
 The basis for the mechanism is the echttp_catalog type:
 
@@ -723,7 +725,7 @@ unsigned int echttp_catalog_signature (const char *name);
 
 This function computes a signature from the provided name. A signature is the hash value before applying the hash array modulo. This function can be reused when implementing a hash table module with different properties. This function is derived from the well known hash function by Daniel J. Bernstein.
 
-## HTTP Character Encoding
+### HTTP Character Encoding
 
 The echttp library comes with a module for encoding and decoding strings per the HTTP encoding rules:
 
@@ -739,7 +741,7 @@ char *echttp_encoding_unescape (char *data);
 
 This function decodes the escape sequences as per the HTTP encoding rules. The decoding happens in-place and the original (encoded) data is lost. A pointer to the result is returned, so that this function can be used in a parameter list.
 
-## Sorted List
+### Sorted List
 
 The echttp library comes with a module for creating and maintaining sorted
 lists. The order is maintained while adding and removing items. This module

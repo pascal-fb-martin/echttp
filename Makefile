@@ -32,6 +32,8 @@ LDCONFIG=/usr/sbin/ldconfig
 
 PACKAGE=build/echttp
 
+HMAN=/var/lib/house/note/content/manuals/infrastructure
+
 OBJS= echttp.o \
       echttp_static.o \
       echttp_cors.o \
@@ -72,6 +74,8 @@ dev:
 	if [ "x$(DESTDIR)" = "x" ] ; then $(LDCONFIG) ; fi
 
 install: dev
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(HMAN)
+	$(INSTALL) -m 0644 README.md $(DESTDIR)$(HMAN)/echttp.md
 
 clean:
 	rm -f *.o *.a *.so
