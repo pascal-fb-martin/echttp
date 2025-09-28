@@ -125,12 +125,21 @@
  *
  * Call this listener completing I/O operations, before waiting for
  * new I/O. This background listener is called with fd 0 and mode 0,
- * and should not block on I/O itself.
+ * and should not block on I/O itself. It will not be called more
+ * frequently than every second, but this is not a precise timer.
+ *
+ * void echttp_fastscan (echttp_listener *listener, int period);
+ *
+ * Call this listener periodically. The period is expressed in millisecond
+ * and must be within the interval ]0, 1000[. This can be used concurrently
+ * with the background mechanism. It is more expensive in term of overhead,
+ * but it is also more accurate in term of timing. The listener will always
+ * be called with with fd 0 and mode 0.
  *
  * void echttp_loop (void);
  * 
  * Enter the HTTP server main loop. The HTTP server may call any callback
- * or listener fucntion, in any order.
+ * or listener function, in any order.
  * 
  *
  * int echttp_isdebug (void);
@@ -1228,6 +1237,10 @@ void echttp_forget (int fd) {
  
 void echttp_background (echttp_listener *listener) {
     echttp_raw_background (listener);
+}
+
+void echttp_fastscan (echttp_listener *listener, int period) {
+    echttp_raw_fastscan (listener, period);
 }
 
 static void echttp_listener_tls (int client, int mode) {

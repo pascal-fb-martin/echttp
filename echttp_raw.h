@@ -17,6 +17,7 @@ void echttp_raw_send (int client, const char *data, int length);
 void echttp_raw_transfer (int client, int fd, int length);
 
 void echttp_raw_background (echttp_listener *listener);
+void echttp_raw_fastscan   (echttp_listener *listener, int period);
 
 void echttp_raw_loop (echttp_raw_acceptor   *acceptor,
                       echttp_raw_receiver   *received,

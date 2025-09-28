@@ -304,11 +304,16 @@ The echttp_forget() function is used to remove the I/O from the list. It has no 
 
 ```
 void echttp_background (echttp_listener *listener);
+void echttp_fastscan   (echttp_listener *listener, int period);
 ```
 
-Call the specified listener before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to on the next cycle. This listener will be called once a second at most.
+The first function declares a listener to be called before waiting for I/O. This listener is called with fd 0 and mode 0; it must not block on I/O itself, but it is allowed to call echttp_listen(), changing the list of I/O to listen to on the next cycle. This listener will be called once a second at most.
 
 There is only one background listener.
+
+The second function declares a listener to be called at the specified period, expressed in milliseconds. Valid period values are from 1 to 999. The timing is more accurate compared to the background listener, at the expense of higher CPU overhead. This fast scan mechanism should only be used for timing sensitive applications. Otherwise the background mechanism should be preferred.
+
+There is only one fast scan listener at any one time. A declared listener can be disabled by declaring a null listener (whith whatever period). Enabling and disabling fast scan this way may be done as often as needed. The fast scan mechanism can be used concurrently with, and independently from, the background mechanism.
 
 ```
 void echttp_loop (void);
