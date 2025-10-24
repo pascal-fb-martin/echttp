@@ -168,11 +168,11 @@ static const char *echttp_json_literal (ParserContext context) {
    JSONTRACE ("literal");
    if (strncmp (json, "true", 4) == 0) {
        token[context->count].type = PARSER_BOOL;
-       token[context->count].value.bool = 1;
+       token[context->count].value.boolean = 1;
        context->cursor += 3;
    } else if (strncmp (json, "false", 5) == 0) {
        token[context->count].type = PARSER_BOOL;
-       token[context->count].value.bool = 0;
+       token[context->count].value.boolean = 0;
        context->cursor += 4;
    } else if (strncmp (json, "null", 4) == 0 && (! isalnum(json[4]))) {
        token[context->count].type = PARSER_NULL;
@@ -534,7 +534,7 @@ static void echttp_json_gen_eol (ParserContext context, int comma) {
 
 static void echttp_json_gen_bool (ParserContext context, int i) {
     echttp_json_gen_append (context,
-                            context->token[i].value.bool?"true":"false");
+                            context->token[i].value.boolean?"true":"false");
 }
 
 static void echttp_json_gen_integer (ParserContext context, int i) {
@@ -943,7 +943,7 @@ void echttp_json_add_bool
     ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
         token->type = PARSER_BOOL;
-        token->value.bool = (value != 0);
+        token->value.boolean = (value != 0);
     }
 }
 

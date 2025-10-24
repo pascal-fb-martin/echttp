@@ -13,7 +13,7 @@ typedef struct {
     const char *key;
     int type;
     union {
-        int bool;
+        int boolean;
         long long integer;
         double real;
         char *string;

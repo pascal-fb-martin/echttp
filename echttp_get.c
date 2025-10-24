@@ -113,7 +113,7 @@ static void print_json (ParserToken *token, int i, int deep) {
         case PARSER_NULL:
             printf ("null\n"); break;
         case PARSER_BOOL:
-            printf ("%s\n", token[i].value.bool?"true":"false"); break;
+            printf ("%s\n", token[i].value.boolean?"true":"false"); break;
         case PARSER_INTEGER:
             printf ("%lld\n", token[i].value.integer); break;
         case PARSER_REAL:
