@@ -948,7 +948,7 @@ void echttp_json_add_bool
 }
 
 void echttp_json_add_integer
-         (ParserContext context, int parent, const char *key, long value) {
+        (ParserContext context, int parent, const char *key, long long value) {
     ParserToken *token = echttp_json_add_token (context, parent, key);
     if (token) {
         token->type = PARSER_INTEGER;

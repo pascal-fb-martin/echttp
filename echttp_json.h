@@ -24,7 +24,7 @@ void echttp_json_add_null
 void echttp_json_add_bool
          (ParserContext context, int parent, const char *key, int value);
 void echttp_json_add_integer
-         (ParserContext context, int parent, const char *key, long value);
+         (ParserContext context, int parent, const char *key, long long value);
 void echttp_json_add_real
          (ParserContext context, int parent, const char *key, double value);
 void echttp_json_add_string
