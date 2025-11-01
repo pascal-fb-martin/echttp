@@ -2,7 +2,7 @@
 
 case $1 in
     configure|abort-upgrade|abort-deconfigure|abort-remove)
-        if [ -d /var/lib/house/note/cache ] ; then rm -rf /var/lib/house/note/cache/* ; fi
+        if [ -d /var/cache/house/note ] ; then rm -rf /var/cache/house/note/* ; fi
         ;;
 esac
 
