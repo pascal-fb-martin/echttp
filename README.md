@@ -601,7 +601,7 @@ Its is valid to provide a path that ends on an object or array: this allows chai
 When the list of token was generated from XML, it is possible to index the name of an object's element. This is used to access the Nth element (i.e. XML tag) with that name. This is done so because repeating the same tag name more than once is valid in XML.
 
 ```
-const char *echttp_json_enumerate (const ParserToken *parent, int *index);
+const char *echttp_json_enumerate (const ParserToken *parent, int *index, int size);
 ```
 
 This function populates the list of children items to a parent array or object. It can be used when the application needs to walk an unknown JSON structure. The index array must be large enough for the expected number of parent's element, as indicated by parent->length. The function always returns exactly parent->length items on success. The index values are offset relative to the parent's record. Return null on success, or an error string on failure.

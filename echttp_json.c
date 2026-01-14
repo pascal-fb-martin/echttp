@@ -38,7 +38,8 @@
  *    Retrieve a JSON item (after decoding) and return its index. return -1
  *    if the item was not found.
  *
- * const char *echttp_json_enumerate (const ParserToken *parent, int *index);
+ * const char *echttp_json_enumerate
+ *                 (const ParserToken *parent, int *index, int size);
  *
  *    Populate the list of children items to an array or object's parent.
  *    The index array must be large enough for the expected number of
@@ -841,7 +842,8 @@ int echttp_json_search (const ParserToken *parent, const char *path) {
     return -1; // Not the type of token we expected.
 }
 
-const char *echttp_json_enumerate (const ParserToken *parent, int *index) {
+const char *echttp_json_enumerate
+                (const ParserToken *parent, int *index, int size) {
 
     int depth = 0;
     int stack[JSON_MAX_DEPTH];
@@ -854,6 +856,7 @@ const char *echttp_json_enumerate (const ParserToken *parent, int *index) {
             return "invalid type";
         return "no data";
     }
+    if (count > size) return "index array too small";
 
     for (i = 1; i <= count; i++) {
 

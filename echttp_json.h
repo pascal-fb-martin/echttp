@@ -15,7 +15,8 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count);
 
 int echttp_json_search (const ParserToken *parent, const char *path);
 
-const char *echttp_json_enumerate (const ParserToken *parent, int *index);
+const char *echttp_json_enumerate
+                (const ParserToken *parent, int *index, int size);
 
 ParserContext echttp_json_start
                   (ParserToken *token, int max, char *pool, int size);

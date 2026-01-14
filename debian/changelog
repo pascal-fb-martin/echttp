@@ -1,3 +1,13 @@
+echttp (2.2) UNRELEASED; urgency=medium
+
+  * Fix the array size limit issue with echttp_json_enumerate() 
+  * Use cache location conform to the FHS
+  * Support 64 bit integers all the way
+  * Avoid conflict with C23 bool
+  * Add fast scan mechanism for subsecond polling
+
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Tue, 13 Jan 2026 17:23:00 -0700
+
 echttp (2.1) UNRELEASED; urgency=medium
 
   * Add support for on-demand HTML page creation, used by HouseNote.

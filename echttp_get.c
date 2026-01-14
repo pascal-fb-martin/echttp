@@ -92,7 +92,7 @@ static void enumerate (ParserToken *parent) {
 
     int i;
     int index[PRINT_MAX];
-    const char *error = echttp_json_enumerate (parent, index);
+    const char *error = echttp_json_enumerate (parent, index, PRINT_MAX);
     if (error) {
         printf ("error: %s\n", error);
         return;
