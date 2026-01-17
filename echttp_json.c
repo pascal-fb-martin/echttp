@@ -824,7 +824,8 @@ static int search_object_element (const ParserToken *parent, const char *path) {
 
 int echttp_json_search (const ParserToken *parent, const char *path) {
 
-    if (*path == 0) return 0; // End of search: any type is fine.
+    if ((path == 0) || (*path == 0))
+        return 0; // End of search: any type is fine.
 
     if (*path == '.' && parent->type == PARSER_OBJECT) {
         return search_object_element (parent, path+1);
