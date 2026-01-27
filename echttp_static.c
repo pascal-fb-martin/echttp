@@ -241,8 +241,10 @@ static const char *echttp_static_file (int page, const char *filename) {
         }
         if (size != fileinfo.st_size) {
             char ascii[128];
-            snprintf (ascii, sizeof(ascii), "bytes %ld-%ld/%ld",
-                      offset, offset+size-1, fileinfo.st_size);
+            snprintf (ascii, sizeof(ascii), "bytes %lld-%lld/%lld",
+                      (long long)offset,
+                      (long long)(offset+size-1),
+                      (long long)fileinfo.st_size);
             echttp_attribute_set ("Content-Range", ascii);
             echttp_error (206, "Partial Content"); // Not really an error.
         }
