@@ -21,6 +21,10 @@ const char *echttp_help (int level);
 const char *echttp_option_match (const char *reference,
                                  const char *input, const char **value);
 
+int echttp_option_csv (const char *reference,
+                       const char *input,
+                       char *values[], int max);
+
 int echttp_option_present (const char *reference, const char *input);
 
 void echttp_default (const char *arg);

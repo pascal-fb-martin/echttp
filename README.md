@@ -418,6 +418,25 @@ Returns 0 if the argument input does not match the reference string, a pointer t
 This function supports the syntax option '=' value, if the reference string ends with a '='. In this case, and if there is a match, value points to the string after the '='. Otherwise value is not touched, so that the caller can initialize it with a default value.
 
 ```
+int echttp_option_csv (const char *reference,
+                       const char *input,
+                       char *values[], int max);
+```
+
+Return 0 if the argument does not match the reference string, or
+the count of returned values otherwise. The `values` parameter is
+an array of size `max`. The argument must follow a comma separated
+format: option '=' value1 ',' value2 ',' value3 .. For example:
+`-option=value1,value2,value3`.
+
+The strings referenced in the array have been allocated as a single
+block, corresponding to the element 0 of the array. The memory should
+be deallocated in a single operation: `free (values[0]);`
+
+If echttp_option_csv() returns 0, the existing content of array `values`
+was not modified.
+
+```
 int echttp_option_present (const char *reference, const char *input);
 ```
 

@@ -37,6 +37,26 @@
  *    value points to the string after the '='. Otherwise value is not
  *    touched, so that the caller can initialize it with a default value.
  *
+ * int echttp_option_csv (const char *reference,
+ *                        const char *input,
+ *                        char *values[], int max);
+ *
+ *    Return 0 if the argument does not match the reference string, or
+ *    the count of returned values otherwise. The "values" parameter is
+ *    an array of size "max". The argument must follow a comma separated
+ *    format. For example:
+ *
+ *        -option=value1,value2,value3
+ *
+ *    The strings referenced in the array have been allocated as a single
+ *    block, corresponding to the element 0 of the array. The memory can
+ *    (should) be deallocated by doing a single free() call:
+ *
+ *        free (values[0]);
+ *
+ *    If echttp_option_csv() returns 0, the existing content of array `values`
+ *    was not modified.
+ *
  * int echttp_option_present (const char *reference, const char *input);
  *
  *    Return 1 if the argument exactly match the reference string.
@@ -70,6 +90,29 @@ const char *echttp_option_match (const char *reference,
         if (value) *value = input + length;
     }
     return input + length;
+}
+
+int echttp_option_csv (const char *reference,
+                       const char *input,
+                       char *values[], int max) {
+
+    if (max < 1) return 0;
+    const char *value = echttp_option_match (reference, input, 0);
+    if (!value) return 0;
+    if (*value == 0) return 0;
+
+    char *copy = strdup (value);
+    char *cursor = copy;
+    int count = 1;
+    values[0] = copy;
+    while (*(++cursor)) {
+        if (*cursor != ',') continue;
+        *(cursor++) = 0;
+        if (*cursor == 0) return count; // Protect against terminal ','.
+        if (count >= max) return count; // Protect against overflow.
+        values[count++] = cursor;
+    }
+    return count;
 }
 
 int echttp_option_present (const char *reference, const char *input) {
