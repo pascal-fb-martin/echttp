@@ -176,6 +176,7 @@ int main (int argc, const char **argv) {
             if (strstr(argv[i], ".xml")) xml_input = 1;
 
             buffer = echttp_parser_load (argv[i]);
+            if (!buffer) return 0; // No file, no data to print.
 
             count = PRINT_MAX;
             if (xml_input)
@@ -196,5 +197,6 @@ int main (int argc, const char **argv) {
         if (index >= 0) print_json (token, index, 1);
         else printf ("invalid path\n");
     }
+    return 0;
 }
 
