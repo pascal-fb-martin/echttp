@@ -32,7 +32,7 @@ LDCONFIG=/usr/sbin/ldconfig
 
 PACKAGE=build/echttp
 
-HMAN=/var/lib/house/note/content/manuals/infrastructure
+HMAN=/var/lib/house/note/manuals/infrastructure
 HMANCACHE=/var/lib/house/note/cache
 
 OBJS= echttp.o \
@@ -74,10 +74,12 @@ dev:
 	$(INSTALL) -m 0755 -s echttp_print echttp_get $(DESTDIR)$(prefix)/bin
 	if [ "x$(DESTDIR)" = "x" ] ; then $(LDCONFIG) ; fi
 
-install: dev
+install-ui:
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(HMAN)
 	$(INSTALL) -m 0644 README.md $(DESTDIR)$(HMAN)/echttp.md
 	rm -rf $(DESTDIR)$(HMANCACHE)/*
+
+install: install-ui dev
 
 clean:
 	rm -f *.o *.a *.so
