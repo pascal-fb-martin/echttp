@@ -244,6 +244,8 @@ const char *echttp_reason (void);
 
 This function returns the error message stored last for the current request (see echttp_error()). This is mostly intended to help the application log HTTP errors.
 
+This also works for the client side code, when receiving a non OK status from the server.
+
 ```
 void echttp_transfer (int fd, int size);
 ```
