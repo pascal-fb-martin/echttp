@@ -769,14 +769,20 @@ static int echttp_received (int client, char *data, int length) {
        if (context->response) {
            // Expect a status line.
            if (echttp_debug) printf("HTTP status: %s\n", line[0]);
-           if (strncmp (line[0], "HTTP/1.", 7)) {
+           char *cursor = strchr(line[0], ' ');
+           if ((!cursor) || strncmp (line[0], "HTTP/1.", 7)) {
                context->status = 505;
+               context->reason = "Invalid HTTP status line";
                echttp_respond (client, 0, 0);
                echttp_raw_close_client(context->client, "protocol error");
                return 0; // Connection was closed, nothing more to do.
            }
-           context->status = atoi(strchr(line[0], ' '));
-           if (context->status < 100 || context->status >= 600) context->status = 500;
+           context->status = atoi(cursor);
+           if (context->status != 200) {
+               if (context->status < 100 ||
+                   context->status >= 600) context->status = 500;
+               context->reason = strchr(cursor+1, ' ');
+           }
        } else {
            // Expect a request line.
            if (echttp_debug) printf("HTTP request: %s\n", line[0]);
