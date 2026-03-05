@@ -274,8 +274,13 @@ static const char *echttp_static_page (const char *action,
         return "";
     }
 
-    strncpy (rooturi, uri, sizeof(rooturi)); // Make a writable copy.
-    rooturi[sizeof(rooturi)-1] = 0;
+    int urilength = strlen (uri);
+    if (urilength >= sizeof(rooturi)) {
+        echttp_error (406, "URI is too long");
+        return "";
+    }
+    memcpy (rooturi, uri, urilength); // Make a writable copy.
+    rooturi[urilength] = 0;
 
     for(;;) {
         if (echttp_isdebug()) printf ("Searching static map for %s\n", rooturi);

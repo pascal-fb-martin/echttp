@@ -490,47 +490,53 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
 }
 
 
+static void echttp_json_gen_append1 (ParserContext context, char text) {
+
+    if (context->cursor + 1 < context->size) {
+        context->source[context->cursor] = text;
+        context->cursor += 1;
+        context->source[context->cursor] = 0;
+    }
+}
+
 static void echttp_json_gen_append (ParserContext context, const char *text) {
 
     int length = strlen(text);
 
     if (context->cursor + length < context->size) {
-        strncpy (context->source+context->cursor,
-                 text, context->size-context->cursor);
-        context->source[context->size-1] = 0;
+        memcpy (context->source+context->cursor, text, length);
         context->cursor += length;
+        context->source[context->cursor] = 0;
     }
 }
 
 static void echttp_json_gen_indent (ParserContext context) {
 
     if (context->options & PRINT_OPTION_PRETTY) {
-        static char indent[81];
-        if (indent[0] == 0) memset (indent, ' ',sizeof(indent)-1);
-        const char *sp = indent + sizeof(indent) -1 - (4 * context->depth);
-        echttp_json_gen_append (context, sp);
+        int i;
+        for (i = 4 * context->depth; i > 0; --i)
+            echttp_json_gen_append1 (context, ' ');
     }
 }
 
 static void echttp_json_gen_key (ParserContext context, const char *key) {
     echttp_json_gen_indent (context);
     if (key) {
-        const char *sep = (context->options & PRINT_OPTION_PRETTY)?"\" : ":"\":";
-        echttp_json_gen_append (context, "\"");
+        echttp_json_gen_append1 (context, '"');
         echttp_json_gen_append (context, key);
-        echttp_json_gen_append (context, sep);
+        echttp_json_gen_append1 (context, '"');
+        if (context->options & PRINT_OPTION_PRETTY)
+           echttp_json_gen_append (context, " : ");
+        else
+           echttp_json_gen_append1 (context, ':');
     }
 }
 
 static void echttp_json_gen_eol (ParserContext context, int comma) {
-    if (context->options & PRINT_OPTION_PRETTY) {
-        if (comma)
-            echttp_json_gen_append (context, ",\n");
-        else
-            echttp_json_gen_append (context, "\n");
-    } else if (comma) {
-        echttp_json_gen_append (context, ",");
-    }
+    if (comma)
+        echttp_json_gen_append1 (context, ',');
+    if (context->options & PRINT_OPTION_PRETTY)
+        echttp_json_gen_append1 (context, '\n');
 }
 
 static void echttp_json_gen_bool (ParserContext context, int i) {
@@ -539,9 +545,14 @@ static void echttp_json_gen_bool (ParserContext context, int i) {
 }
 
 static void echttp_json_gen_integer (ParserContext context, int i) {
-    char buffer[32];
-    snprintf (buffer, sizeof(buffer), "%lld", context->token[i].value.integer);
-    echttp_json_gen_append (context, buffer);
+    long long value = context->token[i].value.integer;
+    if ((value >= 0) && (value < 10)) {
+       echttp_json_gen_append1 (context, '0' + (char)value);
+    } else {
+       char buffer[32];
+       snprintf (buffer, sizeof(buffer), "%lld", value);
+       echttp_json_gen_append (context, buffer);
+    }
 }
 
 static void echttp_json_gen_real (ParserContext context, int i) {
@@ -569,7 +580,8 @@ static void echttp_json_gen_string (ParserContext context, int i) {
 
     const char *value = context->token[i].value.string;
     if (!value || value[0] == 0) {
-        echttp_json_gen_append (context, "\"\"");
+        echttp_json_gen_append1 (context, '"');
+        echttp_json_gen_append1 (context, '"');
         return;
     }
 
@@ -688,14 +700,14 @@ const char *echttp_json_format (ParserToken *token, int count,
             case PARSER_STRING:
                 echttp_json_gen_string (&context, i); break;
             case PARSER_ARRAY:
-                echttp_json_gen_append (&context, "[");
+                echttp_json_gen_append1 (&context, '[');
                 context.depth += 1;
                 context.ending[context.depth] = ']';
                 context.countdown[context.depth] = token[i].length + 1;
                 comma = 0;
                 break;
             case PARSER_OBJECT:
-                echttp_json_gen_append (&context, "{");
+                echttp_json_gen_append1 (&context, '{');
                 context.depth += 1;
                 context.ending[context.depth] = '}';
                 context.countdown[context.depth] = token[i].length + 1;
@@ -710,13 +722,12 @@ const char *echttp_json_format (ParserToken *token, int count,
         echttp_json_gen_eol (&context, comma);
 
         while (context.depth > 0) {
-            char buffer[2];
             context.countdown[context.depth] -= 1;
             if (context.countdown[context.depth] > 0) break;
-            buffer[0] = context.ending[context.depth]; buffer[1] = 0;
+            char ending = context.ending[context.depth];
             context.depth -= 1;
             echttp_json_gen_indent (&context);
-            echttp_json_gen_append (&context, buffer);
+            echttp_json_gen_append1 (&context, ending);
             echttp_json_gen_eol (&context, context.countdown[context.depth]>1);
         }
     }
@@ -899,11 +910,12 @@ ParserContext echttp_json_start
 
 static char *echttp_json_add_pool (ParserContext context, const char *text) {
     if (!text) return 0;
-    if (context->cursor < context->size) {
+    int length = strlen (text);
+    if (context->cursor + length < context->size) {
         char *p = context->source + context->cursor;
-        strncpy (p, text, context->size-context->cursor);
-        context->source[context->size-1] = 0;
-        context->cursor += strlen(context->source+context->cursor) + 1;
+        memcpy (p, text, length);
+        context->cursor += length;
+        context->source[context->cursor++] = 0;
         return p;
     }
     return 0;
