@@ -31,16 +31,6 @@
  *
  *    Insert a new item, or change its value.
  *
- * const char *echttp_catalog_refresh (echttp_catalog *d,
- *                                     const char *name, const char *value,
- *                                     time_t timestamp);
- *
- *    Insert a new item, or change its value and update its timestamp.
- *    This function returns the old value of the item, if it was found,
- *    or else 0.
- *    (The timestamp can be used by the application to detect old items
- *    that can be ignored.)
- *
  * const char *echttp_catalog_get (echttp_catalog *d, const char *name);
  *
  *    Retrieve the value associated with the provided key. Returns 0 when
@@ -70,13 +60,6 @@
 
 void echttp_catalog_reset (echttp_catalog *d) {
     echttp_hash_reset (d, 0);
-}
-
-const char *echttp_catalog_refresh (echttp_catalog *d,
-                                    const char *name, const char *value, time_t timestamp) {
-
-    return (const char *)
-               echttp_hash_refresh (d, name, (void *)value, timestamp);
 }
 
 void echttp_catalog_set (echttp_catalog *d,

@@ -45,8 +45,5 @@ int echttp_hash_iterate (echttp_hash *d,
 //
 void echttp_hash_set (echttp_hash *d, const char *name, void *value);
 
-void *echttp_hash_refresh
-          (echttp_hash *d, const char *name, void *value, time_t timestamp);
-
 void *echttp_hash_get (echttp_hash *d, const char *name);
 

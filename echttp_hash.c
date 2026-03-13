@@ -27,9 +27,11 @@
  *
  * This module provides a way to associate a string key with an array index.
  * It is up to the application to declare the array with a data structure
- * appropriate to their needs.
+ * appropriate to their needs. This module manages which entry in the array
+ * will be allocated next, not the application.
  *
- * This module supports two types of index: unique keys and non-unique keys.
+ * This module supports two types of hash tables: unique keys and
+ * non-unique keys.
  *
  * On a unique key index, each key appears only once. Trying to create an
  * already existing key causes the index for the existing key to be returned.
@@ -41,6 +43,12 @@
  * type of index is very useful to optimize searches like "retrieve all
  * the children of a specific parent".
  *
+ * Alternatively, the hash index may store an application reference. This
+ * can be typically used for a catalog, e.g. the value stored is a string.
+ * If the hash table is used to search through an application's array,
+ * this alternative might not be the best choice as this would force the
+ * application to manage allocation in its array on its own (more work).
+ * 
  * unsigned int echttp_hash_signature (const char *name);
  *
  *    Calculate a signature for the provided key. A signature is the hash
@@ -86,28 +94,19 @@
  *    table is full and cannot accomodate any new item, or the item's index
  *    otherwise (This is used for unique indexes only.)
  *
+ * The following primitives are used to store and retrieve values. These
+ * are meant to be used with a unique index type hash table only.
+ *
  * void echttp_hash_set (echttp_hash *d,
  *                       const char *name, const char *value);
  *
  *    Insert a new item, or change the value of an item that already exists.
- *    (Compatibility API, to be phased out.)
- *
- * const char *echttp_hash_refresh (echttp_hash *d,
- *                                  const char *name, void *value,
- *                                  time_t timestamp);
- *
- *    Same as echttp_hash_set, but also update the item's timestamp.
- *    (The timestamp can be used by the application to detect old items
- *    that should be ignored.)
- *    TBD: the timestamp should really be managed by the caller..
- *    (Compatibility API, to be phased out.)
  *
  * void *echttp_hash_get (echttp_hash *d, const char *name);
  *
  *    Retrieve the value associated with the provided key. Returns 0 when
  *    the key is not found. If there are duplicates items, the value of
  *    the first one found is returned: do not use with non-unique indexes.
- *    (Compatibility API, to be phased out.)
  *
  * LIMITATIONS
  *
@@ -229,24 +228,10 @@ int echttp_hash_insert (echttp_hash *d, const char *name) {
     return index;
 }
 
-void *echttp_hash_refresh (echttp_hash *d,
-                           const char *name, void *value, time_t timestamp) {
-
-    int index = echttp_hash_insert (d, name);
-    void *old;
-
-    if (index > 0) {
-        old = d->item[index].value;
-        d->item[index].value = value;
-        d->item[index].timestamp = timestamp;
-    } else {
-        old = 0;
-    }
-    return old;
-}
-
 void echttp_hash_set (echttp_hash *d, const char *name, void *value) {
-    echttp_hash_refresh (d, name, value, 0);
+
+    int i = echttp_hash_insert (d, name);
+    if (i > 0) d->item[i].value = value;
 }
 
 void *echttp_hash_get (echttp_hash *d, const char *name) {
