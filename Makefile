@@ -36,6 +36,7 @@ HMAN=/var/lib/house/note/manuals/infrastructure
 HMANCACHE=/var/lib/house/note/cache
 
 OBJS= echttp.o \
+      echttp_libc.o \
       echttp_static.o \
       echttp_cors.o \
       echttp_tls.o \
@@ -51,6 +52,7 @@ OBJS= echttp.o \
       echttp_parser.o
 
 PUBLIC_INCLUDE=echttp.h \
+              echttp_libc.h \
               echttp_encoding.h \
               echttp_catalog.h \
               echttp_hash.h \
