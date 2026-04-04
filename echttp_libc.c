@@ -19,6 +19,7 @@
 
 char *stpecpy (char *dst, char *end, const char *restrict src) {
 
+   if (dst == 0) return 0; // Protect against some variant implementations.
    if (dst == end) return end;
    char *p = memccpy(dst, src, '\0', end - dst);
    if (p) return p - 1;
