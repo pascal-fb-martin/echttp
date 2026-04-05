@@ -201,6 +201,11 @@
 #include "echttp_catalog.h"
 #include "echttp_encoding.h"
 
+// FIXME: Some servers apparently do not send the zero-length chunk?
+// Assume end of data synchronized with end of chunk
+// means that the data is complete..
+#define ECHTTP_ACCEPT_UNTERMINATED_CHUNK_DATA 1
+
 static const char *echttp_service = "http";
 static int         echttp_debug = 0;
 
@@ -920,13 +925,37 @@ static int echttp_received (int client, char *data, int length) {
                                            "unsupported transfer encoding");
                    return length; // Consume everything, invalid.
                }
-               // Time to panic: the length is not known yet, as it will
+               // The length is not known yet, as it will
                // be provided in chunks. Did we receive it all?
-               int extracted = 0;
+
+               // This first loop determines that the data is complete when
+               // it finds the zero-length chunk.
                char *decode = endreq;
-               char *cursor = endreq;
                for (;;) {
-                   while ((*decode) && (*decode <= ' ')) decode += 1;
+                   while ((decode < enddata) &&
+                          (*decode) && (*decode <= ' ')) decode += 1;
+                   if (decode >= enddata) return consumed; // Wait for more.
+                   int size = strtol (decode, &decode, 16);
+                   if (size == 0) break; // Data is complete.
+
+                   // Jump to the next chunk
+                   while (*decode != '\n') decode += 1;
+                   decode += 1 + size; // Skip LF and the data.
+                   if (decode > enddata) return consumed; // Wait for more.
+
+#ifdef ECHTTP_ACCEPT_UNTERMINATED_CHUNK_DATA
+                   if (decode == enddata - 2) break;
+#endif
+               }
+
+               // The second loop extract the data. This is reached only
+               // if the data received is considered complete.
+               int extracted = 0;
+               char *cursor = endreq;
+               decode = endreq;
+               for (;;) {
+                   while ((decode < enddata) &&
+                          (*decode) && (*decode <= ' ')) decode += 1;
                    if (decode >= enddata) {
                        echttp_raw_close_client(context->client,
                                                "incomplete chunked data");
@@ -934,7 +963,7 @@ static int echttp_received (int client, char *data, int length) {
                    }
                    int size = strtol (decode, &decode, 16);
                    while (*decode != '\n') decode += 1;
-                   decode += 1; // Skip LF.
+                   decode += 1; // Skip LF or CR.
                    if (size == 0) break; // Last chunk.
 
                    // Eliminate the chunking by moving the data.
@@ -942,6 +971,10 @@ static int echttp_received (int client, char *data, int length) {
                    decode += size; // Skip the data.
                    cursor += size;
                    extracted += size;
+
+#ifdef ECHTTP_ACCEPT_UNTERMINATED_CHUNK_DATA
+                   if (decode == enddata - 2) break;
+#endif
                }
                // We received it all: accept that easy case for now.
                *cursor = 0;
