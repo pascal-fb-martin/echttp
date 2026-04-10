@@ -11,6 +11,9 @@
 #ifndef ECHTTP_LIBC_H__INCLUDED
 #define ECHTTP_LIBC_H__INCLUDED
 
+#include <sys/types.h>
+
 char *stpecpy (char *dest, char *end, const char *restrict src);
+ssize_t strtcpy (char *dst, const char *src, size_t dsize);
 #endif
 

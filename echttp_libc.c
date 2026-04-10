@@ -16,6 +16,11 @@
  *    to signal truncation, in the safest possible manner. It also adds
  *    a non-standard protection against null source, because this is common
  *    with echttp (like missing optional HTTP argument or attribute).
+ *
+ * ssize_t strtcpy (char *dst, const char *src, size_t dsize);
+ *
+ *    Provide a safe and efficient function for string copy.
+ *    See man strtcpy for more information.
  */
 
 #include <string.h>
@@ -38,5 +43,22 @@ char *stpecpy (char *dst, char *end, const char *restrict src) {
    /* truncation detected */
    end[-1] = '\0';
    return end;
+}
+
+ssize_t strtcpy (char *dst, const char *src, size_t dsize) {
+
+   if (dst == 0) return -1;
+   if (dsize <= 0) return -1;
+
+   // There is room for at least one byte..
+   if (src == 0) {
+      dst[0] = 0;
+      return -1; // Nothing copied.
+   }
+   char *p = memccpy(dst, src, '\0', dsize);
+   if (p) return (ssize_t)(p - dst) - 1;
+
+   dst[dsize-1] = 0;
+   return -1;
 }
 
