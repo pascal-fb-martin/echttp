@@ -93,6 +93,7 @@
 
 #include "echttp.h"
 #include "echttp_json.h"
+#include "echttp_libc.h"
 
 #define JSON_MAX_DEPTH 64
 
@@ -492,22 +493,27 @@ const char *echttp_json_parse (char *json, ParserToken *token, int *count) {
 
 static void echttp_json_gen_append1 (ParserContext context, char text) {
 
-    if (context->cursor + 1 < context->size) {
-        context->source[context->cursor] = text;
-        context->cursor += 1;
-        context->source[context->cursor] = 0;
+    int cursor = context->cursor;
+    if (cursor + 1 < context->size) {
+        char *source = context->source;
+        source[cursor] = text;
+        source[++cursor] = 0;
+        context->cursor = cursor;
     }
 }
 
 static void echttp_json_gen_append (ParserContext context, const char *text) {
 
-    int length = strlen(text);
+    char *source = context->source;
+    char *p = stpecpy (source+context->cursor, source+context->size, text);
+    if (p) context->cursor = (int)(p - source);
+}
 
-    if (context->cursor + length < context->size) {
-        memcpy (context->source+context->cursor, text, length);
-        context->cursor += length;
-        context->source[context->cursor] = 0;
-    }
+static void echttp_json_gen_append_integer (ParserContext context, long long val) {
+
+    char *source = context->source;
+    char *p = stpedec (source+context->cursor, source+context->size, val);
+    if (p) context->cursor = (int)(p - source);
 }
 
 static void echttp_json_gen_indent (ParserContext context) {
@@ -549,9 +555,7 @@ static void echttp_json_gen_integer (ParserContext context, int i) {
     if ((value >= 0) && (value < 10)) {
        echttp_json_gen_append1 (context, '0' + (char)value);
     } else {
-       char buffer[32];
-       snprintf (buffer, sizeof(buffer), "%lld", value);
-       echttp_json_gen_append (context, buffer);
+       echttp_json_gen_append_integer (context, value);
     }
 }
 

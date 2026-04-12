@@ -109,7 +109,7 @@ debian-package:
 	cd build ; fakeroot dpkg-deb -b echttp .
 
 %.o: %.c
-	gcc -c -Wall -g -Os -fPIC -o $@ $<
+	gcc -c -Wall -g -O2 -fPIC -o $@ $<
 
 libechttp.so: $(OBJS)
 	gcc -shared -o $@ $^

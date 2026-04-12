@@ -7,7 +7,7 @@ This directory contains the tools and data used to test echttp.
 * Build and install the echttp library (see top folder).
 * Compile httpserver:
 ```
-cc -Og -o httpserver httpserver.c -lechttp -lssl -lcrypto -lmagic
+make httpserver
 ```
 * Run httpserver:
 ```
@@ -17,9 +17,8 @@ cc -Og -o httpserver httpserver.c -lechttp -lssl -lcrypto -lmagic
 ```
 ./httpserver -http-service=8080 -http-debug
 ```
-* Run the test for echttp_sorted.c:
+* Build and run the test for echttp_sorted.c and echttp_libc.c:
 ```
-gcc -g -I.. -Og -o sortedtest sortedtest.c ../echttp_sorted.c
-./sortedtest
+make test
 ```
 
