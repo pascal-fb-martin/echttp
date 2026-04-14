@@ -135,10 +135,14 @@ char *stpedec (char *dst, char *end, long long val) {
         return dst;
     }
 
-    // The value is large enough that a local buffer is needed.
+    // The value is greater than 100 and a local buffer is needed.
+    // Convert the low order decimal digits in reverse order,
+    // then convert the high order digit or two high order digits directly,
+    // then append the low order digits.
     //
     char image[32]; // Buffer is enough for any long long value.
-    char *imagestep = image + sizeof(image);
+    char *imageend = image + sizeof(image);
+    char *imagestep = imageend;
 
     image[0] = 0;
     *(--imagestep) = 0;
@@ -154,10 +158,17 @@ char *stpedec (char *dst, char *end, long long val) {
        if (dst >= last) goto truncate;
        *(dst++) = a[1];
     }
-    return stpecpy (dst, end, imagestep);
+    int length = (int)(imageend - imagestep);
+    if (length <= end - dst) {
+        memcpy (dst, imagestep, length);
+        return dst + length - 1;
+    }
+
+    // Copy the portion that fits and declare truncation.
+    memcpy (dst, imagestep, end - dst);
 
 truncate:
-    *dst = 0;
+    end[-1] = 0;
     return 0;
 }
 

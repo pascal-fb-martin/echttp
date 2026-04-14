@@ -129,9 +129,9 @@ int main (int argc, const char *argv[]) {
       }
    }
    endtest ();
-   starttest ("Testing numbers between 2351 and 1000000");
+   starttest ("Testing numbers between 1000 and 1000000");
    sample = 79190;
-   for (i = 2351; i < 1000000; i += 5531) {
+   for (i = 1000; i < 1000000; i += 5531) {
       snprintf (reference, sizeof(reference), "%lld", i);
       stpedec (result, end, i);
       assertsame (reference, result, "stpedec()");
@@ -142,7 +142,7 @@ int main (int argc, const char *argv[]) {
       }
    }
    endtest ();
-   starttest ("Testing numbers between 235123456 and 1000000000000)");
+   starttest ("Testing numbers between 235123456 and 1000000000000");
    sample = 791912345678;
    for (i = 235123456; i < 1000000000000; i += 1234565531) {
       snprintf (reference, sizeof(reference), "%lld", i);
@@ -261,6 +261,7 @@ int main (int argc, const char *argv[]) {
    struct timeval end4;
    struct timeval end5;
    struct timeval end6;
+   struct timeval end7;
    gettimeofday (&start, 0);
    for (i = 0; i < 1000000; ++i) {
       snprintf (reference, sizeof(reference), "%lld", i);
@@ -286,6 +287,10 @@ int main (int argc, const char *argv[]) {
       stpedec (result, end, 791912345678);
    }
    gettimeofday (&end6, 0);
+   for (i = 0; i < 1000000; ++i) {
+      stpedec (result, end, 66);
+   }
+   gettimeofday (&end7, 0);
    long long elapsed = (end1.tv_sec - start.tv_sec) * 1000
                           + (end1.tv_usec - start.tv_usec) / 1000;
    printhead ("===", 0);
@@ -297,19 +302,23 @@ int main (int argc, const char *argv[]) {
    elapsed = (end3.tv_sec - end2.tv_sec) * 1000
                 + (end3.tv_usec - end2.tv_usec) / 1000;
    printhead ("===", 0);
-   printf ("snprintf() for value 0: %lld ms for 1M iterations\n", elapsed);
+   printf ("snprintf() with value 0: %lld ms for 1M iterations\n", elapsed);
    elapsed = (end4.tv_sec - end3.tv_sec) * 1000
                 + (end4.tv_usec - end3.tv_usec) / 1000;
    printhead ("===", 0);
-   printf ("stpedec() for value 0: %lld ms for 1M iterations\n", elapsed);
+   printf ("stpedec() with value 0: %lld ms for 1M iterations\n", elapsed);
    elapsed = (end5.tv_sec - end4.tv_sec) * 1000
                 + (end5.tv_usec - end4.tv_usec) / 1000;
    printhead ("===", 0);
-   printf ("snprintf() for value 791912345678: %lld ms for 1M iterations\n", elapsed);
+   printf ("snprintf() with value 791912345678: %lld ms for 1M iterations\n", elapsed);
    elapsed = (end6.tv_sec - end5.tv_sec) * 1000
                 + (end6.tv_usec - end5.tv_usec) / 1000;
    printhead ("===", 0);
-   printf ("stpedec() for value 791912345678: %lld ms for 1M iterations\n", elapsed);
+   printf ("stpedec() with value 791912345678: %lld ms for 1M iterations\n", elapsed);
+   elapsed = (end7.tv_sec - end6.tv_sec) * 1000
+                + (end7.tv_usec - end6.tv_usec) / 1000;
+   printhead ("===", 0);
+   printf ("stpedec() with value 66: %lld ms for 1M iterations\n", elapsed);
    endtest ();
    endtest ();
 
