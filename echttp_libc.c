@@ -32,6 +32,7 @@
  */
 
 #include <string.h>
+#include <stdint.h>
 
 #include "echttp_libc.h"
 
@@ -43,7 +44,7 @@ char *stpecpy (char *dst, char *end, const char *restrict src) {
    // There is room for at least one byte..
    if (src == 0) { // Add some custom protection.
       dst[0] = 0;
-      return 0; // Nothing copied.
+      return dst; // Nothing copied.
    }
    char *p = memccpy(dst, src, '\0', end - dst);
    if (p) return p - 1;
@@ -70,34 +71,10 @@ ssize_t strtcpy (char *dst, const char *src, size_t dsize) {
    return -1;
 }
 
-// Format two digits backward.
-// This assumes that the buffer is large enough, but this is always
-// the case for this static function.
-static char *stpbdecstep (char *begin, char *end, long long val) {
+char *stpedec (char *dst, char *end, long long val) {
 
     static const char *ascii[100] = {
         "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
-        "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-        "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
-        "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-        "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
-        "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
-        "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
-        "70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
-        "80", "81", "82", "83", "84", "85", "86", "87", "88", "89",
-        "90", "91", "92", "93", "94", "95", "96", "97", "98", "99"
-    };
-
-    const char *a = ascii[val % 100];
-    *(--end) = a[1];
-    *(--end) = a[0];
-    return end;
-}
-
-char *stpedec (char *dst, char *end, long long val) {
-
-    static const char *headascii[100] = {
-        "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",
         "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
         "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
         "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
@@ -116,56 +93,80 @@ char *stpedec (char *dst, char *end, long long val) {
     char *last = end - 1;
 
     if (val < 0) {
+        // Eliminate a tricky case: abs(INT64_MIN) > INT64_MAX.
+        if (val == INT64_MIN) {
+           return stpecpy (dst, end, "-9223372036854775808");
+        }
         if (dst >= last) goto truncate;
         *(dst++) = '-';
-        *dst = 0;
         val = 0 - val;
     }
 
-    // Optimize a very common case.
+    // Optimize the most common cases.
     if (val < 100) {
-        if (dst >= last) goto truncate;
-        a = headascii[val];
-        *(dst++) = a[0];
-        if (a[1]) {
-           if (dst >= last) goto truncate;
-           *(dst++) = a[1];
+        if (val < 10) {
+            if (dst >= last) goto truncate;
+            *(dst++) = '0' + val;
+            *dst = 0;
+            return dst;
         }
+        a = ascii[val];
+        if (dst >= last-1) {
+            if (dst >= last) goto truncate;
+            *(dst++) = a[0]; // One slot left: do an exact truncation.
+            goto truncate;
+        }
+        *(dst++) = a[0];
+        *(dst++) = a[1];
         *dst = 0;
         return dst;
     }
 
-    // The value is greater than 100 and a local buffer is needed.
-    // Convert the low order decimal digits in reverse order,
-    // then convert the high order digit or two high order digits directly,
-    // then append the low order digits.
-    //
-    char image[32]; // Buffer is enough for any long long value.
-    char *imageend = image + sizeof(image);
-    char *imagestep = imageend;
+    static long long IntegerLengths [] = {
+        0, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+        1000000000, 10000000000, 100000000000, 1000000000000, 10000000000000,
+        100000000000000, 1000000000000000, 10000000000000000,
+        100000000000000000, 1000000000000000000};
 
-    image[0] = 0;
-    *(--imagestep) = 0;
+    // Calculate the length of the ASCII string to be generated.
+    // This uses a binary search to optimize the loop for large numbers
+    // (this also makes the loop worse for small numbers, but numbers
+    // from 0 to 99 were excluded already--see above).
+    int min = 2; // We already eliminated the case "val < 100".
+    int max = 19;
     do {
-        imagestep = stpbdecstep (image, imagestep, val);
+        int mid = (min + max) / 2;
+        if (val < IntegerLengths[mid]) max = mid;
+        else min = mid;
+    } while (max - min > 1);
+
+    // Check that it fits, adjust to make it fit otherwise (truncation).
+    //
+    int truncated = 0;
+    char *actualend = dst + min + 1; // Need room for the null terminator.
+    if (actualend > last) {
+        // Truncation will occur: adjust val to fit.
+        val /= IntegerLengths[actualend - last];
+        actualend = last;
+        truncated = 1;
+    }
+    *actualend = 0;
+    char *cursor = actualend;
+
+    while (val >= 100) {
+        const char *a = ascii[val % 100];
         val /= 100;
-    } while (val >= 100);
-
-    a = headascii[val];
-    if (dst >= last) goto truncate;
-    *(dst++) = a[0];
-    if (a[1]) {
-       if (dst >= last) goto truncate;
-       *(dst++) = a[1];
+        *(--cursor) = a[1];
+        *(--cursor) = a[0];
     }
-    int length = (int)(imageend - imagestep);
-    if (length <= end - dst) {
-        memcpy (dst, imagestep, length);
-        return dst + length - 1;
+    if (val < 10) {
+        *(--cursor) = '0' + val;
+    } else {
+        const char *a = ascii[val];
+        *(--cursor) = a[1];
+        *(--cursor) = a[0];
     }
-
-    // Copy the portion that fits and declare truncation.
-    memcpy (dst, imagestep, end - dst);
+    return truncated?0:actualend;
 
 truncate:
     end[-1] = 0;

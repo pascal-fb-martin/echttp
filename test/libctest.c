@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/time.h>
 
@@ -40,21 +41,22 @@ static void endtest (void) {
 
 int main (int argc, const char *argv[]) {
 
-   char buffer[16];
+   char buffer[22];
+   char *end = buffer + sizeof(buffer);
+
    const char *ref = "Hello world!";
    const char *reflong = "Hello very terribly horribly long world!";
 
    starttest ("Testing stpecpy()");
    starttest ("Positive use case");
    buffer[0] = 0; //make sure a stupid mistake does not trick the test.
-   char *end = buffer + sizeof(buffer);
    char *p = stpecpy (buffer, end, ref);
    assert (p == buffer + strlen(ref), "invalid return pointer");
    assertsame (ref, buffer, "stpecpy()");
    printhead ("===", 0); printf ("Result: %s%s\n", buffer, p?"":" (truncated)");
    endtest ();
 
-   starttest ("Truncate");
+   starttest ("Truncate cases");
    buffer[0] = 0; //make sure a stupid mistake does not trick the test.
    p = stpecpy (buffer, end, reflong);
    assert (p == 0, "not truncated?");
@@ -82,10 +84,21 @@ int main (int argc, const char *argv[]) {
    assert (strlen(buffer) == sizeof(buffer)-1, "not properly truncated");
    printhead ("===", 0); printf ("Result: %s%s\n", buffer, p?"":" (truncated)");
    endtest ();
+
+   starttest ("Null dst, end or src");
+   buffer[0] = 0; //make sure a stupid mistake does not trick the test.
+   p = stpecpy (0, end, ref);
+   assert (p == 0, "copied something to address 0?");
+   p = stpecpy (buffer, 0, ref);
+   assert (p == 0, "copied something to an empty buffer?");
+   p = stpecpy (buffer, end, 0);
+   assert (p == buffer, "invalid return pointer");
+   assert (strlen(buffer) == 0, "copied something from address 0?");
+   endtest ();
    endtest ();
 
    starttest ("Testing strtcpy()");
-   starttest ("Testing positive use case");
+   starttest ("Positive use case");
    buffer[0] = 0; //make sure a stupid mistake does not trick the test.
    int n = strtcpy (buffer, ref, sizeof(buffer));
    assert (n == strlen (ref), "invalid length");
@@ -93,7 +106,7 @@ int main (int argc, const char *argv[]) {
    printhead ("===", 0); printf ("Result: %s%s\n", buffer, (n > 0)?"":" (truncated)");
    endtest ();
 
-   starttest ("Testing truncate");
+   starttest ("Truncate case");
    buffer[0] = 0; //make sure a stupid mistake does not trick the test.
    n = strtcpy (buffer, reflong, sizeof(buffer));
    assert (n < 0, "not truncated?");
@@ -101,7 +114,7 @@ int main (int argc, const char *argv[]) {
    printhead ("===", 0); printf ("Result: %s%s\n", buffer, (n > 0)?"":" (truncated)");
    endtest ();
 
-   starttest ("Testing null dst, src or dsize");
+   starttest ("Null dst, src or dsize");
    buffer[0] = 0; //make sure a stupid mistake does not trick the test.
    n = strtcpy (0, ref, sizeof(buffer));
    assert (n < 0, "copied something to address 0?");
@@ -115,57 +128,73 @@ int main (int argc, const char *argv[]) {
    starttest ("Testing stpedec()");
    long long sample = 765;
    char reference[32];
-   char result[32];
-   end = result + sizeof(result);
    long long i;
-   starttest ("Testing numbers 0 to 999");
+   starttest ("Numbers 0 to 999");
    for (i = 0; i < 1000; ++i) {
       snprintf (reference, sizeof(reference), "%lld", i);
-      stpedec (result, end, i);
-      assertsame (reference, result, "stpedec()");
+      p = stpedec (buffer, end, i);
+      assert (p == buffer + strlen(reference), "invalid return pointer");
+      assertsame (reference, buffer, "stpedec()");
       if (i == sample) {
           printhead ("===", 0);
-          printf ("%lld is printed as %s\n", i, result);
+          printf ("%lld is printed as %s\n", i, buffer);
       }
    }
    endtest ();
-   starttest ("Testing numbers between 1000 and 1000000");
+   starttest ("Numbers between 1000 and 1000000");
    sample = 79190;
    for (i = 1000; i < 1000000; i += 5531) {
       snprintf (reference, sizeof(reference), "%lld", i);
-      stpedec (result, end, i);
-      assertsame (reference, result, "stpedec()");
+      p = stpedec (buffer, end, i);
+      assert (p == buffer + strlen(reference), "invalid return pointer");
+      assertsame (reference, buffer, "stpedec()");
       if (sample && (i > sample)) {
           printhead ("===", 0);
-          printf ("%lld is printed as %s\n", i, result);
+          printf ("%lld is printed as %s\n", i, buffer);
           sample = 0;
       }
    }
    endtest ();
-   starttest ("Testing numbers between 235123456 and 1000000000000");
+   starttest ("Numbers between 235123456 and 1000000000000");
    sample = 791912345678;
    for (i = 235123456; i < 1000000000000; i += 1234565531) {
       snprintf (reference, sizeof(reference), "%lld", i);
-      stpedec (result, end, i);
-      assertsame (reference, result, "stpedec()");
+      p = stpedec (buffer, end, i);
+      assert (p == buffer + strlen(reference), "invalid return pointer");
+      assertsame (reference, buffer, "stpedec()");
       if (sample && (i > sample)) {
           printhead ("===", 0);
-          printf ("%lld is printed as %s\n", i, result);
+          printf ("%lld is printed as %s\n", i, buffer);
           sample = 0;
       }
    }
    endtest ();
-   starttest ("Testing negative numbers");
+   starttest ("Negative numbers");
    static long long Samples[] = {-1, -10, -50, -234, -91234567890};
    for (i = 0; i < 5; ++i) {
       snprintf (reference, sizeof(reference), "%lld", Samples[i]);
-      stpedec (result, end, Samples[i]);
-      assertsame (reference, result, "stpedec()");
+      p = stpedec (buffer, end, Samples[i]);
+      assert (p == buffer + strlen(reference), "invalid return pointer");
+      assertsame (reference, buffer, "stpedec()");
       printhead ("===", 0);
-      printf ("%lld is printed as %s\n", Samples[i], result);
+      printf ("%lld is printed as %s\n", Samples[i], buffer);
    }
+   starttest ("INT64_MIN, INT64_MAX");
+   snprintf (reference, sizeof(reference), "%lld", INT64_MIN);
+   p = stpedec (buffer, end, INT64_MIN);
+   assert (p == buffer + strlen(reference), "invalid return pointer");
+   assertsame (reference, buffer, "stpedec()");
+   printhead ("===", 0);
+   printf ("%lld is printed as %s\n", INT64_MIN, buffer);
+   snprintf (reference, sizeof(reference), "%lld", INT64_MAX);
+   p = stpedec (buffer, end, INT64_MAX);
+   assert (p == buffer + strlen(reference), "invalid return pointer");
+   assertsame (reference, buffer, "stpedec()");
+   printhead ("===", 0);
+   printf ("%lld is printed as %s\n", INT64_MAX, buffer);
    endtest ();
-   starttest ("Truncate");
+   endtest ();
+   starttest ("Truncate cases");
    starttest ("Buffer length 1");
    p = stpedec (buffer, buffer+1, -12);
    assert (p == 0, "-12 not truncated?");
@@ -198,6 +227,7 @@ int main (int argc, const char *argv[]) {
    assert (strlen(buffer) == 1, "-1 not properly truncated");
    p = stpedec (buffer, buffer+2, 1);
    assert (p != 0, "1 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("1", buffer, "truncation test for 1");
    p = stpedec (buffer, buffer+2, 12);
    assert (p == 0, "1234 not truncated?");
@@ -218,9 +248,11 @@ int main (int argc, const char *argv[]) {
    assert (strlen(buffer) == 2, "-12 not properly truncated");
    p = stpedec (buffer, buffer+3, 1);
    assert (p != 0, "1 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("1", buffer, "truncation test for 1");
    p = stpedec (buffer, buffer+3, 12);
    assert (p != 0, "12 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("12", buffer, "truncation test for 12");
    p = stpedec (buffer, buffer+3, 123);
    assert (p == 0, "123 not truncated?");
@@ -235,15 +267,19 @@ int main (int argc, const char *argv[]) {
    assert (strlen(buffer) == 3, "-123 not properly truncated");
    p = stpedec (buffer, buffer+4, -12);
    assert (p != 0, "-12 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("-12", buffer, "truncation test for -12");
    p = stpedec (buffer, buffer+4, 1);
    assert (p != 0, "1 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("1", buffer, "truncation test for 1");
    p = stpedec (buffer, buffer+4, 12);
    assert (p != 0, "12 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("12", buffer, "truncation test for 12");
    p = stpedec (buffer, buffer+4, 123);
    assert (p != 0, "123 truncated?");
+   assert (p == buffer + strlen(buffer), "invalid return pointer");
    assertsame ("123", buffer, "truncation test for 123");
    p = stpedec (buffer, buffer+4, 1234);
    assert (p == 0, "1234 not truncated?");
@@ -253,7 +289,14 @@ int main (int argc, const char *argv[]) {
    assert (strlen(buffer) == 3, "12345 not properly truncated");
    endtest ();
    endtest ();
-   starttest ("Testing stpedec() performances");
+   starttest ("Null dst, end or src");
+   buffer[0] = 0; //make sure a stupid mistake does not trick the test.
+   p = stpedec (0, end, 1);
+   assert (p == 0, "copied something to address 0?");
+   p = stpedec (buffer, 0, 1);
+   assert (p == 0, "copied something to an empty buffer?");
+   endtest ();
+   starttest ("Performances");
    struct timeval start;
    struct timeval end1;
    struct timeval end2;
@@ -268,7 +311,7 @@ int main (int argc, const char *argv[]) {
    }
    gettimeofday (&end1, 0);
    for (i = 0; i < 1000000; ++i) {
-      stpedec (result, end, i);
+      stpedec (buffer, end, i);
    }
    gettimeofday (&end2, 0);
    for (i = 0; i < 1000000; ++i) {
@@ -276,7 +319,7 @@ int main (int argc, const char *argv[]) {
    }
    gettimeofday (&end3, 0);
    for (i = 0; i < 1000000; ++i) {
-      stpedec (result, end, 0);
+      stpedec (buffer, end, 0);
    }
    gettimeofday (&end4, 0);
    for (i = 0; i < 1000000; ++i) {
@@ -284,11 +327,11 @@ int main (int argc, const char *argv[]) {
    }
    gettimeofday (&end5, 0);
    for (i = 0; i < 1000000; ++i) {
-      stpedec (result, end, 791912345678);
+      stpedec (buffer, end, 791912345678);
    }
    gettimeofday (&end6, 0);
    for (i = 0; i < 1000000; ++i) {
-      stpedec (result, end, 66);
+      stpedec (buffer, end, 66);
    }
    gettimeofday (&end7, 0);
    long long elapsed = (end1.tv_sec - start.tv_sec) * 1000
