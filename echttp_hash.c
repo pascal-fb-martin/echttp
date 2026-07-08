@@ -88,7 +88,7 @@
  *    is found; otherwise the iteration stops and returns the last
  *    processed index.
  *
- * void echttp_hash_insert (echttp_hash *d, const char *name);
+ * int echttp_hash_insert (echttp_hash *d, const char *name);
  *
  *    Insert a new item if it did not exist already. Return 0 if the hash
  *    table is full and cannot accomodate any new item, or the item's index

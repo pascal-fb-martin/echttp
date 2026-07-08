@@ -541,6 +541,10 @@ static void echttp_execute (int route, int client,
     else
         length = strlen(data);
 
+    if (context->transfer.size + context->queued + length <= 0) {
+        context->status = 204;
+        context->reason = "No Content";
+    }
     char buffer[256];
     snprintf (buffer, sizeof(buffer), "HTTP/1.1 %d %s\r\n",
              context->status, context->reason);
