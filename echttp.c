@@ -541,7 +541,8 @@ static void echttp_execute (int route, int client,
     else
         length = strlen(data);
 
-    if (context->transfer.size + context->queued + length <= 0) {
+    if ((context->status == 200) &&
+        (context->transfer.size + context->queued + length <= 0)) {
         context->status = 204;
         context->reason = "No Content";
     }
