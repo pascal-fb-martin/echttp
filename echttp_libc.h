@@ -16,5 +16,7 @@
 char *stpecpy (char *dest, char *end, const char *restrict src);
 char *stpedec (char *dest, char *end, long long value);
 ssize_t strtcpy (char *dst, const char *src, size_t dsize);
+
+int strsame  (const char *s1, const char *s2);
 #endif
 

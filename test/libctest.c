@@ -16,18 +16,31 @@ static void printhead (const char *marker, const char *text) {
 }
    
 static void assert (int good, const char *text) {
+   const char *preamble = "===";
    if (!good) {
-       printhead ("***", text);
+       preamble = "***";
        errorcount += 1;
    }
+   printhead (preamble, text);
 }
 
 static void assertsame (const char *s1, const char *s2, const char *text) {
+   const char *preamble = "===";
    if (strcmp (s1, s2)) {
-       printhead ("***", 0);
-       printf ("%s: %s and %s are different\n", text, s1, s2);
+       preamble = "***";
+       printf ("%s and %s are different\n", text, s1, s2);
        errorcount += 1;
    }
+   printhead (preamble, text);
+}
+
+static void showperformance (struct timeval *start,
+                             struct timeval *end,
+                             const char *action, int count) {
+   long long elapsed = (end->tv_sec - start->tv_sec) * 1000
+                          + (end->tv_usec - start->tv_usec) / 1000;
+   printhead ("===", 0);
+   printf ("%s: %lld ms for %d iterations\n", action, elapsed, count);
 }
 
 static void starttest (const char *text) {
@@ -37,6 +50,17 @@ static void starttest (const char *text) {
 
 static void endtest (void) {
    indent -= 1;
+}
+
+// This function is intended to fool the gcc optimizer, which
+// has special cases for intrinsic functions..
+__attribute__((noinline)) int stringcasecompare (const char *s1, const char *s2) {
+   return strcasecmp (s1, s2);
+}
+
+// The same treatement is applied to strsame() for fairness.
+__attribute__((noinline)) int stringsame (const char *s1, const char *s2) {
+   return strsame (s1, s2);
 }
 
 int main (int argc, const char *argv[]) {
@@ -334,34 +358,64 @@ int main (int argc, const char *argv[]) {
       stpedec (buffer, end, 66);
    }
    gettimeofday (&end7, 0);
-   long long elapsed = (end1.tv_sec - start.tv_sec) * 1000
-                          + (end1.tv_usec - start.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("snprintf() incremented: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end2.tv_sec - end1.tv_sec) * 1000
-                + (end2.tv_usec - end1.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("stpedec() incremented: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end3.tv_sec - end2.tv_sec) * 1000
-                + (end3.tv_usec - end2.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("snprintf() with value 0: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end4.tv_sec - end3.tv_sec) * 1000
-                + (end4.tv_usec - end3.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("stpedec() with value 0: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end5.tv_sec - end4.tv_sec) * 1000
-                + (end5.tv_usec - end4.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("snprintf() with value 791912345678: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end6.tv_sec - end5.tv_sec) * 1000
-                + (end6.tv_usec - end5.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("stpedec() with value 791912345678: %lld ms for 1M iterations\n", elapsed);
-   elapsed = (end7.tv_sec - end6.tv_sec) * 1000
-                + (end7.tv_usec - end6.tv_usec) / 1000;
-   printhead ("===", 0);
-   printf ("stpedec() with value 66: %lld ms for 1M iterations\n", elapsed);
+   showperformance (&start, &end1, "snprintf() incremented", 1000000);
+   showperformance (&end1, &end2, "stpedec() incremented", 1000000);
+   showperformance (&end2, &end3, "snprintf() with value 0", 1000000);
+   showperformance (&end3, &end4, "stpdec() with value 0", 1000000);
+   showperformance (&end4, &end5, "snprintf() with value 791912345678", 1000000);
+   showperformance (&end5, &end6, "stpdec() with value 791912345678", 1000000);
+   showperformance (&end6, &end7, "stpdec() with value 66", 1000000);
+   endtest ();
+   endtest ();
+
+   starttest ("Testing strsame()");
+   starttest ("Testing strsame() with null pointers");
+   assert (strsame(0,0) == 0, "strsame(null,null)");
+   assert (strsame("whatever",0) == 0, "strsame(string,null)");
+   assert (strsame(0,"whatever") == 0, "strsame(null,string)");
+   endtest ();
+   starttest ("Testing strsame() with equal pointers");
+   const char *p1 = "whatSoever";
+   assert (strsame(p1,p1), "strsame(p1,p1)");
+   endtest ();
+   starttest ("Testing strsame() with same content");
+   char p2[60];
+   snprintf (p2, sizeof(p2), p1);
+   assert (strsame(p1,p2), "strsame(whatSoever,whatSoever)");
+   assert (strsame(p1,"whatsoever"), "strsame(whatSoever,whatsoever)");
+   endtest ();
+   starttest ("Testing strsame() with different strings");
+   assert (strsame(p1,"whats0ever") == 0, "strsame(whatSoever,whats0ever)");
+   assert (strsame(p1,"somethingelse") == 0, "strsame(whatSoever,somethingelse)");
+   assert (strsame(p1,"short") == 0, "strsame(whatSoever,short)");
+   endtest ();
+
+   starttest ("Performances");
+   for (i = 0; i < 10; ++i) { // Prime the cache.
+      if (!strsame (p1, p2)) printf ("*** mismatch at %d!\n", i);
+      if (stringcasecompare (p1, p2)) printf ("*** mismatch at %d!\n", i);
+   }
+   gettimeofday (&start, 0);
+   for (i = 0; i < 1000000; ++i) {
+      if (!stringsame (p1, p1)) printf ("*** mismatch at %d!\n", i);
+   }
+   gettimeofday (&end1, 0);
+   for (i = 0; i < 1000000; ++i) {
+      if (stringcasecompare (p1, p1)) printf ("*** mismatch at %d!\n", i);
+   }
+   gettimeofday (&end2, 0);
+   for (i = 0; i < 1000000; ++i) {
+      if (!stringsame (p1, p2)) printf ("*** mismatch at %d!\n", i);
+   }
+   gettimeofday (&end3, 0);
+   for (i = 0; i < 1000000; ++i) {
+      if (stringcasecompare (p1, p2)) printf ("*** mismatch at %d!\n", i);
+   }
+   gettimeofday (&end4, 0);
+   showperformance (&start, &end1, "strsame() with same pointer", 1000000);
+   showperformance (&end1, &end2, "strcasecmp() with same pointer", 1000000);
+   showperformance (&end2, &end3, "strsame() with same content", 1000000);
+   showperformance (&end3, &end4, "strcasecmp() with same content", 1000000);
    endtest ();
    endtest ();
 

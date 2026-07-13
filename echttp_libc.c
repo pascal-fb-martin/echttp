@@ -29,10 +29,17 @@
  *
  *    This converts an integer to a decimal string. It is otherwise similar
  *    to, and is designed to work in combination with, stpecpy().
+ *
+ * int strsame  (const char *s1, const char *s2);
+ *
+ *    This function is made up. It is case independent and returns 1 if s1 and
+ *    s2 are the same (regardless of case). Either pointer can be null,
+ *    in which case the result is always 0.
  */
 
 #include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #include "echttp_libc.h"
 
@@ -171,5 +178,22 @@ char *stpedec (char *dst, char *end, long long val) {
 truncate:
     end[-1] = 0;
     return 0;
+}
+
+int strsame  (const char *s1, const char *s2) {
+
+    if (!s1) return 0;
+    if (s1 == s2) return 1;
+    if (!s2) return 0;
+
+    for (;;) {
+        char a = *(s1++);
+        char b = *(s2++);
+        if (a != b) {
+            if (tolower(a) != tolower(b)) return 0;
+        }
+        if (!a) return 1;
+    }
+    return 0; // Make gcc happy.
 }
 
