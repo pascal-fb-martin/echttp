@@ -1,3 +1,17 @@
+echttp (2.3) UNRELEASED; urgency=medium
+
+  * Fix initialization of hash table.
+  * Add strsame() (strcmp drives me insane).
+  * Return HTTP code 204 when there is no content (avoid JavaScript exception).
+  * Add stpedec(), similar to stpecpy but for integers (better performances).
+  * JSON performance improvements (strncpy() is evil): use stpecpy(), strtcpy().
+  * Keep a reference to the HTTP reason when code is not 200
+  * Handle errors when a file does not exist.
+  * Add echttp_option_csv() for multi-values options.
+  * Accept null path pointer as equivalent to empty path.
+
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Mon, 24 Aug 2026 17:23:00 -0700
+
 echttp (2.2) UNRELEASED; urgency=medium
 
   * Fix the array size limit issue with echttp_json_enumerate() 
