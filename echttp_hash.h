@@ -30,6 +30,7 @@ typedef int echttp_hash_action (int i, const char *name);
 
 unsigned int echttp_hash_signature (const char *name);
 
+void echttp_hash_create (echttp_hash *d);
 void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action);
 
 int echttp_hash_find (echttp_hash *d, const char *name);

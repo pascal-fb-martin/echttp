@@ -22,9 +22,14 @@
  * Manage a catalog of symbols. This is basically a specialized hash table,
  * where the values are printable strings.
  *
+ * void echttp_catalog_create (echttp_catalog *d);
+ *
+ *    Create a new catalog. This disregards any data held in the provided
+ *    catalog structure.
+ *
  * void echttp_catalog_reset (echttp_catalog *d);
  *
- *    Erase all data in the given catalog. After this the catalog is empty.
+ *    Erase all data in the given catalog. After this, the catalog is empty.
  *
  * void echttp_catalog_set (echttp_catalog *d,
  *                          const char *name, const char *value);
@@ -57,6 +62,10 @@
 #include "echttp_encoding.h"
 #include "echttp_catalog.h"
 
+
+void echttp_catalog_create (echttp_catalog *d) {
+    echttp_hash_create (d);
+}
 
 void echttp_catalog_reset (echttp_catalog *d) {
     echttp_hash_reset (d, 0);

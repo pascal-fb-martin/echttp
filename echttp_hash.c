@@ -57,6 +57,11 @@
  *    independent from the hash modulo (if ever that one changes when the
  *    table expands).
  *
+ * void echttp_hash_create (echttp_hash *d);
+ *
+ *    Initialize a new hash table, empty. Any data held in the provided
+ *    data structure is ignored: do not use this on an existing hash.
+ *
  * void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action);
  *
  *    Erase all data in the given hash. After this call the hash is empty.
@@ -135,6 +140,10 @@ unsigned int echttp_hash_signature (const char *name) {
     while ((c = *name++) != 0)
         hash = ((hash << 5) + hash) + tolower(c); /* hash * 33 + c */
     return hash;
+}
+
+void echttp_hash_create (echttp_hash *d) {
+    *d = (echttp_hash){0};
 }
 
 void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action) {

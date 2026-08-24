@@ -659,6 +659,13 @@ static int echttp_newclient (int client) {
        context = echttp_context[client] = malloc (sizeof(echttp_request));
        context->client = client;
        context->next = context->last = 0;
+       echttp_catalog_create (&(context->in));
+       echttp_catalog_create (&(context->out));
+       echttp_catalog_create (&(context->params));
+   } else {
+       echttp_catalog_reset(&(context->in));
+       echttp_catalog_reset(&(context->out));
+       echttp_catalog_reset(&(context->params));
    }
    context->state = ECHTTP_STATE_IDLE;
    context->mode = ECHTTP_RAW;
@@ -667,8 +674,6 @@ static int echttp_newclient (int client) {
    context->asynchronous = 0;
    context->origin = 0;
    context->route = 0;
-   echttp_catalog_reset(&(context->in));
-   echttp_catalog_reset(&(context->out));
    context->queued = 0;
    return 1;
 }
