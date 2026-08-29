@@ -29,3 +29,5 @@ typedef int echttp_catalog_action (const char *name, const char *value);
 
 void echttp_catalog_enumerate (echttp_catalog *d,
                                echttp_catalog_action *action);
+
+void echttp_catalog_release (echttp_catalog *d);

@@ -52,6 +52,11 @@
  *
  *    Call action for each item of the catalog. Stop at the end of the catalog
  *    Or when the action returns true.
+ *
+ * void echttp_catalog_release (echttp_catalog *d);
+ *
+ *    Release all resources allocated fro this catalog.
+ *
  */
 
 #include <stdlib.h>
@@ -62,13 +67,19 @@
 #include "echttp_encoding.h"
 #include "echttp_catalog.h"
 
+#define ECHTTP_MAX_SYMBOL 256
 
 void echttp_catalog_create (echttp_catalog *d) {
-    echttp_hash_create (d);
+    echttp_hash_create (d, ECHTTP_MAX_SYMBOL);
 }
 
 void echttp_catalog_reset (echttp_catalog *d) {
     echttp_hash_reset (d, 0);
+}
+
+void echttp_catalog_release (echttp_catalog *d) {
+    echttp_catalog_reset (d);
+    echttp_hash_release (d);
 }
 
 void echttp_catalog_set (echttp_catalog *d,

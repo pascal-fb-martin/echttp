@@ -78,7 +78,7 @@ static magic_t echttp_magic_cookie = 0;
 
 static echttp_catalog echttp_static_roots;
 
-static echttp_catalog echttp_static_type;
+static echttp_catalog echttp_static_type = {0};
 
 static int echttp_static_cannot_find (const char *path) {return -1;}
 static echttp_not_found_handler *echttp_static_not_found = echttp_static_cannot_find;
@@ -310,6 +310,7 @@ static void echttp_static_internal_initialization (void) {
     static int Initialized = 0;
     if (!Initialized) {
         // Create some common default content types.
+        echttp_catalog_create (&echttp_static_type);
         int i;
         for (i = 0; echttp_static_default_types[i].extension; ++i) {
             echttp_catalog_set (&echttp_static_type,
@@ -317,6 +318,7 @@ static void echttp_static_internal_initialization (void) {
                                 echttp_static_default_types[i].content);
         }
         echttp_magic_cookie = magic_open (MAGIC_MIME_TYPE);
+        echttp_catalog_create (&echttp_static_roots);
         Initialized = 1;
     }
 }

@@ -57,7 +57,7 @@
  *    independent from the hash modulo (if ever that one changes when the
  *    table expands).
  *
- * void echttp_hash_create (echttp_hash *d);
+ * void echttp_hash_create (echttp_hash *d, int size);
  *
  *    Initialize a new hash table, empty. Any data held in the provided
  *    data structure is ignored: do not use this on an existing hash.
@@ -66,7 +66,9 @@
  *
  *    Erase all data in the given hash. After this call the hash is empty.
  *    The action may be used to free name and value if required.
- *    A null action is ignored.
+ *    A null action is ignored. This does not change the size of the hash
+ *    table or release any allocated resources. This has no effect if the
+ *    hash table is empty.
  *
  * int echttp_hash_find (echttp_hash *d, const char *name);
  *
@@ -113,6 +115,13 @@
  *    the key is not found. If there are duplicates items, the value of
  *    the first one found is returned: do not use with non-unique indexes.
  *
+ * void echttp_hash_release (echttp_hash *d);
+ *
+ *    Release all resources allocated for this has table. The hash table
+ *    must be empty or else nothing happens. See echttp_hash_reset().
+ *    This function does nothing if no resource were allocated, or if all
+ *    resources were already released.
+ *
  * LIMITATIONS
  *
  * The current implementation is limited to a maximum of 256 entries. This
@@ -142,14 +151,18 @@ unsigned int echttp_hash_signature (const char *name) {
     return hash;
 }
 
-void echttp_hash_create (echttp_hash *d) {
+void echttp_hash_create (echttp_hash *d, int size) {
     *d = (echttp_hash){0};
+    d->item = calloc (size, sizeof(echttp_symbol));
+    d->size = size;
 }
 
 void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action) {
 
+    if (!d) return;
+
     int i;
-    for (i = 1; i < ECHTTP_MAX_SYMBOL; ++i) {
+    for (i = 1; i < d->size; ++i) {
         if (d->item[i].name && action)
             action (i, d->item[i].name);
         d->item[i].name = d->item[i].value = 0;
@@ -160,6 +173,16 @@ void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action) {
         d->index[i] = 0;
     }
     d->count = 0;
+}
+
+void echttp_hash_release (echttp_hash *d) {
+
+    if (!d) return;
+    if (d->count > 0) return;
+
+    if (d->item) free (d->item);
+    d->item = 0;
+    d->size = 0;
 }
 
 static int echttp_hash_forage (echttp_hash *d, int start,
@@ -182,8 +205,8 @@ int echttp_hash_find (echttp_hash *d, const char *name) {
 }
 
 int echttp_hash_next (echttp_hash *d, int from, const char *name) {
-    if (from <= 0 || from >= ECHTTP_MAX_SYMBOL) return 0;
     if (!d) return 0;
+    if (from <= 0 || from >= d->size) return 0;
     return echttp_hash_forage (d, d->item[from].next,
                                name, d->item[from].signature);
 }
@@ -195,8 +218,8 @@ int echttp_hash_add (echttp_hash *d, const char *name) {
     int hash = signature % ECHTTP_HASH;
     int index = d->count + 1;
 
-    if (index >= ECHTTP_MAX_SYMBOL) {
-        fprintf (stderr, "Too many symbols in hash.\n");
+    if (index >= d->size) {
+        fprintf (stderr, "Cannot add %s: too many symbols in hash (size %d)\n", name, d->size);
         return 0;
     }
     d->item[index].name = name;

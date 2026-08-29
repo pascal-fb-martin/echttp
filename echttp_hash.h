@@ -10,27 +10,27 @@
 #include "time.h"
 
 typedef struct {
-    const char *name;
-    void       *value;
+    const char  *name;
+    void        *value;
     unsigned int signature;
     time_t       timestamp;
     int next;
 } echttp_symbol;
 
 #define ECHTTP_HASH 127
-#define ECHTTP_MAX_SYMBOL 256
 
 typedef struct {
+    int size;
     int count;
     int index[ECHTTP_HASH];
-    echttp_symbol item[ECHTTP_MAX_SYMBOL];
+    echttp_symbol *item;
 } echttp_hash;
 
 typedef int echttp_hash_action (int i, const char *name);
 
 unsigned int echttp_hash_signature (const char *name);
 
-void echttp_hash_create (echttp_hash *d);
+void echttp_hash_create (echttp_hash *d, int size);
 void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action);
 
 int echttp_hash_find (echttp_hash *d, const char *name);
@@ -47,4 +47,6 @@ int echttp_hash_iterate (echttp_hash *d,
 void echttp_hash_set (echttp_hash *d, const char *name, void *value);
 
 void *echttp_hash_get (echttp_hash *d, const char *name);
+
+void echttp_hash_release (echttp_hash *d);
 
