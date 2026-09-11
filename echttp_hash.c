@@ -238,7 +238,7 @@ int echttp_hash_iterate (echttp_hash *d,
     if (!d) return 0;
     int i;
     if (!name) {
-        for (i = 1; i < d->count; ++i) {
+        for (i = 1; i <= d->count; ++i) {
             if (action (i, d->item[i].name)) return i;
         }
     } else {
