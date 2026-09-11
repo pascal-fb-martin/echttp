@@ -104,10 +104,11 @@
  * The following primitives are used to store and retrieve values. These
  * are meant to be used with a unique index type hash table only.
  *
- * void echttp_hash_set (echttp_hash *d,
- *                       const char *name, const char *value);
+ * void *echttp_hash_set (echttp_hash *d,
+ *                        const char *name, const char *value);
  *
  *    Insert a new item, or change the value of an item that already exists.
+ *    Return the value previously assigned to the item, or else null.
  *
  * void *echttp_hash_get (echttp_hash *d, const char *name);
  *
@@ -260,10 +261,15 @@ int echttp_hash_insert (echttp_hash *d, const char *name) {
     return index;
 }
 
-void echttp_hash_set (echttp_hash *d, const char *name, void *value) {
+void *echttp_hash_set (echttp_hash *d, const char *name, void *value) {
 
     int i = echttp_hash_insert (d, name);
-    if (i > 0) d->item[i].value = value;
+    if (i > 0) {
+        void *old = d->item[i].value;
+        d->item[i].value = value;
+        return old;
+    }
+    return 0;
 }
 
 void *echttp_hash_get (echttp_hash *d, const char *name) {

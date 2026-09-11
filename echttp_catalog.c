@@ -31,10 +31,13 @@
  *
  *    Erase all data in the given catalog. After this, the catalog is empty.
  *
- * void echttp_catalog_set (echttp_catalog *d,
- *                          const char *name, const char *value);
+ * char *echttp_catalog_set (echttp_catalog *d,
+ *                           const char *name, const char *value);
  *
  *    Insert a new item, or change its value.
+ *    Return the item's previous value, or else null. The returned pointer
+ *    is not a constant: the reference was removed from the catalog and
+ *    the caller is allowed to do what it sees fit with it (like free it).
  *
  * const char *echttp_catalog_get (echttp_catalog *d, const char *name);
  *
@@ -82,9 +85,9 @@ void echttp_catalog_release (echttp_catalog *d) {
     echttp_hash_release (d);
 }
 
-void echttp_catalog_set (echttp_catalog *d,
-                         const char *name, const char *value) {
-    echttp_hash_set (d, name, (void *) value);
+char *echttp_catalog_set (echttp_catalog *d,
+                          const char *name, const char *value) {
+    return (char *) echttp_hash_set (d, name, (void *) value);
 }
 
 const char *echttp_catalog_get (echttp_catalog *d, const char *name) {

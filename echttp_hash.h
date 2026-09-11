@@ -42,10 +42,9 @@ int echttp_hash_insert (echttp_hash *d, const char *name);
 int echttp_hash_iterate (echttp_hash *d,
                          const char *name, echttp_hash_action *action);
 
-// Compatibility API, to be phased out.
+// Compatibility API, mostly used by module echttp_catalog.c.
 //
-void echttp_hash_set (echttp_hash *d, const char *name, void *value);
-
+void *echttp_hash_set (echttp_hash *d, const char *name, void *value);
 void *echttp_hash_get (echttp_hash *d, const char *name);
 
 void echttp_hash_release (echttp_hash *d);

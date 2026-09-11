@@ -17,8 +17,8 @@ unsigned int echttp_catalog_signature (const char *name);
 void echttp_catalog_create (echttp_catalog *d);
 void echttp_catalog_reset (echttp_catalog *d);
 
-void echttp_catalog_set (echttp_catalog *d,
-                         const char *name, const char *value);
+char *echttp_catalog_set (echttp_catalog *d,
+                          const char *name, const char *value);
 
 const char *echttp_catalog_get (echttp_catalog *d, const char *name);
 
