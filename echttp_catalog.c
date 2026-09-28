@@ -58,8 +58,13 @@
  *
  * void echttp_catalog_release (echttp_catalog *d);
  *
- *    Release all resources allocated fro this catalog.
+ *    Release all resources allocated for this catalog. This is a simplified
+ *    variant of echttp_catalog_free(), when the caller has nothing to free.
  *
+ * void echttp_catalog_free (echttp_catalog *d, echttp_catalog_action *action);
+ *
+ *    Release all resources allocated for this catalog by this module or the
+ *    caller. The action allows the caller to free its own resources.
  */
 
 #include <stdlib.h>
@@ -83,6 +88,11 @@ void echttp_catalog_reset (echttp_catalog *d) {
 void echttp_catalog_release (echttp_catalog *d) {
     echttp_catalog_reset (d);
     echttp_hash_release (d);
+}
+
+void echttp_catalog_free (echttp_catalog *d, echttp_catalog_action *action) {
+    if (action) echttp_catalog_enumerate (d, action);
+    echttp_catalog_release (d);
 }
 
 char *echttp_catalog_set (echttp_catalog *d,

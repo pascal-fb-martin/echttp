@@ -665,11 +665,15 @@ There are also two JSON utilities provided with echttp:
 
 Both tools have minimal features. They were intended to test the JSON and XML functions, but can be useful to analyze the content of a JSON file, especially when the JSON data was not formatted for readability.
 
-### Catalog
+### Hash tables and catalogs
 
-The echttp library uses its own (minimalist) associative array mechanism for managing HTTP attributes or routes. This module is made public because it is somewhat useful for the echttp applications as well, for example when maintaining a catalog of known web services.
+The echttp library uses its own (minimalist) associative array mechanism for managing HTTP attributes or routes. This is made public because it is somewhat useful for the echttp applications as well, for example when maintaining a catalog of known web services.
 
-The basis for the mechanism is the echttp_catalog type:
+This is meant to be use for tables that contain a limited number of items. The current implementation is limited to a fix and limited number of entries. This was never designed to be used for datasets with millions of items.
+
+The basic mechanism is provided by the echttp_hash.c module. The echttp_catalog.c modules is built on top of echttp_hash.c and provides a simplified API with some additional features. The main difference is that a hash table may be used to index any type of data, while a catalog indexes a string.
+
+The basis for the mechanism is the echttp_hash type:
 
 ```
 typedef struct {
@@ -681,52 +685,136 @@ typedef struct {
 } echttp_symbol;
 
 #define ECHTTP_HASH 127
-#define ECHTTP_MAX_SYMBOL 256
 
 typedef struct {
     int count;
     int index[ECHTTP_HASH];
-    echttp_symbol item[ECHTTP_MAX_SYMBOL];
-} echttp_catalog;
+    echttp_symbol *item;
+} echttp_hash;
 ```
 
-A catalog must be initialized. A static catalog is naturally initialized by the compiler, but a local catalog must be initialized explicitely:
+The echttp_catalog type is simply a renaming of the echttp_hash type.
+
+Both a hash table and a catalog must be initialized. A static hash or catalog structure is initialized by the compiler, but a local hash or catalog structure must be initialized explicitely.
+
+#### Hash table API
+
+This module provides a way to associate a string key with an application array.  It is up to the application to declare the array using whatever data structure is appropriate to their needs. This module manages which entry in the array will be allocated next, not the application. Index 0 is never used.
+
+Alternatively, a hash table may store an application reference. This can be typically used for a catalog, e.g. the value stored is a string. If the hash table is used to search through an application's array, this alternative might not be the best choice as this would force the application to manage allocation in its array on its own (more work).
+
+Several functions take an action callback, which must follow the profile below:
+
+```
+typedef int echttp_hash_action (int i, const char *name);
+```
+
+This module supports two types of hash tables: unique keys and non-unique keys.
+
+- On a unique key index, each key appears only once. Trying to create an already existing key causes the index for the existing key to be returned. This type of index can be used to create a key/value store (see module echttp_catalog.c).
+
+- On a non-unique key index, each key may appear more than once. It is possible to walk the list of records matching a specific key. This type of index is very useful to optimize searches like "retrieve all the children of a specific parent".
+
+```
+unsigned int echttp_hash_signature (const char *name);
+```
+
+This function computes a signature from the provided name. A signature is the hash index value before applying the hash array modulo. This function is derived from the well known hash function by Daniel J. Bernstein.
+
+This function is made public because there are cases when using a signature can accelerate a search in small lists, but the overhead of using a full hash table is not really justified.
+
+```
+void echttp_hash_create (echttp_hash *d, int size);
+```
+
+Initialize an empty hash table. The hash structure must not contain any valid data: any preexisting data is ignored and erased. The size parameter defines the maximum number of items that can be stored in this hash table.
+
+```
+void echttp_hash_reset (echttp_hash *d, echttp_hash_action *action);
+```
+
+Erase all the data stored in the given hash table. The action callback can be used to deallocate the caller's resources associated with each item.
+
+```
+int echttp_hash_find (echttp_hash *d, const char *name);
+```
+
+Return 0 if the item was not found, the item's index otherwise.
+
+```
+int echttp_hash_next (echttp_hash *d, int from, const char *name);
+```
+
+Return 0 if a matching item was found after item `from`, 0 otherwise. This is useful for non-unique indexes only.
+
+```
+int echttp_hash_add (echttp_hash *d, const char *name);
+```
+
+Add a new item, even if the key already exists. Return 0 if the hash table is full, the new item's index otherwise. This is used for non-unique indexes only.
+
+```
+int echttp_hash_iterate (echttp_hash *d,
+                         const char *name, echttp_hash_action *action);
+```
+
+Scan the items in the hash index and call `action` for each matching item. If `name` is null, `action` is called for all items in the hash table. The `action` should not be null (what's the point?). If the `action` function returns 0, the iteration continue until no more items are found; otherwise the iteration stops and returns the last processed item index.
+
+```
+int echttp_hash_insert (echttp_hash *d, const char *name);
+```
+
+Insert a new item if it did not exist already. Return 0 if the hash table is full and cannot accomodate any new item, or the item index otherwise. This is used for unique indexes only.
+
+```
+void *echttp_hash_set (echttp_hash *d,
+                       const char *name, const char *value);
+void *echttp_hash_get (echttp_hash *d, const char *name);
+```
+
+These two functions handle the optional caller references stored in the hash table. because of the way they work, these should not be used with non-unique hash tables.
+
+- `echttp_hash_set()` inserts a new item or changes the value of an item that already exists. It returns the value previously assigned to the item, or else null.
+
+- `echttp_hash_get` retrieves the value associated with the provided key, 0r 0 when the key is not found. If there are duplicates items, the value of the first one found is returned: do not use with non-unique indexes.
+
+```
+void echttp_hash_release (echttp_hash *d);
+```
+
+Release all resources allocated for this hash table. The hash table must be empty or else nothing happens. See `echttp_hash_reset()`. This function does nothing if no resource were allocated, or if all resources were already released.
+
+> [!NOTE]
+> `echttp_hash_reset()` eliminates the content of the hash table, while `echttp_hash_release()` eliminates the hash table container itself.
+
+#### Catalog API
+
+A catalog is a specialized type of hash table that associates a string with a key. At this time, a catalog may contain up to 256 entries.
+
+Several functions in this API use an action callback that must follow the profile below:
+
+```
+typedef int echttp_catalog_action (const char *name, const char *value);
+```
+
+```
+void echttp_catalog_create (echttp_catalog *d);
+```
+
+Create a new catalog. This disregards any data held in the provided catalog structure.
 
 ```
 void echttp_catalog_reset (echttp_catalog *d);
 ```
 
-There are two ways to add (or update) entries in a catalog:
-
-* The simplest method works if the value was not allocated, or is referenced in another place:
+Erase all data in the given catalog. After this, the catalog is empty.
 
 ```
 void echttp_catalog_set (echttp_catalog *d,
                          const char *name, const char *value);
 ```
 
-* The more generic method returns the old (and discarded) value, if any, which allows it do be deallocated cleanly if necessary:
-
-```
-const char *echttp_catalog_refresh
-               (echttp_catalog *d, const char *name, const char *value, time_t timestamp);
-```
-
-In both case the value of an existing entry is replaced with the new value, or a new entry is added if non match the name. The timestamp parameter indicates the age of the entry, which can be useful when using the catalog for discovery, i.e. when expired entries should be ignored.
-
-A catalog entry can be retrieved in two ways:
-
-* Find the entry, for example when both the value and timestamp must be accessed:
-
-```
-int echttp_catalog_find (echttp_catalog *d, const char *name);
-```
-
-* Get the value:
-
-```
-const char *echttp_catalog_get (echttp_catalog *d, const char *name);
-```
+Insert a new item, or change its value. This returns the item's previous value, or else null. The returned pointer is not a constant: the reference was removed from the catalog and the caller is allowed to do what it sees fit with it (like free it).
 
 A few more functions are used in more rare cases:
 
@@ -738,7 +826,6 @@ void echttp_catalog_join (echttp_catalog *d,
 This function dumps all its content in the HTTP parameter format.
 
 ```
-typedef int echttp_catalog_action (const char *name, const char *value);
 void echttp_catalog_enumerate (echttp_catalog *d,
                                echttp_catalog_action *action);
 ```
@@ -746,10 +833,16 @@ void echttp_catalog_enumerate (echttp_catalog *d,
 Call the specified action for each item present in the catalog.
 
 ```
-unsigned int echttp_catalog_signature (const char *name);
+void echttp_catalog_free (echttp_catalog *d, echttp_catalog_action *action);
 ```
 
-This function computes a signature from the provided name. A signature is the hash value before applying the hash array modulo. This function can be reused when implementing a hash table module with different properties. This function is derived from the well known hash function by Daniel J. Bernstein.
+Release all resources allocated for this catalog by this module or the caller. The action allows the caller to free its own resources.
+
+```
+void echttp_catalog_release (echttp_catalog *d);
+```
+
+Release all resources allocated for this catalog. This is a simplified variant of `echttp_catalog_free()`. It can be used when the caller has nothing to free.
 
 ### HTTP Character Encoding
 

@@ -31,3 +31,4 @@ void echttp_catalog_enumerate (echttp_catalog *d,
                                echttp_catalog_action *action);
 
 void echttp_catalog_release (echttp_catalog *d);
+void echttp_catalog_free (echttp_catalog *d, echttp_catalog_action *action);

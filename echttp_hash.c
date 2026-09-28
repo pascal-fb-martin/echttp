@@ -118,15 +118,19 @@
  *
  * void echttp_hash_release (echttp_hash *d);
  *
- *    Release all resources allocated for this has table. The hash table
+ *    Release all resources allocated for this hash table. The hash table
  *    must be empty or else nothing happens. See echttp_hash_reset().
  *    This function does nothing if no resource were allocated, or if all
  *    resources were already released.
  *
+ *    Note: echttp_hash_reset() eliminates the content of the hash, while
+ *    echttp_hash_release() eliminates the hash container.
+ *
  * LIMITATIONS
  *
- * The current implementation is limited to a maximum of 256 entries. This
- * module was never meant to be used for datasets with millions of items.
+ * The current implementation is limited to a fix and limited number of
+ * entries. This module was never meant to be used for datasets with
+ * millions of items.
  */
 
 #include <stdlib.h>
