@@ -51,6 +51,7 @@ int echttp_asynchronous_route (int route, echttp_callback *callback);
 const char *echttp_attribute_get (const char *name);
 const char *echttp_parameter_get  (const char *name);
 void        echttp_parameter_join (char *text, int size);
+int         echttp_parameter_present (const char *name);
 
 void echttp_attribute_set (const char *name, const char *value);
 void echttp_error         (int code, const char *message);

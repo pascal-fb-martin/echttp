@@ -165,10 +165,18 @@ const char *echttp_attribute_get (const char *name);
 Retrieve the value of the specified HTTP attribute, or 0 if not found. This function should be called from within an HTTP callback, while processing an HTTP request.
 
 ```
+int echttp_parameter_present (const char *name);
+```
+
+Return 0 if the parameter is not present, non zero otherwise. A parameter counts as present even if it has no value or an empty value: this is intended to support _boolean_ parameters. This function must be called from within an HTTP callback, while processing an HTTP request.
+
+Parameter names are case insensitive: __NaMe__ is the same as __name__.
+
+```
 const char *echttp_parameter_get  (const char *name);
 ```
 
-Retrieve the value of the specified HTTP parameter, or 0 if not found. This function should be called from within an HTTP callback, while processing an HTTP request.
+Retrieve the value of the specified HTTP parameter. This returns 0 if the parameter is not found, has no associated value or if the value is an empty string. This function must be called from within an HTTP callback, while processing an HTTP request.
 
 Parameter names are case insensitive: __NaMe__ is the same as __name__.
 

@@ -62,9 +62,16 @@
  * Get the value of the specified HTTP attribute, or 0 if not found.
  *
  *
+ * int echttp_parameter_present (const char *name);
+ *
+ * Return 0 if the parameter is not present, non zero otherwise.
+ * Note that a paremeter counts as present even if it has no value:
+ * this is intended to support 'boolean' parameters.
+ *
  * const char *echttp_parameter_get  (const char *name);
  *
- * Get the value of the specified HTTP parameter, or 0 if not found.
+ * Get the value of the specified HTTP parameter, or 0 if the parameter
+ * was not found, or if the parameter has no or an empty value.
  *
  *
  * void echttp_attribute_set (const char *name, const char *value);
@@ -837,9 +844,13 @@ static int echttp_received (int client, char *data, int length) {
                wordcount = echttp_split (rawuri[1], "&", arg, 32);
                for (i = 0; i < wordcount; ++i) {
                    char *param[4];
-                   if (echttp_split (arg[i], "=", param, 4) >= 2) {
+                   int paramcount = echttp_split (arg[i], "=", param, 4);
+                   if (paramcount >= 1) {
                        char *name = echttp_encoding_unescape (param[0]);
-                       char *value = echttp_encoding_unescape (param[1]);
+                       char *value = "";
+                       if (paramcount >= 2) {
+                           value = echttp_encoding_unescape (param[1]);
+                       }
                        if (!name || !value) {
                            echttp_invalid (client, "Invalid Parameter Syntax");
                            return length; // Consume everything, invalid.
@@ -1155,9 +1166,16 @@ const char *echttp_attribute_get (const char *name) {
     return echttp_catalog_get (&(echttp_current->in), name);
 }
 
+int echttp_parameter_present (const char *name) {
+    if (! echttp_current) return 0;
+    return echttp_catalog_get (&(echttp_current->params), name) != 0;
+}
+
 const char *echttp_parameter_get (const char *name) {
     if (! echttp_current) return 0;
-    return echttp_catalog_get (&(echttp_current->params), name);
+    const char *value = echttp_catalog_get (&(echttp_current->params), name);
+    if (value && (*value)) return value; // Empty does not count.
+    return 0;
 }
 
 void echttp_parameter_join (char *text, int size) {
