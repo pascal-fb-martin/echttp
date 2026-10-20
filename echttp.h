@@ -60,6 +60,8 @@ void echttp_permanent_redirect (const char *url);
 
 const char *echttp_reason (void);
 
+void echttp_abort (void);
+
 void echttp_content_type_set  (const char *value);
 void echttp_content_type_text (void);
 void echttp_content_type_html (void);

@@ -57,6 +57,19 @@
  * Defines a route for a parent URI and all its children.
  *
  *
+ * int echttp_asynchronous_route (int route, echttp_callback *callback);
+ *
+ * Declare a route as asynchronous. The callback provided here is called when
+ * all the HTTP request headers have been received, but not all the content.
+ *
+ *
+ * void echttp_asynchronous (echttp_response *asynchronous);
+ *
+ * Set the current client context as asynchronous. The response callback
+ * will be called when all the HTTP response headers have been received,
+ * but not all the content.
+ *
+ *
  * const char *echttp_attribute_get (const char *name);
  *
  * Get the value of the specified HTTP attribute, or 0 if not found.
@@ -79,6 +92,13 @@
  * Set an attribute for the HTTP response.
  * 
  * 
+ * void echttp_abort (void);
+ *
+ * Force the current connection to abort. This is typically used for
+ * asynchronous client connections, when the response callback is unable
+ * to process the response for some internal reason.
+ *
+ *
  * void echttp_error (int code, const char *message);
  * 
  * Send an error response instead of OK.
@@ -1250,6 +1270,11 @@ void echttp_transfer (int fd, int size) {
     }
     echttp_current->transfer.fd = fd;
     echttp_current->transfer.size = size;
+}
+
+void echttp_abort (void) {
+    if (! echttp_current) return;
+    echttp_current->state = ECHTTP_STATE_ERROR;;
 }
 
 void echttp_error (int code, const char *message) {

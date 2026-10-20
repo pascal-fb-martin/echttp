@@ -235,6 +235,12 @@ void echttp_content_queue (const char *data, int length);
 Queue more content to be transmitted later. This function must be called within an HTTP callback. This allows the application to handle large data in chunks of known size when the total size of the data is not known beforehand. The data queued will be sent _after_ the data directly returned by the HTTP callback, but before any transfer data (see `echttp_transfer()` below). The data's buffer must have been allocated from the heap (i.e. using `malloc()`, `strdup()` and friends) and will be free'd once the data has been transmitted or when the connection breaks (whichever happens first).
 
 ```
+void echttp_abort (void);
+```
+
+Force the current connection to abort. This is typically called from within an asynchronous client response callback (see echttp_asynchronous()), when it is unable to process the response for some internal reason.
+
+```
 void echttp_error (int code, const char *message);
 ```
 
