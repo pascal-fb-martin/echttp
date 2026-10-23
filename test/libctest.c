@@ -15,6 +15,14 @@ static void printhead (const char *marker, const char *text) {
    if (text) printf ("%s\n", text);
 }
    
+static void printerror (const char *text, const char *value) {
+   char formatted[256];
+   snprintf (formatted, sizeof(formatted),
+             "%s failed for value %s", text, value);
+   printhead ("***", formatted);
+   errorcount += 1;
+}
+
 static void assert (int good, const char *text) {
    const char *preamble = "===";
    if (!good) {
@@ -417,6 +425,52 @@ int main (int argc, const char *argv[]) {
    showperformance (&end2, &end3, "strsame() with same content", 1000000);
    showperformance (&end3, &end4, "strcasecmp() with same content", 1000000);
    endtest ();
+   endtest ();
+
+   starttest ("Testing hexadecimal to raw byte conversion");
+   static const char *hexref[] = {
+       "00", "01", "02", "03", "04", "05", "06", "07",
+       "08", "09", "0a", "0B", "0c", "0D", "0e", "0F",
+       "10", "11", "12", "13", "14", "15", "16", "17",
+       "18", "19", "1a", "1B", "1c", "1D", "1e", "1F",
+       "20", "21", "22", "23", "24", "25", "26", "27",
+       "28", "29", "2a", "2B", "2c", "2D", "2e", "2F",
+       "30", "31", "32", "33", "34", "35", "36", "37",
+       "38", "39", "3a", "3B", "3c", "3D", "3e", "3F",
+       "40", "41", "42", "43", "44", "45", "46", "47",
+       "48", "49", "4a", "4B", "4c", "4D", "4e", "4F",
+       "50", "51", "52", "53", "54", "55", "56", "57",
+       "58", "59", "5a", "5B", "5c", "5D", "5e", "5F",
+       "60", "61", "62", "63", "64", "65", "66", "67",
+       "68", "69", "6a", "6B", "6c", "6D", "6e", "6F",
+       "70", "71", "72", "73", "74", "75", "76", "77",
+       "78", "79", "7a", "7B", "7c", "7D", "7e", "7F",
+       "80", "81", "82", "83", "84", "85", "86", "87",
+       "88", "89", "8a", "8B", "8c", "8D", "8e", "8F",
+       "90", "91", "92", "93", "94", "95", "96", "97",
+       "98", "99", "9a", "9B", "9c", "9D", "9e", "9F",
+       "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+       "a8", "a9", "aa", "aB", "ac", "aD", "ae", "aF",
+       "B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7",
+       "b8", "b9", "ba", "bB", "bc", "bD", "be", "bF",
+       "C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7",
+       "c8", "c9", "ca", "cB", "cc", "cD", "ce", "cF",
+       "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7",
+       "d8", "d9", "da", "dB", "dc", "dD", "de", "dF",
+       "E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7",
+       "e8", "e9", "ea", "eB", "ec", "eD", "ee", "eF",
+       "F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7",
+       "f8", "f9", "fa", "fB", "fc", "fD", "fe", "fF"};
+   for (i = 0; i < 255; ++i) {
+      if (i != hextobyte (hexref[i]))
+          printerror ("Convert hex to byte", hexref[i]);
+   }
+   static const char *hexinvalid[] =
+       {"/0", "0:", "0@", "G0", "`0", "g0", "0", "", 0};
+   for (i = 0; hexinvalid[i] != 0; ++i) {
+       if (hextobyte (hexinvalid[i]) != -1)
+           printerror ("Invalid conversion", hexinvalid[i]);
+   }
    endtest ();
 
    if (errorcount > 0) printf ("*** Test failed after %d errors\n", errorcount);

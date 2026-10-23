@@ -89,6 +89,9 @@ clean:
 
 rebuild: clean all
 
+test: PHONY
+	(cd test ; make test)
+
 uninstall:
 	rm -f $(DESTDIR)$(prefix)/lib/libechttp.a
 	rm -f $(DESTDIR)$(prefix)/include/echttp*.h
@@ -123,4 +126,6 @@ echttp_print: echttp_print.o libechttp.a
 
 echttp_get: echttp_get.o libechttp.a
 	gcc -Os -fPIC -o $@ echttp_get.o libechttp.a
+
+PHONY:
 

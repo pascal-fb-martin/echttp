@@ -35,6 +35,13 @@
  *    This function is made up. It is case independent and returns 1 if s1 and
  *    s2 are the same (regardless of case). Either pointer can be null,
  *    in which case the result is always 0.
+ *
+ * int hextobyte (const char *s);
+ *
+ *    This function is made up. It is case independent and converts a two
+ *    bytes string to a raw byte value (range 0..255). Return -1 on failure.
+ *
+ *    This was added here because that type of conversion is very common.
  */
 
 #include <string.h>
@@ -195,5 +202,33 @@ int strsame  (const char *s1, const char *s2) {
         if (!a) return 1;
     }
     return 0; // Make gcc happy.
+}
+
+// A reasonably fast, self-initializing, hex conversion.
+
+static int Ascii2Bin[128] = {0};
+
+static int hextonibble (int ascii) {
+    if (ascii & 0xffffff80) return -1; // char is sometimes signed..
+    return Ascii2Bin[ascii];
+}
+
+int hextobyte (const char *s) {
+    if (Ascii2Bin[0] == 0) {
+        int i;
+        for (i = 0; i < 128; ++i) Ascii2Bin[i] = -1;
+        for (i = 0; i < 10; ++i) Ascii2Bin['0'+i] = i;
+        Ascii2Bin['a'] = Ascii2Bin['A'] = 10;
+        Ascii2Bin['b'] = Ascii2Bin['B'] = 11;
+        Ascii2Bin['c'] = Ascii2Bin['C'] = 12;
+        Ascii2Bin['d'] = Ascii2Bin['D'] = 13;
+        Ascii2Bin['e'] = Ascii2Bin['E'] = 14;
+        Ascii2Bin['f'] = Ascii2Bin['F'] = 15;
+    }
+    if (!s) return -1;
+    int high = hextonibble (s[0]);
+    int low =  hextonibble (s[1]);
+    if ((high < 0) || (low < 0)) return -1;
+    return high * 16 + low;
 }
 
