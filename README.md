@@ -968,7 +968,7 @@ This function provides a safe and efficient alternative for string copy. See `ma
 char *stpedec (char *dest, char *end, long long value);
 ```
 
-This function provides a fast and safe method for converting an integer to a decimal string, at least it is faster than snprintf(). This is designed to work in combination with `stpecpy()`.
+This function provides a fast and safe method for converting an integer to a decimal string, at least it is faster than `snprintf()`. This is designed to work in combination with `stpecpy()`.
 
 This function does not conform to any standard or commonly known implementation.
 
@@ -984,7 +984,7 @@ This function does not conform to any standard or commonly known implementation.
 int hextobyte (const char *s);
 ```
 
-This function converts a two bytes string to a raw byte value (range 0..255). It accepts characters '0' to '9', 'A' to 'F' and 'a' to 'f'. It returns -1 on failure, either if the string is too short or there is an invalid character.
+This function converts a two bytes hexadecimal string to a raw byte value (range 0..255). It accepts characters '0' to '9', 'A' to 'F' and 'a' to 'f'. It returns -1 if the string is too short or if an invalid character has been found.
 
 This function does not conform to any standard or commonly known implementation.
 
