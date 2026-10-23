@@ -1,6 +1,7 @@
 # The echttp Library
 
 ## Overview
+
 This is a minimal HTTP server library to serve as an application console for configuration and monitoring.
 
 It implements a small HTTP/1.1 server designed with a simple API in plain C and limited dependencies. The target use case is an application that needs to be administrated or monitored remotely, or that exports (or is the client of) a web API. Typically this application would run on a Raspberry Pi or an old mini PC acting as a home server, running Linux.
@@ -26,6 +27,7 @@ cc -o httpserver httpserver.c -lechttp -lssl -lcrypto -lmagic
 ```
 
 ## Minimum viable example
+
 Below is an example of a small, but fully functional web server written using echttp. This server returns pages from the current directory as well as an embedded welcome message.
 
 ```
@@ -59,8 +61,10 @@ int main (int argc, const char **argv) {
 ```
 
 ## API
+
 ### Base HTTP Server
-The application must include echttp.h as a prerequisit to using the echttp API.
+
+The application must include `echttp.h` as a prerequisit to using the echttp API.
 
 The echttp primitives are:
 
@@ -345,7 +349,7 @@ Immediately close the HTTP server and all current HTTP connections.
 
 ### Static Pages Extension
 
-The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include echttp_static.h.
+The echttp library can serve local files, from several separate locations if needed. This capacity is a separate extension and requires to include `echttp_static.h`.
 The static page extension primitives are:
 
 ```
@@ -466,7 +470,7 @@ Return true if the HTTP debug option was selected. Only used for debug or troubl
 
 ### HTTP Client
 
-The echttp library includes support for the HTTP and HTTPS client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
+The echttp library provides support for the HTTP and HTTPS client side. This is an extension to the HTTP server function, not an independent client library: the HTTP server needs to be initialized before the client functions can be used.
 
 The intent is to allow an application using echttp to access other web servers to collect information, or to access web services. For example a sprinkler controller may need to access public web sites to get weather information, or control relays through local web services.
 
@@ -547,7 +551,7 @@ This support function encodes the s string according to the HTTP character encod
 
 ### JSON and XML Support
 
-The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include echttp_json.h or echttp_xml.h (depending on the format used).
+The echttp library provides functions to handle JSON and XML data: a small JSON parser, a small XML parser and a JSON generator. These are built using the same approach as echttp itself: make the API simple to use. This parser support is a separate extension and requires to include `echttp_json.h` or `echttp_xml.h` (depending on the format used).
 
 These parsers support UTF-8 only.
 
@@ -935,6 +939,54 @@ The later two functions iterate only on items for which the key is less or
 equal (or greater or equal) than the provided key value. This can be used
 to avoid the overhead of iterating repeatedly over the same items again and
 again when specific key ranges are of interest.
+
+### C Library Extension
+
+The standard C library is getting old, especially its string functions, most of them unsafe. There are recommended, and documented, alternatives, but these were not added to the standard C library for some reasons.
+
+That sad state of affaire started the need for this echttp extension. There are also some conversion functions that are commonly needed but are not provided in the standard C library either.
+
+Covering for all these holes in the standard C library is what this specific API is about.
+
+The application must include file `echttp_libc.h`.
+
+```
+char *stpecpy (char *dest, char *end, const char *restrict src);
+```
+
+This function provides a safe and efficient alternative for string copy and concatenation. See `man stpecpy` for more information.
+
+This implementation attempts to conform to all known variants, like how to signal truncation, in the safest possible manner. It also adds a non-standard protection against null sources, because this is a common situation with echttp (like missing optional HTTP arguments or attributes).
+
+```
+ssize_t strtcpy (char *dst, const char *src, size_t dsize);
+```
+
+This function provides a safe and efficient alternative for string copy. See `man strtcpy` for more information.
+
+```
+char *stpedec (char *dest, char *end, long long value);
+```
+
+This function provides a fast and safe method for converting an integer to a decimal string, at least it is faster than snprintf(). This is designed to work in combination with `stpecpy()`.
+
+This function does not conform to any standard or commonly known implementation.
+
+```
+int strsame  (const char *s1, const char *s2);
+```
+
+This function returns 1 if the `s1` and `s2` strings are the same, 0 otherwise. The comparison is case independent. Either pointer can be null, in which case the result is always 0.
+
+This function does not conform to any standard or commonly known implementation.
+
+```
+int hextobyte (const char *s);
+```
+
+This function converts a two bytes string to a raw byte value (range 0..255). It accepts characters '0' to '9', 'A' to 'F' and 'a' to 'f'. It returns -1 on failure, either if the string is too short or there is an invalid character.
+
+This function does not conform to any standard or commonly known implementation.
 
 ## Debian Packaging
 
