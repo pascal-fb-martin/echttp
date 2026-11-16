@@ -57,6 +57,7 @@ donotcommit
 echttp_get
 echttp_print
 httpserver
+httpclient
 sortedtest
 libctest
 
