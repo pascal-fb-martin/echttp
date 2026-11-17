@@ -184,6 +184,7 @@ static int echttp_raw_ttl = 10;
 
 #define DEBUG if(echttp_raw_debug) printf
 
+#define ECHTTP_RAW_NONE   0 // Used as a 'no specific type expected'.
 #define ECHTTP_RAW_TCP    1 // Total control of connection and data.
 #define ECHTTP_RAW_APP    2 // Control of connection, not of data.
 #define ECHTTP_RAW_LISTEN 3 // Unknown resource, no control
@@ -260,7 +261,7 @@ static echttp_raw_context *echttp_raw_access_io (int client, char use) {
        fprintf (stderr, "Invalid client number %d (unused slot)\n", client);
        return 0;
    }
-   if ((use >= 0) && (context->use != use)) {
+   if ((use != ECHTTP_RAW_NONE) && (context->use != use)) {
        fprintf (stderr, "Invalid client number %d (unexpected type)\n", client);
        return 0;
    }
@@ -1024,7 +1025,7 @@ int echttp_raw_register (int fd, int mode,
     // Is this an existing I/O to update?
     //
     for (i = 0; i <= echttp_raw_io_last; ++i) {
-        echttp_raw_context *context = echttp_raw_access_io (i, -1);
+        echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
         if (!context) continue;
         if (context->fd == fd) { // Update existing entry.
             if (context->use != use) return -1;
@@ -1073,7 +1074,7 @@ int echttp_raw_attach (int fd, int mode, echttp_listener *listener) {
 
 int echttp_raw_update (int client, int mode) {
 
-    echttp_raw_context *context = echttp_raw_access_io (client, -1);
+    echttp_raw_context *context = echttp_raw_access_io (client, ECHTTP_RAW_NONE);
     if (!context) return client;
 
     switch (context->use) {
@@ -1090,7 +1091,7 @@ int echttp_raw_update (int client, int mode) {
 void echttp_raw_forget (int fd) {
     int i;
     for (i = 0; i < echttp_raw_io_last; ++i) {
-        echttp_raw_context *context = echttp_raw_access_io (i, -1);
+        echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
         if (context && (context->fd == fd)) {
             if (context->use == ECHTTP_RAW_LISTEN)
                 echttp_raw_io_cleanup (context);
@@ -1181,7 +1182,7 @@ int echttp_raw_manage (int s) {
 void echttp_raw_close (void) {
    int i;
    for (i = 0; i <= echttp_raw_io_last; ++i) {
-       echttp_raw_context *context = echttp_raw_access_io (i, -1);
+       echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
        if (context) echttp_raw_close_client (i, "closing server");
    }
    close(echttp_raw_server);

@@ -1506,7 +1506,7 @@ const char *echttp_client (const char *method, const char *url) {
                          return "TLS failed";
                      case 0:
                      case 1:
-                         echttp_raw_update (socket, 1); // Read only.
+                         echttp_raw_update (client, 1); // Read only.
                          break;
                      case 2:
                          break;
