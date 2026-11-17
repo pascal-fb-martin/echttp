@@ -22,22 +22,38 @@
  * applications.
  *
  * httpclient.c: a test program to validate the connection reuse mechanism
+ *
+ * SYNOPSYS:
+ *
+ * httpclient [-c] [-v] URL ..
+ *
+ * This application periodically initiates all the listed requests (URLs)
+ * from its command lines, in successive short bursts separated by a 15
+ * seconds pause.
+ *
+ * The -c option causes httpclient to show a list of the current connection
+ * context held by the echttp library. The list is shown when the periodic
+ * pause starts.
+ *
+ * The -v option causes httpclient to show the content portion of the HTTP
+ * responses. This can be lengthy.
  */
 
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <time.h>
 
 #include "echttp.h"
 #include "echttp_json.h"
+
+#include "../echttp_raw.h"
 
 #define MAXURLS 8
 static char *Urls[MAXURLS];
 static int UrlCount = 0;
 
 static int Verbose = 0;
+static int ShowConnections = 0;
 
 static void response (void *origin, int status, char *data, int length) {
 
@@ -47,8 +63,8 @@ static void response (void *origin, int status, char *data, int length) {
         return;
     }
 
-    printf ("== HTTP code %d to %s: %s %s\n",
-            status, (const char *)origin, echttp_reason(), Verbose?data:"");
+    printf ("== %s: HTTP status %d %s %s\n",
+            (const char *)origin, status, echttp_reason(), Verbose?data:"");
 }
 
 static void background (int fd, int mode) {
@@ -60,6 +76,21 @@ static void background (int fd, int mode) {
     if ((Pause > 0) && (Pause > now)) return;
 
     if (++Count > 4) {
+        if (ShowConnections && (Count == 5)) {
+           const char *side;
+           char peer[256];
+           long long sent, received;
+           int client = echttp_raw_walk (-1,
+                                         &side, peer, sizeof(peer),
+                                         &sent, &received);
+           while (client >= 0) {
+               printf ("Client[%d]: %s connected to %s, %lld sent, %lld received\n",
+                       client, side, peer, sent, received);
+               client = echttp_raw_walk (client,
+                                         &side, peer, sizeof(peer),
+                                         &sent, &received);
+           }
+        }
         Pause = now + 15;
         Count = 0;
         return;
@@ -87,11 +118,16 @@ int main (int argc, const char **argv) {
            Verbose = 1;
            continue;
        }
-       if (strncmp (argv[i], "http", 4)) continue; // Not an URL
-       Urls[UrlCount++] = strdup (argv[i]);
-       if (UrlCount >= MAXURLS) break;
+       if (!strcmp (argv[i], "-c")) {
+           ShowConnections = 1;
+           continue;
+       }
+       if (!strncmp (argv[i], "http", 4)) {
+           Urls[UrlCount++] = strdup (argv[i]);
+           if (UrlCount >= MAXURLS) break;
+       }
    }
-       
+
    echttp_background (&background);
    echttp_loop ();
    return 0;

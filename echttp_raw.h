@@ -38,3 +38,8 @@ void echttp_raw_close_client (int i, const char *reason);
 void echttp_raw_forget (int fd);
 void echttp_raw_close (void);
 
+int echttp_raw_walk (int after, const char **side,
+                                char *peer, int size,
+                                long long *sent,
+                                long long *received);
+
