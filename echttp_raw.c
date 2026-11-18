@@ -23,6 +23,11 @@
  *
  * echttp_raw.c -- a socket management, protocol-independent layer.
  *
+ * const char *echttp_raw_error (void);
+ *
+ *    Return a detailed description of the latest failure.
+ *    RESTRICTION: for now, this applies only to echttp_raw_connect().
+ *
  * int echttp_raw_open (const char *service, int debug, int ttl);
  *
  *    Open the HTTP service socket, using the port defined by the service
@@ -1119,6 +1124,18 @@ void echttp_raw_fastscan (echttp_listener *listener, int period) {
     echttp_raw_scanperiod = period;
 }
 
+static char RawSystemError[512] = {0};
+
+static void echttp_raw_save (const char *action, int code) {
+    snprintf (RawSystemError, sizeof(RawSystemError),
+              "%s: %s", action, strerror(code));
+    DEBUG (__FILE__ " %s\n", RawSystemError);
+}
+
+const char *echttp_raw_error (void) {
+    return RawSystemError;
+}
+
 int echttp_raw_connect (const char *host, const char *service) {
 
     int s = -1;
@@ -1139,10 +1156,14 @@ int echttp_raw_connect (const char *host, const char *service) {
             continue;
 
         s = socket(cursor->ai_family, cursor->ai_socktype, cursor->ai_protocol);
-        if (s < 0) continue;
+        if (s < 0) {
+            echttp_raw_save ("socket()", errno);
+            continue;
+        }
 
         int flags = fcntl(s, F_GETFL);
         if (flags == -1) {
+            echttp_raw_save ("fcntl()", errno);
             close(s);
             s = -1;
             continue;
@@ -1152,7 +1173,7 @@ int echttp_raw_connect (const char *host, const char *service) {
 
         if (connect(s, cursor->ai_addr, cursor->ai_addrlen) != 0) {
             if (!echttp_raw_inprogress(errno)) {
-                DEBUG (__FILE__ " connection failed: %s\n", strerror(errno));
+                echttp_raw_save ("connect()", errno);
                 close(s);
                 s = -1;
                 continue;

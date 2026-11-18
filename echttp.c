@@ -1490,7 +1490,7 @@ const char *echttp_client (const char *method, const char *url) {
             printf ("Connecting to %s at %lld\n", buffer, (long long)time(0));
 
         socket = echttp_raw_connect(host, service+1); // Skip the ':'
-        if (socket < 0) return "connection failed";
+        if (socket < 0) return echttp_raw_error();
 
         switch (mode) {
             case ECHTTP_RAW:

@@ -8,6 +8,8 @@ typedef int  echttp_raw_acceptor (int client);
 typedef int  echttp_raw_receiver (int client, char *data, int length);
 typedef void echttp_raw_terminator (int client, const char *reason);
 
+const char *echttp_raw_error (void);
+
 int  echttp_raw_open (const char *service, int debug, int ttl);
 
 int  echttp_raw_capacity (void);
