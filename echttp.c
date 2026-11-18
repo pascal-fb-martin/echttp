@@ -787,6 +787,7 @@ static int echttp_client_received (int client, char *data, int length) {
        echttp_transfer_cancel(context); // Done with data transfer, if any.
        if (context->response) {
            context->status = 505;
+           context->reason = "Lost connection";
            echttp_respond (client, 0, 0);
        }
        context->state = ECHTTP_STATE_ERROR;
@@ -886,8 +887,10 @@ static int echttp_client_received (int client, char *data, int length) {
            }
            context->status = atoi(cursor);
            if (context->status != 200) {
-               if (context->status < 100 ||
-                   context->status >= 600) context->status = 500;
+               if (context->status < 100 || context->status >= 600) {
+                   context->reason = "Invalid HTTP status code";
+                   context->status = 500;
+               }
            }
            context->reason = strchr(cursor+1, ' ');
 
@@ -1375,7 +1378,7 @@ void echttp_error (int code, const char *message) {
 }
 
 const char *echttp_reason (void) {
-    if (! echttp_current) return 0;
+    if (! echttp_current) return "Invalid client context";
     return echttp_current->reason;
 }
 
@@ -1433,6 +1436,7 @@ static void echttp_listener_tls (int client, int mode) {
         echttp_request *context = echttp_context[client];
         if (context->response) {
             context->status = 505;
+            context->reason = "TLS error";
             echttp_respond (client, 0, 0);
         }
         echttp_raw_close_client(client, "TLS failure");
@@ -1580,10 +1584,15 @@ int echttp_redirected (const char *method) {
         echttp_request *stacked = echttp_stacked;
         const char *error = echttp_client (method, redirect);
         echttp_stacked = stacked;
-        if (error) return 500;
+        if (error) {
+            echttp_current = redirected;
+            echttp_current->reason = error;
+            return 500;
+        }
         echttp_copy_attributes (redirected, echttp_current);
         return 0;
     }
+    echttp_current->reason = "Response has no redirect location";
     return 500;
 }
 
