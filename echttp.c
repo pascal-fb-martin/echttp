@@ -1174,15 +1174,21 @@ int echttp_open (int argc, const char **argv) {
    int i;
    int shift;
    int ttl = 0;
-   const char *ttl_ascii;
+   int backlog = 0;
+   const char *ascii;
 
    for (i = 1, shift = 1; i < argc; ++i) {
        if (shift != i) argv[shift] = argv[i];
        if (echttp_option_match ("-http-service=", argv[i], &echttp_service))
            continue;
-       if (echttp_option_match ("-http-ttl=", argv[i], &ttl_ascii)) {
-           ttl = atoi(ttl_ascii);
+       if (echttp_option_match ("-http-ttl=", argv[i], &ascii)) {
+           ttl = atoi(ascii);
            if (ttl < 0) ttl = 0;
+           continue;
+       }
+       if (echttp_option_match ("-http-backlog=", argv[i], &ascii)) {
+           backlog = atoi(ascii);
+           if (backlog < 0) backlog = 0;
            continue;
        }
        if (echttp_option_present ("-http-debug", argv[i])) {
@@ -1193,7 +1199,7 @@ int echttp_open (int argc, const char **argv) {
    }
    echttp_routing.count = 0;
    echttp_routing.protect = 0;
-   if (! echttp_raw_open (echttp_service, echttp_debug, ttl)) return -1;
+   if (!echttp_raw_open (echttp_service, backlog, echttp_debug, ttl)) return -1;
    echttp_context_count = echttp_raw_capacity();
    echttp_context_high = -1;
    echttp_context = calloc (echttp_context_count, sizeof(echttp_request *));

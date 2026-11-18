@@ -28,12 +28,18 @@
  *    Return a detailed description of the latest failure.
  *    RESTRICTION: for now, this applies only to echttp_raw_connect().
  *
- * int echttp_raw_open (const char *service, int debug, int ttl);
+ * int echttp_raw_open (const char *service, int backlog, int debug, int ttl);
  *
  *    Open the HTTP service socket, using the port defined by the service
  *    string (one need to remember that most echttp applciations do not
- *    use port 80). The ttl parameter defines how long echttp waits before
- *    killing an idle client connection.
+ *    use port 80).
+ *
+ *    The backlog parameter is used for the listen(2) call; if its
+ *    value is 0, a (reasonable but conservative) default value is used.
+ *
+ *    The ttl parameter defines how long echttp waits before killing
+ *    an idle client connection. This applies to both incoming and
+ *    outgoing HTTP connections.
  *
  * int echttp_raw_capacity (void);
  *
@@ -465,7 +471,7 @@ static void echttp_raw_accept (echttp_raw_acceptor *acceptor, int server) {
    }
 }
 
-int echttp_raw_open (const char *service, int debug, int ttl) {
+int echttp_raw_open (const char *service, int backlog, int debug, int ttl) {
 
    struct sockaddr_in6 netaddress6;
    int port = -1;
@@ -530,7 +536,8 @@ int echttp_raw_open (const char *service, int debug, int ttl) {
        DEBUG (__FILE__ " Dynamic port allocated: %d\n", port);
    }
 
-   if (listen (echttp_raw_server, 4) < 0) {
+   if (backlog <= 0) backlog = 16;
+   if (listen (echttp_raw_server, backlog) < 0) {
        fprintf (stderr, __FILE__ " listen to service %s failed: %s\n",
                 service, strerror(errno));
        return 0;
