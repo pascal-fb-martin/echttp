@@ -1037,7 +1037,7 @@ int echttp_raw_register (int fd, int mode,
     // Is this an existing I/O to update?
     //
     for (i = 0; i <= echttp_raw_io_last; ++i) {
-        echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
+        echttp_raw_context *context = echttp_raw_io[i];
         if (!context) continue;
         if (context->fd == fd) { // Update existing entry.
             if (context->use != use) return -1;
@@ -1070,6 +1070,8 @@ int echttp_raw_register (int fd, int mode,
 static void echttp_raw_retrieve_peer (int client) {
 
     echttp_raw_context *context = echttp_raw_io[client];
+    if (!context) return;
+
     socklen_t length = sizeof(struct sockaddr_in6);
     context->peer = (struct sockaddr_in6){0};
     getpeername (context->fd, (struct sockaddr *) &(context->peer), &length);
@@ -1103,7 +1105,7 @@ int echttp_raw_update (int client, int mode) {
 void echttp_raw_forget (int fd) {
     int i;
     for (i = 0; i < echttp_raw_io_last; ++i) {
-        echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
+        echttp_raw_context *context = echttp_raw_io[i];
         if (context && (context->fd == fd)) {
             if (context->use == ECHTTP_RAW_LISTEN)
                 echttp_raw_io_cleanup (context);
@@ -1210,7 +1212,7 @@ int echttp_raw_manage (int s) {
 void echttp_raw_close (void) {
    int i;
    for (i = 0; i <= echttp_raw_io_last; ++i) {
-       echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_NONE);
+       echttp_raw_context *context = echttp_raw_io[i];
        if (context) echttp_raw_close_client (i, "closing server");
    }
    close(echttp_raw_server);
