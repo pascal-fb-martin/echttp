@@ -48,7 +48,7 @@
  * If the hash table is used to search through an application's array,
  * this alternative might not be the best choice as this would force the
  * application to manage allocation in its array on its own (more work).
- * 
+ *
  * unsigned int echttp_hash_signature (const char *name);
  *
  *    Calculate a signature for the provided key. A signature is the hash
@@ -84,6 +84,13 @@
  *    Add a new item, even if the key already exists.
  *    Return 0 if the hash table is full, the new item's index otherwise.
  *    (This is used for non-unique indexes only.)
+ *
+ * const char *echttp_hash_key (echttp_hash *d, int index);
+ *
+ *    Return the key associated with the specified index, or 0 if the index
+ *    is invalid. This is typically used in combination with echttp_hash_find()
+ *    and echttp_hash_add() to convert a reference to a local string into
+ *    a reference into a long term storage (using strdup()).
  *
  * int echttp_hash_iterate (echttp_hash *d,
  *                          const char *name, echttp_hash_action *action);
@@ -235,6 +242,13 @@ int echttp_hash_add (echttp_hash *d, const char *name) {
     d->count = index;
 
     return index;
+}
+
+const char *echttp_hash_key (echttp_hash *d, int index) {
+
+    if (!d) return 0;
+    if ((index <= 0) || (index > d->count)) return 0; // Invalid index
+    return d->item[index].name;
 }
 
 int echttp_hash_iterate (echttp_hash *d,

@@ -37,6 +37,8 @@ int echttp_hash_find (echttp_hash *d, const char *name);
 int echttp_hash_next (echttp_hash *d, int from, const char *name);
 int echttp_hash_add (echttp_hash *d, const char *name);
 
+const char *echttp_hash_key (echttp_hash *d, int index);
+
 int echttp_hash_insert (echttp_hash *d, const char *name);
 
 int echttp_hash_iterate (echttp_hash *d,
