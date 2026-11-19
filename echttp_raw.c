@@ -250,6 +250,8 @@ static echttp_raw_context **echttp_raw_io = 0;
 static int echttp_raw_io_size = 0;
 static int echttp_raw_io_last = 0;
 
+static int *echttp_raw_active = 0;
+
 static echttp_listener *echttp_raw_backgrounder = 0;
 static echttp_listener *echttp_raw_scanner = 0;
 static int echttp_raw_scanperiod = 0;
@@ -483,6 +485,7 @@ int echttp_raw_open (const char *service, int backlog, int debug, int ttl) {
    getrlimit(RLIMIT_NOFILE, &limit);
    echttp_raw_io_size = limit.rlim_cur;
    echttp_raw_io = calloc (echttp_raw_io_size, sizeof(*echttp_raw_io));
+   echttp_raw_active = calloc (echttp_raw_io_size, sizeof(*echttp_raw_active));
 
    if (strcmp ("dynamic", service) == 0) {
        port = 0;
@@ -659,13 +662,10 @@ static int echttp_raw_consume (echttp_buffer *buffer, int length) {
    return buffer->end == 0;
 }
 
-static void echttp_raw_transmit (int i) {
+static void echttp_raw_transmit (echttp_raw_context *context) {
 
    // This function is where the data stored in the buffers or
    // part of a transfer is being sent through the socket.
-
-   echttp_raw_context *context = echttp_raw_access_io (i, ECHTTP_RAW_TCP);
-   if (!context) return;
 
    echttp_queue buffer = &(context->state.tcp.out);
 
@@ -680,13 +680,13 @@ static void echttp_raw_transmit (int i) {
       length = send (context->fd,
                      buffer->data + buffer->start, (size_t)length, 0);
       if (length <= 0) {
-          DEBUG (__FILE__ " [client %d] send() error\n", i);
+          DEBUG (__FILE__ " [client %d] send() error\n", context->client);
           if (!echttp_raw_inprogress(errno))
-              echttp_raw_close_client (i, strerror(errno));
+              echttp_raw_close_client (context->client, strerror(errno));
           return;
       }
       DEBUG (__FILE__ " [client %d] Transmit data at offset %d: %*.*s\n",
-             i, buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
+             context->client, buffer->start, (int)(0-length), (int)length, buffer->data + buffer->start);
 
       echttp_raw_extendlife (context); // Actively transmitting
 
@@ -700,7 +700,7 @@ static void echttp_raw_transmit (int i) {
           }
           if (echttp_raw_debug &&
               (context->state.tcp.transfer.size > 0)) {
-              printf (__FILE__ " [Client %d] Transmit buffers are now empty.\n", i);
+              printf (__FILE__ " [Client %d] Transmit buffers are now empty.\n", context->client);
           }
       }
       return;
@@ -712,16 +712,16 @@ static void echttp_raw_transmit (int i) {
        if (length > ETH_MAX_FRAME) length = ETH_MAX_FRAME;
 
        DEBUG (__FILE__ " [client %d] transfer from %d to %d, %ld out of %d bytes\n",
-              i,
+              context->client,
               context->state.tcp.transfer.fd,
               context->fd,
               (long)length, context->state.tcp.transfer.size);
        length = sendfile (context->fd,
                           context->state.tcp.transfer.fd, 0, length);
        if (length <= 0) {
-           DEBUG (__FILE__ " [client %d] sendfile error %s\n", i, strerror(errno));
+           DEBUG (__FILE__ " [client %d] sendfile error %s\n", context->client, strerror(errno));
            if (!echttp_raw_inprogress(errno))
-               echttp_raw_close_client (i, strerror(errno));
+               echttp_raw_close_client (context->client, strerror(errno));
            return;
        }
        echttp_raw_extendlife (context); // Actively transmitting
@@ -873,7 +873,6 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
    struct timeval now;
    fd_set readset;
    fd_set writeset;
-   int i;
    int count;
 
    gettimeofday (&now, 0);
@@ -927,9 +926,15 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
           timeout.tv_usec = (suseconds_t)(1000 * (delta % 1000));
       }
 
-      for (i = 0; i <= echttp_raw_io_last; ++i) {
+      // This first loop leaves a list of the active connections.
+      // The goal is to avoid going through a sparse array multiple times.
+      int activecount = 0;
+      int i;
+      for (i = echttp_raw_io_last; i >= 0; --i) {
           echttp_raw_context *context = echttp_raw_io[i];
           if (!context) continue;
+          echttp_raw_active[activecount++] = i; // Shorter list next time
+
           int fd = context->fd;
           if (fd <= 0) continue;
           switch (context->use) {
@@ -962,9 +967,9 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
       count = select(maxfd+1, &readset, &writeset, NULL, &timeout);
 
       if (count > 0) {
-          for (i = 0; i <= echttp_raw_io_last; ++i) {
-              echttp_raw_context *context = echttp_raw_io[i];
-              if (!context) continue;
+          for (i = activecount-1; i >= 0; --i) {
+              echttp_raw_context *context = echttp_raw_io[echttp_raw_active[i]];
+              if (!context) continue; // Stay safe
               if (!context->premium) continue;
               if (context->use != ECHTTP_RAW_LISTEN) continue;
               int fd = context->fd;
@@ -978,15 +983,15 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
               }
           }
 
-          for (i = 0; i <= echttp_raw_io_last; ++i) {
-             echttp_raw_context *context = echttp_raw_io[i];
-             if (!context) continue;
+          for (i = activecount-1; i >= 0; --i) {
+             echttp_raw_context *context = echttp_raw_io[echttp_raw_active[i]];
+             if (!context) continue; // Stay safe
              int fd = context->fd;
              if (fd <= 0) continue;
              switch (context->use) {
                  case ECHTTP_RAW_TCP:
                      if (FD_ISSET(fd, &writeset)) {
-                         echttp_raw_transmit (i);
+                         echttp_raw_transmit (context);
                      }
                      if (FD_ISSET(fd, &readset)) {
                          echttp_raw_receive (context, received);
@@ -1003,7 +1008,7 @@ void echttp_raw_loop (echttp_raw_acceptor *accept,
                          int id = fd;
                          if (context->use == ECHTTP_RAW_APP) {
                              echttp_raw_extendlife (context); // Active
-                             id = i;
+                             id = context->client;
                          }
                          context->state.listen.listener (id, mode);
                      }
