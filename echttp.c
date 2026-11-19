@@ -886,13 +886,13 @@ static int echttp_client_received (int client, char *data, int length) {
                return 0; // Connection was closed, nothing more to do.
            }
            context->status = atoi(cursor);
-           if (context->status != 200) {
-               if (context->status < 100 || context->status >= 600) {
-                   context->reason = "Invalid HTTP status code";
-                   context->status = 500;
-               }
-           }
            context->reason = strchr(cursor+1, ' ');
+           if (context->reason) context->reason += 1; // Move beyond the space.
+           else context->reason = "";
+           if ((context->status < 100) || (context->status >= 600)) {
+               context->reason = "Invalid HTTP status code";
+               context->status = 500;
+           }
 
        } else {
 
