@@ -11,6 +11,8 @@
 #ifndef ECHTTP_H__INCLUDED
 #define ECHTTP_H__INCLUDED
 
+#define ECHTTP_SUCCESS(x) (((x) / 100) == 2)
+
 /*
  * The open function understands the following options:
  * -http-service=N: service name or port number to be used by the server.
