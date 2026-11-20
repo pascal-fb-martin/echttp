@@ -26,7 +26,8 @@
  * const char *echttp_raw_error (void);
  *
  *    Return a detailed description of the latest failure.
- *    RESTRICTION: for now, this applies only to echttp_raw_connect().
+ *    RESTRICTION: for now, this applies only to echttp_raw_connect() and
+ *    to the receive hook.
  *
  * int echttp_raw_open (const char *service, int backlog, int debug, int ttl);
  *
@@ -55,6 +56,10 @@
  *
  *    The ip parameter is meant to represent the IP version (4 or 6).
  *    The profile of this function is likely to change in the future.
+ *
+ * int echttp_raw_healthy (int client);
+ *
+ *     Return 1 if the connection is healthy, 0 if some error is detected.
  *
  * int echttp_raw_send (int client, const char *data, int length);
  *
@@ -185,6 +190,7 @@
 #include <ifaddrs.h>
 
 #include "echttp.h"
+#include "echttp_libc.h"
 #include "echttp_raw.h"
 
 #define ETH_MAX_FRAME 1500
@@ -260,6 +266,24 @@ static int echttp_raw_serverport = 0;
 
 static echttp_raw_terminator *echttp_raw_terminate = 0;
 
+
+// Collect system error information, accessible from the application later.
+static char RawSystemError[512] = {0};
+
+static void echttp_raw_save (const char *action, int code) {
+
+    if (code)
+        snprintf (RawSystemError, sizeof(RawSystemError),
+                  "%s: %s", action, strerror(code));
+    else
+        strtcpy (RawSystemError, action, sizeof(RawSystemError));
+
+    DEBUG (__FILE__ " %s\n", RawSystemError);
+}
+
+const char *echttp_raw_error (void) {
+    return RawSystemError;
+}
 
 // Retrieve and validate an IO context with an established file descriptor.
 //
@@ -716,6 +740,7 @@ static void echttp_raw_transmit (echttp_raw_context *context) {
               context->state.tcp.transfer.fd,
               context->fd,
               (long)length, context->state.tcp.transfer.size);
+
        length = sendfile (context->fd,
                           context->state.tcp.transfer.fd, 0, length);
        if (length <= 0) {
@@ -753,6 +778,14 @@ static int echttp_raw_bufferedinput (echttp_raw_context *context,
     return 0;
 }
 
+static void echttp_raw_abort (echttp_raw_context *context,
+                              echttp_raw_receiver received,
+                              const char *reason) {
+       echttp_raw_save (reason, 0);
+       if (received) received (context->client, 0, -1);
+       echttp_raw_close_client (context->client, reason);
+}
+
 static void echttp_raw_receive (echttp_raw_context *context,
                                 echttp_raw_receiver received) {
 
@@ -761,13 +794,16 @@ static void echttp_raw_receive (echttp_raw_context *context,
 
    ssize_t length = sizeof(buffer->data) - buffer->end - 1;
    if (length <= 0) {
-       if (received) received (context->client, 0, -1);
-       echttp_raw_close_client (context->client, "data too large");
+       echttp_raw_abort (context, received, "data too large");
        return;
    }
    length = recv (context->fd,
                   buffer->data + buffer->end, (size_t)length-1, 0);
-   if (length <= 0) {
+   if (length == 0) {
+       echttp_raw_abort (context, received, "connection ended by peer");
+       return;
+   } else if (length < 0) {
+       echttp_raw_save ("recv()", errno);
        DEBUG (__FILE__ " [client %d] recv() error %s on socket %d\n",
               context->client, strerror(errno), context->fd);
 
@@ -807,6 +843,18 @@ int  echttp_raw_server_port (int ip) {
             return echttp_raw_serverport;
     }
     return 0; // Not a known IP version.
+}
+
+int echttp_raw_healthy (int client) {
+
+   echttp_raw_context *context = echttp_raw_access_io (client, ECHTTP_RAW_NONE);
+   if (!context) return 0;
+   if (context->fd <= 0) return 0;
+
+   int e = 0;
+   socklen_t l = sizeof(e);
+   if (getsockopt(context->fd, SOL_SOCKET, SO_ERROR, &e, &l) < 0) return 0;
+   return e ? 0 : 1;
 }
 
 void echttp_raw_send (int client, const char *data, int length) {
@@ -1136,18 +1184,6 @@ void echttp_raw_fastscan (echttp_listener *listener, int period) {
     }
     echttp_raw_scanner = listener;
     echttp_raw_scanperiod = period;
-}
-
-static char RawSystemError[512] = {0};
-
-static void echttp_raw_save (const char *action, int code) {
-    snprintf (RawSystemError, sizeof(RawSystemError),
-              "%s: %s", action, strerror(code));
-    DEBUG (__FILE__ " %s\n", RawSystemError);
-}
-
-const char *echttp_raw_error (void) {
-    return RawSystemError;
 }
 
 int echttp_raw_connect (const char *host, const char *service) {

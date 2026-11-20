@@ -15,6 +15,7 @@ int  echttp_raw_open (const char *service, int backlog, int debug, int ttl);
 int  echttp_raw_capacity (void);
 int  echttp_raw_server_port (int ip);
 
+int  echttp_raw_healthy (int client);
 void echttp_raw_send (int client, const char *data, int length);
 void echttp_raw_transfer (int client, int fd, int length);
 

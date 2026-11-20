@@ -748,6 +748,8 @@ static int echttp_client_reuse (const char *destination, int mode) {
        if (context->destination[0] == 0) continue; // Server side connection
        if (!strsame (context->destination, destination)) continue;
 
+       if (!echttp_raw_healthy (context->client)) continue; // Let it die later
+
        if (echttp_debug)
            printf ("Reusing client context %d connected to %s at %lld\n",
                    i, context->destination, (long long)time(0));
@@ -787,7 +789,7 @@ static int echttp_client_received (int client, char *data, int length) {
        echttp_transfer_cancel(context); // Done with data transfer, if any.
        if (context->response) {
            context->status = 505;
-           context->reason = "Lost connection";
+           context->reason = echttp_raw_error();
            echttp_respond (client, 0, 0);
        }
        context->state = ECHTTP_STATE_ERROR;
