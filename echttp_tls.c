@@ -473,7 +473,11 @@ static int echttp_tls_transmit (int client) {
 
 int echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver) {
 
-    echttp_tls_registration *registered = echttp_tls_clients[client];
+     echttp_tls_registration *registered = echttp_tls_clients[client];
+// Leave this debug trace for now. Indicates if the specific case that
+// caused a crash has occurred.
+if (!registered) printf ("Ready on invalid client %d\n", client);
+     if (!registered) return -1;
 
      switch (registered->pending) {
         case ECHTTP_TLS_CONNECT:
@@ -503,7 +507,10 @@ int echttp_tls_ready (int client, int mode, echttp_tls_receiver *receiver) {
 
 void echttp_tls_detach_client (int i, const char *reason) {
 
-    if (echttp_tls_clients[i]->ssl != 0) {
+    echttp_tls_registration *registered = echttp_tls_clients[i];
+    if (!registered) return;
+
+    if (registered->ssl != 0) {
         if (echttp_tls_debug) printf ("closing TLS client %d: %s\n", i, reason);
         echttp_tls_cleanup(i);
     }

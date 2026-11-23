@@ -1436,7 +1436,7 @@ static void echttp_listener_tls (int client, int mode) {
     mode = echttp_tls_ready (client, mode, echttp_client_received);
     if (mode < 0) {
         echttp_request *context = echttp_context[client];
-        if (context->response) {
+        if (context && context->response) {
             context->status = 505;
             context->reason = "TLS error";
             echttp_respond (client, 0, 0);
